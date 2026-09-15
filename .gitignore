@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+artifacts/
+.tools/
+.nuget/
+.dotnet-home/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+local-data/
+*.log
+!samples/**

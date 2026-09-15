@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ThreadLogViewer.Core/ThreadLogViewer.Core.csproj" />
+    <Project Path="src/ThreadLogViewer.App/ThreadLogViewer.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ThreadLogViewer.Tests/ThreadLogViewer.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,24 @@
+{
+  "Timestamp": "2026-09-15T22:22:29.5340168+09:00",
+  "OSVersion": {
+    "Platform": 2,
+    "ServicePack": "",
+    "Version": "10.0.26200.0",
+    "VersionString": "Microsoft Windows NT 10.0.26200.0"
+  },
+  "Runtime": "10.0.12",
+  "ProcessorCount": 12,
+  "SyntheticFile": "local-data/synthetic-100MiB.log",
+  "Bytes": 104857641,
+  "Lines": 1232948,
+  "FilteredLines": 168377,
+  "OpenReadDecodeParseMs": 1637.0405,
+  "AllProjectionAndAvalonDocumentMs": 854.5223,
+  "FilterProjectionMs": 58.1268,
+  "FilteredAvalonDocumentMs": 56.0025,
+  "InitialWorkingSetBytes": 51294208,
+  "WorkingSetBytes": 1006120960,
+  "PeakWorkingSetBytes": 1006120960,
+  "ManagedHeapBytes": 909771464,
+  "Scope": "Console process: core + AvalonEdit TextDocument creation; excludes WPF layout/render, one cold process run, synthetic data only. Both documents retained."
+}
