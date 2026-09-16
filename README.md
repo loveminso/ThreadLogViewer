@@ -1,8 +1,19 @@
-# ThreadLog Viewer v0.1
+# ThreadLog Viewer v0.2.0
 
 Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10 + WPF + AvalonEdit.
 실행 중 인터넷, 로그인, API, 서버, DB, 텔레메트리를 사용하지 않습니다.
 개발 시 .NET SDK와 NuGet 패키지 다운로드에는 인터넷이 필요합니다. 회사 PC에는 ZIP 전체를 풀어서 복사합니다.
+
+## v0.2.0 — 워크벤치 UI
+
+- 얇은 아이콘 툴바, 정돈된 스레드 목록, 은은한 행 배경색, 통합 상태줄.
+- 오른쪽 위에서 **다크 / 라이트** 전환. 로그·원본 줄 번호·검색·선택 영역도 함께 바뀝니다.
+- **기본 간격 / 좁은 간격**으로 행 높이를 조절합니다. 글자 크기는 별도로 선택합니다.
+- 테마·행 간격은 현재 실행 중인 창에 적용됩니다. 재실행 시 다크·기본 간격으로 시작합니다.
+- 원본 파일 경로는 파일명 위에 마우스를 올려 확인합니다. 하단 줄 수 위에는 최근 작업 결과가 표시됩니다.
+- 진행률과 취소는 작업 중에 표시됩니다. 기존 읽기·붙여넣기·필터·검색·내보내기 기능을 유지합니다.
+
+[최신 실행 ZIP](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip) · [릴리스 목록](https://github.com/loveminso/ThreadLogViewer/releases)
 
 ## 개발도구
 
@@ -90,7 +101,7 @@ dotnet run --project tests\ThreadLogViewer.Tests -c Release -- --benchmark local
 
 벤치마크는 파일을 생성한 뒤 읽기·디코딩·파싱, 필터 투영, AvalonEdit 문서 생성 시간과 해당 콘솔 프로세스 메모리를 JSON으로 저장합니다. UI 배치/렌더 시간은 포함하지 않습니다. 합성 10/100 **MiB**(1 MiB=1,048,576바이트)를 사용합니다.
 
-실제 빌드·자동 테스트·GUI 확인 및 10/100 MiB 측정 결과는 [검증 기록](docs/VALIDATION.md)에 있습니다. 100 MiB 콘솔 측정의 최대 작업 집합은 약 960 MiB였습니다.
+현재 UI 변경의 빌드·자동 테스트·GUI 확인은 [v0.2 검증 기록](docs/VALIDATION-v0.2.md)에 있습니다. 이전 v0.1의 10/100 MiB 측정은 [기존 검증 기록](docs/VALIDATION.md)에 있으며 100 MiB 콘솔 측정의 최대 작업 집합은 약 960 MiB였습니다. v0.2에서는 성능을 재측정하지 않았습니다.
 
 ## 구조와 현재 한계
 

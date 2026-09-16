@@ -10,7 +10,7 @@ namespace ThreadLogViewer.App;
 public sealed class ThreadBackgroundRenderer : IBackgroundRenderer
 {
     public LogProjection? Projection { get; set; }
-    private readonly Dictionary<string, Brush> brushes = [];
+    public WorkbenchTheme Theme { get; set; } = new(true);
     public KnownLayer Layer => KnownLayer.Background;
     public void Draw(TextView textView, DrawingContext drawingContext)
     {
@@ -19,14 +19,10 @@ public sealed class ThreadBackgroundRenderer : IBackgroundRenderer
         {
             var line = Projection.AtDisplayLine(visual.FirstDocumentLine.LineNumber);
             if (line is null) continue;
-            string color = ThreadColors.ForThread(line.Value.ThreadId);
-            if (!brushes.TryGetValue(color, out var brush))
-            {
-                brush = (Brush)new BrushConverter().ConvertFromString(color)!;
-                brush.Freeze(); brushes[color] = brush;
-            }
+            Brush brush = Theme.ThreadBackground(line.Value.ThreadId);
             double top = visual.VisualTop - textView.VerticalOffset;
             drawingContext.DrawRectangle(brush, null, new Rect(0, top, textView.ActualWidth, visual.Height));
+            drawingContext.DrawRectangle(Theme.ThreadMarker(line.Value.ThreadId), null, new Rect(0, top, 2, visual.Height));
         }
     }
 }
@@ -35,14 +31,15 @@ public sealed class OriginalLineMargin : AbstractMargin
 {
     public LogProjection? Projection { get; set; }
     public double LogFontSize { get; set; } = 14;
-    private readonly Typeface typeface = new("Consolas");
+    public FontFamily LogFontFamily { get; set; } = LogTypography.Create(false);
+    public WorkbenchTheme Theme { get; set; } = new(true);
     protected override Size MeasureOverride(Size availableSize)
     {
         var text = Format(new string('9', Math.Max(3, (Projection?.Source.Lines.Count ?? 0).ToString().Length)));
         return new Size(text.Width + 20, 0);
     }
     private FormattedText Format(string value) => new(value, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-        typeface, LogFontSize, Brushes.SlateGray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        new Typeface(LogFontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), LogFontSize, Theme.Muted, VisualTreeHelper.GetDpi(this).PixelsPerDip);
     protected override void OnTextViewChanged(TextView oldTextView, TextView newTextView)
     {
         if (oldTextView is not null) oldTextView.VisualLinesChanged -= LinesChanged;
@@ -52,7 +49,7 @@ public sealed class OriginalLineMargin : AbstractMargin
     private void LinesChanged(object? sender, EventArgs e) => InvalidateVisual();
     protected override void OnRender(DrawingContext drawingContext)
     {
-        drawingContext.DrawRectangle(new SolidColorBrush(Color.FromRgb(247, 248, 250)), null, new Rect(RenderSize));
+        drawingContext.DrawRectangle(Theme.Panel, null, new Rect(RenderSize));
         if (TextView is null || !TextView.VisualLinesValid || Projection is null) return;
         foreach (var visual in TextView.VisualLines)
         {
@@ -68,8 +65,9 @@ public sealed class SearchHighlightRenderer : IBackgroundRenderer
 {
     public SearchHit[] Hits { get; set; } = [];
     public KnownLayer Layer => KnownLayer.Background;
-    private readonly Brush fill = new SolidColorBrush(Color.FromRgb(255, 220, 88));
-    private readonly Pen outline = new(Brushes.DarkGoldenrod, 1);
+    private WorkbenchTheme theme = new(true);
+    private Pen outline = new(new WorkbenchTheme(true).SearchOutline, 1);
+    public WorkbenchTheme Theme { get => theme; set { theme = value; outline = new(value.SearchOutline, 1); outline.Freeze(); } }
     public void Draw(TextView textView, DrawingContext drawingContext)
     {
         if (!textView.VisualLinesValid || textView.VisualLines.Count == 0 || Hits.Length == 0) return;
@@ -82,7 +80,7 @@ public sealed class SearchHighlightRenderer : IBackgroundRenderer
             var hit = Hits[i];
             var segment = new ICSharpCode.AvalonEdit.Document.TextSegment { StartOffset = hit.Offset, Length = hit.Length };
             foreach (var rect in BackgroundGeometryBuilder.GetRectsForSegment(textView, segment))
-                drawingContext.DrawRectangle(fill, outline, rect);
+                drawingContext.DrawRectangle(theme.Search, outline, rect);
         }
     }
 }

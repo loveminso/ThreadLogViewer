@@ -29,6 +29,9 @@ public partial class MainWindow : Window
     private bool suppressFilters, busy;
     private int searchIndex = -1;
     private bool searchLimited;
+    private bool viewReady;
+    private WorkbenchTheme theme = new(true);
+    private const string AppTitle = "ThreadLog Viewer v0.2.0";
 
     public MainWindow()
     {
@@ -37,13 +40,14 @@ public partial class MainWindow : Window
         Editor.TextArea.LeftMargins.Add(margin);
         Editor.TextArea.TextView.BackgroundRenderers.Add(threadRenderer);
         Editor.TextArea.TextView.BackgroundRenderers.Add(searchRenderer);
-        Editor.TextArea.SelectionBrush = new SolidColorBrush(Color.FromRgb(35, 83, 162));
-        Editor.TextArea.SelectionForeground = Brushes.White;
-        Editor.TextArea.SelectionBorder = new Pen(Brushes.MidnightBlue, 1);
         Editor.Options.EnableHyperlinks = false;
         Editor.Options.EnableEmailHyperlinks = false;
         Editor.Options.HighlightCurrentLine = false;
         Editor.TextArea.SelectionCornerRadius = 0;
+        viewReady = true;
+        ApplyTheme();
+        ApplyTypography();
+        SourceInitialized += (_, _) => theme.ApplyTitleBar(this);
         Closed += (_, _) => { work.Dispose(); searchWork.Dispose(); };
         Loaded += async (_, _) =>
         {
@@ -107,6 +111,7 @@ public partial class MainWindow : Window
     {
         var operation = work.Begin();
         busy = true;
+        WorkPanel.Visibility = Visibility.Visible;
         ExportButton.IsEnabled = false;
         FilterPanel.IsEnabled = !lockFilters;
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Visible;
@@ -124,6 +129,7 @@ public partial class MainWindow : Window
     {
         if (!work.IsCurrent(version)) return;
         busy = false;
+        WorkPanel.Visibility = Visibility.Collapsed;
         FilterPanel.IsEnabled = true;
         ExportButton.IsEnabled = projection is not null;
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Collapsed;
@@ -163,15 +169,16 @@ public partial class MainWindow : Window
             if (!work.IsCurrent(op.Version)) return;
             data = result.loaded;
             foreach (var item in threadItems) item.PropertyChanged -= Thread_Changed;
-            threadItems = data.Threads.Select(t => new ThreadItem(t)).ToList();
+            threadItems = data.Threads.Select(t => new ThreadItem(t, theme)).ToList();
             foreach (var item in threadItems) item.PropertyChanged += Thread_Changed;
             ThreadList.ItemsSource = threadItems;
+            ThreadCount.Text = $"{threadItems.Count:N0}개";
             PublishView(result.view, result.document);
             requestedPath = data.SourcePath;
             ReloadButton.IsEnabled = requestedPath is not null;
-            FileLabel.Text = data.SourcePath ?? "붙여넣은 로그 · 줄 번호는 붙여넣은 텍스트 기준";
-            FileLabel.ToolTip = FileLabel.Text;
-            Title = $"{(data.SourcePath is null ? "붙여넣은 로그" : Path.GetFileName(data.SourcePath))} — ThreadLog Viewer v0.1";
+            FileLabel.Text = data.SourcePath is null ? "붙여넣은 로그" : Path.GetFileName(data.SourcePath);
+            FileLabel.ToolTip = data.SourcePath ?? "줄 번호는 붙여넣은 텍스트의 첫 줄부터 1입니다.";
+            Title = $"{FileLabel.Text} — {AppTitle}";
             EncodingStatus.Text = data.EncodingDescription;
             ParseStatus.Text = $"파싱: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
             OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용";
@@ -195,7 +202,8 @@ public partial class MainWindow : Window
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         CountStatus.Text = $"표시 {view.Count:N0} / 전체 {view.Source.Lines.Count:N0}줄";
         EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 줄이 없습니다. 스레드 필터를 선택하세요.";
-        EmptyHint.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyDetail.Text = view.Source.Lines.Count == 0 ? "다른 파일을 열거나 Ctrl+V로 로그를 붙여넣으세요." : "전체 선택 또는 왼쪽 스레드 체크박스를 사용하세요.";
         _ = SearchAsync();
     }
     private void RestoreFilters()
@@ -272,6 +280,30 @@ public partial class MainWindow : Window
         MessageBox.Show(this, ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
     private void Wrap_Changed(object sender, RoutedEventArgs e) { if (Editor is not null) Editor.WordWrap = WrapBox.IsChecked == true; }
+    private void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) ApplyTheme(); }
+    private void ApplyTheme()
+    {
+        theme = new(ThemeBox.SelectedIndex != 1);
+        theme.Apply(Resources);
+        if (Application.Current is { } application) theme.Apply(application.Resources);
+        theme.ApplyTitleBar(this);
+        threadRenderer.Theme = margin.Theme = searchRenderer.Theme = theme;
+        foreach (var item in threadItems) item.ApplyTheme(theme);
+        Editor.TextArea.SelectionBrush = theme.Selection;
+        Editor.TextArea.SelectionForeground = theme.SelectionText;
+        Editor.TextArea.SelectionBorder = new Pen(theme.Selection, 1);
+        Editor.TextArea.Caret.CaretBrush = theme.Text;
+        margin.InvalidateVisual();
+        Editor.TextArea.TextView.Redraw();
+    }
+    private void Density_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) ApplyTypography(); }
+    private void ApplyTypography()
+    {
+        Editor.FontFamily = LogTypography.Create(DensityBox.SelectedIndex == 1);
+        margin.LogFontFamily = Editor.FontFamily;
+        margin.InvalidateMeasure(); margin.InvalidateVisual();
+        Editor.TextArea.TextView.Redraw();
+    }
     private void FontSize_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (Editor is null || FontSizeBox.SelectedItem is not ComboBoxItem item) return;

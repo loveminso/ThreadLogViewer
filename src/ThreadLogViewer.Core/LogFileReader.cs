@@ -12,7 +12,7 @@ public static class LogFileReader
         // Caller may use Task.Run to keep decoding/parsing off a UI synchronization context.
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
             1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        if (stream.Length > int.MaxValue) throw new IOException("v0.1은 2GB 이상의 파일을 지원하지 않습니다.");
+        if (stream.Length > int.MaxValue) throw new IOException("2GB 이상의 파일을 지원하지 않습니다.");
         byte[] bytes = new byte[(int)stream.Length];
         int read = 0;
         while (read < bytes.Length)
@@ -37,7 +37,7 @@ public static class LogFileReader
         if (bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
             return (new UTF8Encoding(false, true).GetString(bytes, 3, bytes.Length - 3), "UTF-8 (BOM 확인)");
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE, 0, 0 }) || bytes.AsSpan().StartsWith(new byte[] { 0, 0, 0xFE, 0xFF }))
-            throw new InvalidDataException("UTF-32는 v0.1에서 지원하지 않습니다.");
+            throw new InvalidDataException("UTF-32는 지원하지 않습니다.");
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE }))
             return (new UnicodeEncoding(false, true, true).GetString(bytes, 2, bytes.Length - 2), "UTF-16 LE (BOM 확인)");
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF }))
