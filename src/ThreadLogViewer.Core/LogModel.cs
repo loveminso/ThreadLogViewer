@@ -1,30 +1,37 @@
 namespace ThreadLogViewer.Core;
 
-public enum ParseQuality { Complete, Partial, Unrecognized }
+public enum ParseQuality { Complete, Partial, Unrecognized, Continuation }
 public enum EncodingMode { Auto, Cp949 }
 
 // Slices share the immutable decoded file string; filtering does not clone parsed fields.
+// ThreadId is the owning entry's ID. TimeOfDay is an input duration and may exceed 24 hours.
+// Continuation lines do not invent their own timestamp/source fields.
 public readonly record struct LogLine(
     int OriginalLineNumber, ReadOnlyMemory<char> RawText, ReadOnlyMemory<char> LineEnding,
     int? ThreadId, TimeSpan? TimeOfDay, ReadOnlyMemory<char> TimestampText,
     ReadOnlyMemory<char> Message, ReadOnlyMemory<char> SourceFile, int? SourceLineNumber,
-    ParseQuality Quality);
+    ParseQuality Quality, int EntryIndex = 0);
 
-public sealed record ThreadSummary(int? ThreadId, int Count, string? FirstRecordedTime, string? LastRecordedTime);
+// One timestamp header and its following physical lines, or one pre-header line.
+public readonly record struct LogEntry(int StartLineIndex, int LineCount, int? ThreadId);
+public sealed record ThreadSummary(int? ThreadId, int Count, string? FirstRecordedTime, string? LastRecordedTime,
+    int EntryCount);
 public sealed record WorkProgress(string Phase, double Percent);
 
 public sealed class LogData(string? sourcePath, string text, string encodingDescription,
-    LogLine[] lines, IReadOnlyList<ThreadSummary> threads)
+    LogLine[] lines, LogEntry[] entries, IReadOnlyList<ThreadSummary> threads)
 {
     // Null means text supplied directly by the user, with no known source file to re-read.
     public string? SourcePath { get; } = sourcePath;
     public string Text { get; } = text;
     public string EncodingDescription { get; } = encodingDescription;
     public IReadOnlyList<LogLine> Lines { get; } = Array.AsReadOnly(lines);
+    public IReadOnlyList<LogEntry> Entries { get; } = Array.AsReadOnly(entries);
     public IReadOnlyList<ThreadSummary> Threads { get; } = threads;
     public int CompleteCount { get; } = lines.Count(l => l.Quality == ParseQuality.Complete);
     public int PartialCount { get; } = lines.Count(l => l.Quality == ParseQuality.Partial);
-    public int UnrecognizedCount => Lines.Count - CompleteCount - PartialCount;
+    public int UnrecognizedCount => Entries.Count - CompleteCount - PartialCount;
+    public int ContinuationCount => Lines.Count - Entries.Count;
 }
 
 public static class ThreadColors

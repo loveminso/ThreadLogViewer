@@ -28,4 +28,24 @@ $text = $text.Replace("`r`n", "`n")
 [IO.File]::WriteAllText((Join-Path $sampleRoot 'mixed-cp949.log'), $text, [Text.Encoding]::GetEncoding(949))
 [IO.File]::WriteAllBytes((Join-Path $sampleRoot 'empty.log'), [byte[]]@())
 [IO.File]::WriteAllText((Join-Path $sampleRoot 'line-mapping.log'), ((1..110 | ForEach-Object { '[10:00:00] [T' + $(if ($_ -eq 100 -or $_ -eq 105) { '3' } else { '7' }) + '] synthetic original row ' + $_ + ' (testcase.cpp:900)' }) -join "`n"), (New-Object Text.UTF8Encoding($false)))
+$multiline = @'
+Synthetic session preamble / 합성 데이터
+
+[014:15:50.113] [T 1124525] 로그 내용 (testcase.cpp:132)
+  DE AD BE EF 00 01 02 03 / 첫 번째 덤프
+[T7] 본문에 등장한 표식이며 T 1124525에 포함
+
+[014:15:50.113] [T 7] Read submitted (testcase.cpp:208)
+  10 11 12 13 / T 7 덤프
+[014:15:51] [T1124525] Write completed (testcase.cpp:145)
+  stack: submit -> complete
+[014:15:52] 스레드 없는 공통 기록
+  미분류 기록의 본문
+[014:99:00] [T 9] 잘못된 시각도 새 기록 (testcase.cpp:300)
+  T 9 덤프
+[025:00:00.0001] [T7] 24시간을 넘는 합성 시간 (testcase.cpp:229)
+  Long synthetic payload for horizontal scroll and word wrap: 000102030405060708090A0B0C0D0E0F 101112131415161718191A1B1C1D1E1F 202122232425262728292A2B2C2D2E2F 303132333435363738393A3B3C3D3E3F 404142434445464748494A4B4C4D4E4F
+  last T 7 continuation without final newline
+'@
+[IO.File]::WriteAllText((Join-Path $sampleRoot 'multiline-elapsed.log'), $multiline.Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding($false)))
 Write-Host 'Generated synthetic samples.'

@@ -10,6 +10,7 @@ public sealed class CoreTests
     [Theory]
     [InlineData("[10:03:12] [T3] Write submitted (testcase.cpp:103)", "10:03:12")]
     [InlineData("[10:03:12.1234] [T 3] Write submitted (testcase.cpp:103)", "10:03:12.1234")]
+    [InlineData("[014:15:50.113] [T 3] Write submitted (testcase.cpp:103)", "014:15:50.113")]
     public void ExtractsFieldsWithoutConfusingLineNumbers(string text, string stamp)
     {
         var line = LogParser.Parse(text).Lines[0];
@@ -25,17 +26,17 @@ public sealed class CoreTests
     }
 
     [Fact]
-    public void PreservesBlankMalformedAndUnclassifiedDumpLines()
+    public void TimestampEntryIncludesBlankMalformedAndThreadLookingContinuationLines()
     {
         var log = LogParser.Parse("[10:03:12] [T 3] 한글 메시지\r\n\r\nDE AD BE EF\nwrong format\r[T7] no clock");
         Assert.Equal(5, log.Lines.Count);
         Assert.Equal("한글 메시지", log.Lines[0].Message.ToString());
         Assert.Null(log.Lines[0].SourceLineNumber);
-        Assert.Null(log.Lines[1].ThreadId);
-        Assert.Null(log.Lines[2].ThreadId);
-        Assert.Null(log.Lines[3].ThreadId);
-        Assert.Equal(7, log.Lines[4].ThreadId);
-        Assert.Equal(3, log.Threads.Single(t => t.ThreadId is null).Count);
+        Assert.All(log.Lines, line => Assert.Equal(3, line.ThreadId));
+        Assert.All(log.Lines.Skip(1), line => Assert.Equal(ParseQuality.Continuation, line.Quality));
+        Assert.Equal(5, Assert.Single(log.Entries).LineCount);
+        Assert.Equal(5, Assert.Single(log.Threads).Count);
+        Assert.Equal(1, log.Threads[0].EntryCount);
         Assert.Equal("\r\n", log.Lines[1].LineEnding.ToString());
     }
 

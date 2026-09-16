@@ -14,7 +14,7 @@ public sealed class InputTests
     [Fact]
     public void PasteHasNoInventedFileOrEncodingAndPreservesRelativeLineNumbers()
     {
-        const string text = "[10:00:00] [T3] 한글 (source.cpp:800)\r\n\r\ndump\n[T7] other";
+        const string text = "[014:15:50.113] [T3] 한글 (source.cpp:800)\r\n\r\ndump\n[014:15:51] [T7] other";
         var log = LogParser.ParsePastedText(text);
         Assert.Null(log.SourcePath);
         Assert.Contains("원본 인코딩 알 수 없음", log.EncodingDescription);
@@ -24,7 +24,7 @@ public sealed class InputTests
         Assert.Equal(1, view.AtDisplayLine(1)!.Value.OriginalLineNumber);
         Assert.Equal(800, view.AtDisplayLine(1)!.Value.SourceLineNumber);
         Assert.Equal(3, view.AtDisplayLine(3)!.Value.OriginalLineNumber);
-        Assert.Equal("[10:00:00] [T3] 한글 (source.cpp:800)\r\n\r\ndump\n", view.Text);
+        Assert.Equal("[014:15:50.113] [T3] 한글 (source.cpp:800)\r\n\r\ndump\n", view.Text);
     }
 
     [Fact]

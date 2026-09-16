@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.2.0";
+    private const string AppTitle = "ThreadLog Viewer v0.3.0";
 
     public MainWindow()
     {
@@ -180,7 +180,8 @@ public partial class MainWindow : Window
             FileLabel.ToolTip = data.SourcePath ?? "줄 번호는 붙여넣은 텍스트의 첫 줄부터 1입니다.";
             Title = $"{FileLabel.Text} — {AppTitle}";
             EncodingStatus.Text = data.EncodingDescription;
-            ParseStatus.Text = $"파싱: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
+            ParseStatus.Text = $"기록: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
+            ParseStatus.ToolTip = $"헤더 기준 {data.Entries.Count:N0}건 · 이어지는 본문 {data.ContinuationCount:N0}줄\n시간 헤더부터 다음 시간 헤더 직전까지 같은 기록입니다.";
             OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용";
         }
         catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) { RestoreFilters(); OperationStatus.Text = "열기 취소 · 이전 화면 유지"; } }
@@ -200,7 +201,7 @@ public partial class MainWindow : Window
         Editor.Document = document;
         margin.InvalidateMeasure(); margin.InvalidateVisual();
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-        CountStatus.Text = $"표시 {view.Count:N0} / 전체 {view.Source.Lines.Count:N0}줄";
+        CountStatus.Text = $"{view.EntryCount:N0}/{view.Source.Entries.Count:N0}건 · 표시 {view.Count:N0}/{view.Source.Lines.Count:N0}줄";
         EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 줄이 없습니다. 스레드 필터를 선택하세요.";
         EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyDetail.Text = view.Source.Lines.Count == 0 ? "다른 파일을 열거나 Ctrl+V로 로그를 붙여넣으세요." : "전체 선택 또는 왼쪽 스레드 체크박스를 사용하세요.";

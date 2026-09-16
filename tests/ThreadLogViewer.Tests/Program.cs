@@ -42,7 +42,8 @@ public static class Program
         {
             Timestamp = DateTimeOffset.Now, Environment.OSVersion, Runtime = Environment.Version.ToString(),
             ProcessorCount = Environment.ProcessorCount, SyntheticFile = path, Bytes = new FileInfo(path).Length,
-            Lines = log.Lines.Count, FilteredLines = filtered.Count, OpenReadDecodeParseMs = openMs,
+            Entries = log.Entries.Count, Lines = log.Lines.Count, FilteredEntries = filtered.EntryCount,
+            FilteredLines = filtered.Count, OpenReadDecodeParseMs = openMs,
             AllProjectionAndAvalonDocumentMs = allDocumentMs, FilterProjectionMs = filterMs,
             FilteredAvalonDocumentMs = filteredDocumentMs, InitialWorkingSetBytes = initialWorkingSet,
             WorkingSetBytes = process.WorkingSet64, PeakWorkingSetBytes = process.PeakWorkingSet64,
@@ -64,7 +65,7 @@ public static class Program
         for (int i = 0; total < target; i++)
         {
             string line = i % 113 == 0 ? "DE AD BE EF 00 01 02 03 — synthetic dump without thread" : i % 227 == 0 ? "" :
-                $"[{(i / 3600) % 24:00}:{(i / 60) % 60:00}:{i % 60:00}] [T {i % 16}] {(i % 7 == 0 ? "합성 읽기 완료" : "Synthetic Write completed")} LBA={i:000000000} status=OK (testcase.cpp:{100 + i % 300})";
+                $"[{i / 3600:000}:{(i / 60) % 60:00}:{i % 60:00}] [T {i % 16}] {(i % 7 == 0 ? "합성 읽기 완료" : "Synthetic Write completed")} LBA={i:000000000} status=OK (testcase.cpp:{100 + i % 300})";
             writer.Write(line); writer.Write('\n');
             total += Encoding.UTF8.GetByteCount(line) + 1;
         }
