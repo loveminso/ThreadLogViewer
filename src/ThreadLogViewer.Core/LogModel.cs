@@ -21,6 +21,7 @@ public sealed record WorkProgress(string Phase, double Percent);
 public sealed class LogData(string? sourcePath, string text, string encodingDescription,
     LogLine[] lines, LogEntry[] entries, IReadOnlyList<ThreadSummary> threads)
 {
+    private readonly int[] lineOffsets = BuildLineOffsets(lines);
     // Null means text supplied directly by the user, with no known source file to re-read.
     public string? SourcePath { get; } = sourcePath;
     public string Text { get; } = text;
@@ -32,6 +33,34 @@ public sealed class LogData(string? sourcePath, string text, string encodingDesc
     public int PartialCount { get; } = lines.Count(l => l.Quality == ParseQuality.Partial);
     public int UnrecognizedCount => Entries.Count - CompleteCount - PartialCount;
     public int ContinuationCount => Lines.Count - Entries.Count;
+
+    // The end sentinel is useful for the final entry; it is not an extra source line.
+    public int GetLineOffset(int sourceLineIndex) => sourceLineIndex >= 0 && sourceLineIndex < lineOffsets.Length
+        ? lineOffsets[sourceLineIndex] : throw new ArgumentOutOfRangeException(nameof(sourceLineIndex));
+
+    public SourceTextRange GetEntryRange(int entryIndex)
+    {
+        if (entryIndex < 0 || entryIndex >= Entries.Count) throw new ArgumentOutOfRangeException(nameof(entryIndex));
+        var entry = Entries[entryIndex];
+        int start = GetLineOffset(entry.StartLineIndex);
+        return new(start, GetLineOffset(entry.StartLineIndex + entry.LineCount) - start);
+    }
+
+    public int GetLineIndexAtOffset(int sourceOffset)
+    {
+        if (sourceOffset < 0 || sourceOffset > Text.Length) throw new ArgumentOutOfRangeException(nameof(sourceOffset));
+        if (Lines.Count == 0) return -1;
+        int found = Array.BinarySearch(lineOffsets, 0, Lines.Count, sourceOffset);
+        return found >= 0 ? found : Math.Max(0, ~found - 1);
+    }
+
+    private static int[] BuildLineOffsets(LogLine[] lines)
+    {
+        var offsets = new int[lines.Length + 1];
+        for (int i = 0; i < lines.Length; i++)
+            offsets[i + 1] = checked(offsets[i] + lines[i].RawText.Length + lines[i].LineEnding.Length);
+        return offsets;
+    }
 }
 
 public static class ThreadColors

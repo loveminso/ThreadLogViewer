@@ -1,0 +1,100 @@
+[014:15:50.113] INFO 합성 공통 상태 · batch=1
+[014:15:50.196] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (io_queue.cpp:101)
+[014:15:50.279] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (sim_device.cpp:102)
+[014:15:50.362] [T 42] DEBUG Queue dispatch · queue=2 · depth=4 (verify.cpp:103)
+[014:15:50.445] [T 1124525] INFO Read completed · latency=0.42ms (testcase.cpp:104)
+[014:15:50.528] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (io_queue.cpp:105)
+  dump: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+  [T99] 본문 속 표식 · 새 시간 헤더가 없어 앞 기록의 스레드에 포함
+[014:15:50.777] [T 42] ERROR 합성 오류 주입 · code=SIM_EIO · recovered=true (testcase.cpp:108)
+[014:15:50.860] [T 1124525] INFO 테스트 단계 완료 · result=PASS (io_queue.cpp:109)
+[014:15:50.943] [T 3] INFO 합성 SSD 테스트 시작 · device=SIM-SSD-01 (sim_device.cpp:110)
+[014:15:51.026] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (verify.cpp:111)
+[014:15:51.109] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (testcase.cpp:112)
+
+[014:15:51.275] [T 1124525] INFO Read completed · latency=0.42ms (sim_device.cpp:114)
+[014:15:51.358] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (verify.cpp:115)
+[014:15:51.441] [T 7] DEBUG Buffer verified · checksum=0xA1B2C3D4 (testcase.cpp:116)
+[014:15:51.524] [T 11] INFO Write completed · latency=0.83ms (io_queue.cpp:117)
+  trace: submit -> dispatch -> complete -> verify · 합성 payload=0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+[014:15:51.690] [T 1124525] INFO 테스트 단계 완료 · result=PASS (verify.cpp:119)
+[014:15:51.773] INFO 합성 공통 상태 · batch=2
+[014:15:51.856] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (io_queue.cpp:121)
+[014:15:51.939] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (sim_device.cpp:122)
+[014:15:52.022] [T 42] DEBUG Queue dispatch · queue=2 · depth=4 (verify.cpp:123)
+[014:15:52.105] [T 1124525] INFO Read completed · latency=0.42ms (testcase.cpp:124)
+[014:15:52.188] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (io_queue.cpp:125)
+  dump: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+  [T99] 본문 속 표식 · 새 시간 헤더가 없어 앞 기록의 스레드에 포함
+[014:15:52.437] [T 42] ERROR 합성 오류 주입 · code=SIM_EIO · recovered=true (testcase.cpp:128)
+[014:15:52.520] [T 1124525] INFO 테스트 단계 완료 · result=PASS (io_queue.cpp:129)
+[014:15:52.603] [T 3] INFO 합성 SSD 테스트 시작 · device=SIM-SSD-01 (sim_device.cpp:130)
+[014:15:52.686] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (verify.cpp:131)
+[014:15:52.769] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (testcase.cpp:132)
+
+[014:15:52.935] [T 1124525] INFO Read completed · latency=0.42ms (sim_device.cpp:134)
+[014:15:53.018] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (verify.cpp:135)
+[014:15:53.101] [T 7] DEBUG Buffer verified · checksum=0xA1B2C3D4 (testcase.cpp:136)
+[014:15:53.184] [T 11] INFO Write completed · latency=0.83ms (io_queue.cpp:137)
+  trace: submit -> dispatch -> complete -> verify · 합성 payload=0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+[014:15:53.350] [T 1124525] INFO 테스트 단계 완료 · result=PASS (verify.cpp:139)
+[014:15:53.433] INFO 합성 공통 상태 · batch=3
+[014:15:53.516] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (io_queue.cpp:141)
+[014:15:53.599] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (sim_device.cpp:142)
+[014:15:53.682] [T 42] DEBUG Queue dispatch · queue=2 · depth=4 (verify.cpp:143)
+[014:15:53.765] [T 1124525] INFO Read completed · latency=0.42ms (testcase.cpp:144)
+[014:15:53.848] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (io_queue.cpp:145)
+  dump: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+  [T99] 본문 속 표식 · 새 시간 헤더가 없어 앞 기록의 스레드에 포함
+[014:15:54.097] [T 42] ERROR 합성 오류 주입 · code=SIM_EIO · recovered=true (testcase.cpp:148)
+[014:15:54.180] [T 1124525] INFO 테스트 단계 완료 · result=PASS (io_queue.cpp:149)
+[014:15:54.263] [T 3] INFO 합성 SSD 테스트 시작 · device=SIM-SSD-01 (sim_device.cpp:150)
+[014:15:54.346] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (verify.cpp:151)
+[014:15:54.429] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (testcase.cpp:152)
+
+[014:15:54.595] [T 1124525] INFO Read completed · latency=0.42ms (sim_device.cpp:154)
+[014:15:54.678] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (verify.cpp:155)
+[014:15:54.761] [T 7] DEBUG Buffer verified · checksum=0xA1B2C3D4 (testcase.cpp:156)
+[014:15:54.844] [T 11] INFO Write completed · latency=0.83ms (io_queue.cpp:157)
+  trace: submit -> dispatch -> complete -> verify · 합성 payload=0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+[014:15:55.010] [T 1124525] INFO 테스트 단계 완료 · result=PASS (verify.cpp:159)
+[014:15:55.093] INFO 합성 공통 상태 · batch=4
+[014:15:55.176] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (io_queue.cpp:161)
+[014:15:55.259] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (sim_device.cpp:162)
+[014:15:55.342] [T 42] DEBUG Queue dispatch · queue=2 · depth=4 (verify.cpp:163)
+[014:15:55.425] [T 1124525] INFO Read completed · latency=0.42ms (testcase.cpp:164)
+[014:15:55.508] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (io_queue.cpp:165)
+  dump: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+  [T99] 본문 속 표식 · 새 시간 헤더가 없어 앞 기록의 스레드에 포함
+[014:15:55.757] [T 42] ERROR 합성 오류 주입 · code=SIM_EIO · recovered=true (testcase.cpp:168)
+[014:15:55.840] [T 1124525] INFO 테스트 단계 완료 · result=PASS (io_queue.cpp:169)
+[014:15:55.923] [T 3] INFO 합성 SSD 테스트 시작 · device=SIM-SSD-01 (sim_device.cpp:170)
+[014:15:56.006] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (verify.cpp:171)
+[014:15:56.089] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (testcase.cpp:172)
+
+[014:15:56.255] [T 1124525] INFO Read completed · latency=0.42ms (sim_device.cpp:174)
+[014:15:56.338] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (verify.cpp:175)
+[014:15:56.421] [T 7] DEBUG Buffer verified · checksum=0xA1B2C3D4 (testcase.cpp:176)
+[014:15:56.504] [T 11] INFO Write completed · latency=0.83ms (io_queue.cpp:177)
+  trace: submit -> dispatch -> complete -> verify · 합성 payload=0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+[014:15:56.670] [T 1124525] INFO 테스트 단계 완료 · result=PASS (verify.cpp:179)
+[014:15:56.753] INFO 합성 공통 상태 · batch=5
+[014:15:56.836] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (io_queue.cpp:181)
+[014:15:56.919] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (sim_device.cpp:182)
+[014:15:57.002] [T 42] DEBUG Queue dispatch · queue=2 · depth=4 (verify.cpp:183)
+[014:15:57.085] [T 1124525] INFO Read completed · latency=0.42ms (testcase.cpp:184)
+[014:15:57.168] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (io_queue.cpp:185)
+  dump: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+  [T99] 본문 속 표식 · 새 시간 헤더가 없어 앞 기록의 스레드에 포함
+[014:15:57.417] [T 42] ERROR 합성 오류 주입 · code=SIM_EIO · recovered=true (testcase.cpp:188)
+[014:15:57.500] [T 1124525] INFO 테스트 단계 완료 · result=PASS (io_queue.cpp:189)
+[014:15:57.583] [T 3] INFO 합성 SSD 테스트 시작 · device=SIM-SSD-01 (sim_device.cpp:190)
+[014:15:57.666] [T 7] INFO Read submitted · LBA=4096 · sectors=8 (verify.cpp:191)
+[014:15:57.749] [T 11] INFO Write submitted · LBA=8192 · sectors=16 (testcase.cpp:192)
+
+[014:15:57.915] [T 1124525] INFO Read completed · latency=0.42ms (sim_device.cpp:194)
+[014:15:57.998] [T 3] WARN 재시도 발생 · synthetic timeout · attempt=1 (verify.cpp:195)
+[014:15:58.081] [T 7] DEBUG Buffer verified · checksum=0xA1B2C3D4 (testcase.cpp:196)
+[014:15:58.164] [T 11] INFO Write completed · latency=0.83ms (io_queue.cpp:197)
+  trace: submit -> dispatch -> complete -> verify · 합성 payload=0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+[014:15:58.330] [T 1124525] INFO 테스트 단계 완료 · result=PASS (verify.cpp:199)

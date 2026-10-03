@@ -45,7 +45,17 @@ public static class LogFileReader
         try { return (new UTF8Encoding(false, true).GetString(bytes), "UTF-8로 해석 (BOM 없음; 추정)"); }
         catch (DecoderFallbackException)
         {
-            throw new InvalidDataException("BOM이 없고 올바른 UTF-8로 읽을 수 없습니다. ‘CP949로 다시 읽기’를 사용하세요.");
+            // This is a decoding preference, not reliable encoding identification.
+            // A recognized BOM is authoritative and its malformed payload never reaches this fallback.
+            try
+            {
+                return (Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback).GetString(bytes),
+                    "CP949로 해석 (UTF-8 실패 후 대체; 추정)");
+            }
+            catch (DecoderFallbackException ex)
+            {
+                throw new InvalidDataException("BOM이 없고 UTF-8과 CP949 모두로 올바르게 읽을 수 없습니다.", ex);
+            }
         }
     }
 }

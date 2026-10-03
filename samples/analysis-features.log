@@ -1,0 +1,9 @@
+[014:15:50.113] [T 3] Read start · error ERROR error_code terror · A한🙂 (synthetic.cpp:100)
+  timeout · dump=00 01 02 03
+  checksum=OK
+[014:15:50.125] [T 7] Write complete (synthetic.cpp:200)
+[014:15:50.200] [T 3] heartbeat (synthetic.cpp:300)
+  timeout
+[014:99:00] [T 11] invalid timestamp (synthetic.cpp:400)
+[023:59:59] [T 3] before midnight (synthetic.cpp:500)
+[000:00:00] [T 7] after midnight (synthetic.cpp:600)

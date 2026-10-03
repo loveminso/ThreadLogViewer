@@ -132,11 +132,14 @@ public sealed class CoreTests
     }
 
     [Fact]
-    public void Cp949RequiresExplicitChoiceAndInvalidUtf8IsNotSilentlyReplaced()
+    public void Cp949FallsBackAutomaticallyWithoutReplacementAndExplicitChoiceRemainsAvailable()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         byte[] bytes = Encoding.GetEncoding(949).GetBytes("한글 테스트");
-        Assert.Throws<InvalidDataException>(() => LogFileReader.Decode(bytes));
+        var automatic = LogFileReader.Decode(bytes);
+        Assert.Equal("한글 테스트", automatic.Text);
+        Assert.Contains("UTF-8 실패 후 대체", automatic.Description);
+        Assert.Contains("추정", automatic.Description);
         var decoded = LogFileReader.Decode(bytes, EncodingMode.Cp949);
         Assert.Equal("한글 테스트", decoded.Text);
         Assert.Contains("사용자 지정", decoded.Description);

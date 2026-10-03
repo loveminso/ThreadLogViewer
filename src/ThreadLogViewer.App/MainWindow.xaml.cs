@@ -31,54 +31,51 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.3.0";
+    private const string AppTitle = "ThreadLog Viewer v0.6.2";
 
-    public MainWindow()
+    public MainWindow() : this(null, true) { }
+    public MainWindow(string? settingsDirectory, bool persistSettings)
     {
         InitializeComponent();
         Editor.TextArea.AllowDrop = true;
         Editor.TextArea.LeftMargins.Add(margin);
+        margin.LineClicked += SelectWholeDisplayLine;
+        InitializeLineSelection();
         Editor.TextArea.TextView.BackgroundRenderers.Add(threadRenderer);
+        Editor.TextArea.TextView.BackgroundRenderers.Add(keywordRenderer);
         Editor.TextArea.TextView.BackgroundRenderers.Add(searchRenderer);
         Editor.Options.EnableHyperlinks = false;
         Editor.Options.EnableEmailHyperlinks = false;
         Editor.Options.HighlightCurrentLine = false;
         Editor.TextArea.SelectionCornerRadius = 0;
+        InitializeFeatures(settingsDirectory, persistSettings);
+        InitializeSessions();
         viewReady = true;
+        InitializeAnalysis();
         ApplyTheme();
         ApplyTypography();
+        UpdateMenus();
         SourceInitialized += (_, _) => theme.ApplyTitleBar(this);
-        Closed += (_, _) => { work.Dispose(); searchWork.Dispose(); };
+        Closed += (_, _) => { fileBatchVersion++; viewReady = false; DisposeFeatures(); work.Dispose(); searchWork.Dispose(); };
         Loaded += async (_, _) =>
         {
-            string? path = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault();
-            if (path is not null) await OpenAsync(path, EncodingMode.Auto);
+            string[] paths = Environment.GetCommandLineArgs().Skip(1).ToArray();
+            if (paths.Length > 0) await OpenFilesAsync(paths);
         };
     }
 
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Title = "로그 파일 열기", Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*", CheckFileExists = true };
-        if (dialog.ShowDialog(this) == true) await OpenAsync(dialog.FileName, EncodingMode.Auto);
+        var dialog = new OpenFileDialog { Title = "로그 파일 열기 — 여러 파일 선택 가능", Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*", CheckFileExists = true, Multiselect = true };
+        if (dialog.ShowDialog(this) == true) await OpenFilesAsync(dialog.FileNames);
     }
     private async void Reload_Click(object sender, RoutedEventArgs e)
     {
-        if (requestedPath is not null) await OpenAsync(requestedPath, EncodingMode.Cp949);
+        await ReloadCurrentAsync(EncodingMode.Cp949);
     }
     private async void Paste_Click(object sender, RoutedEventArgs e) => await PasteAsync();
-    private async Task PasteAsync()
-    {
-        try
-        {
-            var input = LogTransfer.ReadClipboard(Clipboard.GetDataObject());
-            if (input.FilePath is not null) await OpenAsync(input.FilePath, EncodingMode.Auto);
-            else await LoadAsync((token, progress) => Task.FromResult(LogParser.ParsePastedText(input.Text!, token, progress)),
-                "붙여넣은 로그 준비…", "붙여넣은 로그를 열 수 없습니다");
-        }
-        catch (ExternalException) { ShowError("클립보드를 읽을 수 없습니다", new IOException("다른 프로그램이 클립보드를 사용 중입니다. 잠시 후 다시 붙여넣으세요.")); }
-        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException)
-        { ShowError("붙여넣기 실패", ex); }
-    }
+    private async void PasteLog_Click(object sender, RoutedEventArgs e) => await PasteAsync();
+    private Task PasteAsync() => PasteFromDataObjectAsync(Clipboard.GetDataObject);
     private void Copy_Click(object sender, RoutedEventArgs e) => Editor.Copy();
     private void SelectText_Click(object sender, RoutedEventArgs e) { Editor.Focus(); Editor.SelectAll(); }
     private void Window_DragOver(object sender, DragEventArgs e)
@@ -87,11 +84,10 @@ public partial class MainWindow : Window
         e.Effects = DragDropEffects.None;
         try
         {
-            if (e.AllowedEffects.HasFlag(DragDropEffects.Copy) && e.Data.GetDataPresent(DataFormats.FileDrop)
-                && LogTransfer.IsSingleLogFile(e.Data.GetData(DataFormats.FileDrop) as string[]))
+            if (e.AllowedEffects.HasFlag(DragDropEffects.Copy) && LogTransfer.ReadDroppedFiles(e.Data).Count > 0)
                 e.Effects = DragDropEffects.Copy;
         }
-        catch (Exception ex) when (ex is ExternalException or ArgumentException or IOException) { }
+        catch (Exception ex) when (ex is ExternalException or ArgumentException or IOException or InvalidDataException or OutOfMemoryException) { }
     }
     private async void Window_Drop(object sender, DragEventArgs e)
     {
@@ -100,11 +96,11 @@ public partial class MainWindow : Window
         if (!e.AllowedEffects.HasFlag(DragDropEffects.Copy)) return;
         try
         {
-            string path = LogTransfer.ReadDroppedFile(e.Data);
+            var paths = LogTransfer.ReadDroppedFiles(e.Data);
             e.Effects = DragDropEffects.Copy; // Opening a file never moves or deletes the source.
-            await OpenAsync(path, EncodingMode.Auto);
+            await OpenFilesAsync(paths);
         }
-        catch (Exception ex) when (ex is ExternalException or IOException or ArgumentException)
+        catch (Exception ex) when (ex is ExternalException or IOException or InvalidDataException or ArgumentException or OutOfMemoryException)
         { ShowError("끌어 놓은 파일을 열 수 없습니다", ex); }
     }
     private (long Version, CancellationToken Token, IProgress<WorkProgress> Progress) BeginWork(string label, bool lockFilters)
@@ -113,10 +109,11 @@ public partial class MainWindow : Window
         busy = true;
         WorkPanel.Visibility = Visibility.Visible;
         ExportButton.IsEnabled = false;
-        FilterPanel.IsEnabled = !lockFilters;
+        SetFilterLock(lockFilters);
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Visible;
         ProgressBar.Value = 0;
         OperationStatus.Text = label;
+        UpdateMenus();
         var progress = new Progress<WorkProgress>(p =>
         {
             if (!work.IsCurrent(operation.Version) || operation.Token.IsCancellationRequested || !busy) return;
@@ -130,9 +127,10 @@ public partial class MainWindow : Window
         if (!work.IsCurrent(version)) return;
         busy = false;
         WorkPanel.Visibility = Visibility.Collapsed;
-        FilterPanel.IsEnabled = true;
+        SetFilterLock(false);
         ExportButton.IsEnabled = projection is not null;
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Collapsed;
+        UpdateMenus();
     }
     private static TextDocument PrepareDocument(string text, CancellationToken token, IProgress<WorkProgress> progress)
     {
@@ -145,16 +143,32 @@ public partial class MainWindow : Window
         progress.Report(new("화면 문서 준비", 100));
         return document;
     }
-    private Task OpenAsync(string path, EncodingMode mode)
+    private Task<bool> OpenAsync(string path, EncodingMode mode)
     {
-        requestedPath = path;
-        ReloadButton.IsEnabled = true;
-        return LoadAsync((token, progress) => LogFileReader.ReadAsync(path, mode, token, progress),
-            "파일 읽기 준비…", "파일을 열 수 없습니다");
+        string fullPath;
+        try { fullPath = Path.GetFullPath(path); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        { ShowError("파일 경로를 읽을 수 없습니다", ex); return Task.FromResult(false); }
+        var existing = sessions.FirstOrDefault(s => s.Scope is null && s.Source.SourcePath is { } sourcePath &&
+            string.Equals(sourcePath, fullPath, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null && mode == EncodingMode.Auto)
+        { if (existing == activeSession && busy) CancelSessionWork(); ActivateSession(existing); return Task.FromResult(true); }
+        return LoadIntoSessionAsync((token, progress) => LogFileReader.ReadAsync(fullPath, mode, token, progress),
+            "파일 읽기 준비…", "파일을 열 수 없습니다", existing);
     }
-    private async Task LoadAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
-        string startingMessage, string errorTitle)
+    private Task ReloadCurrentAsync(EncodingMode mode)
     {
+        if (ActiveScope is not null || activeSession?.Source.SourcePath is not { } path) return Task.CompletedTask;
+        return LoadIntoSessionAsync((token, progress) => LogFileReader.ReadAsync(path, mode, token, progress),
+            "인코딩으로 다시 읽기…", "파일을 다시 읽을 수 없습니다", activeSession);
+    }
+    private Task<bool> LoadAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
+        string startingMessage, string errorTitle) => LoadIntoSessionAsync(load, startingMessage, errorTitle, null);
+
+    private async Task<bool> LoadIntoSessionAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
+        string startingMessage, string errorTitle, LogSession? replaceSession)
+    {
+        if (busy) RestoreFilters();
         var op = BeginWork(startingMessage, true);
         var timer = Stopwatch.StartNew();
         try
@@ -166,63 +180,70 @@ public partial class MainWindow : Window
                 return (loaded, view, document: PrepareDocument(view.Text, op.Token, op.Progress));
             }, op.Token);
             op.Token.ThrowIfCancellationRequested();
-            if (!work.IsCurrent(op.Version)) return;
-            data = result.loaded;
-            foreach (var item in threadItems) item.PropertyChanged -= Thread_Changed;
-            threadItems = data.Threads.Select(t => new ThreadItem(t, theme)).ToList();
-            foreach (var item in threadItems) item.PropertyChanged += Thread_Changed;
-            ThreadList.ItemsSource = threadItems;
-            ThreadCount.Text = $"{threadItems.Count:N0}개";
-            PublishView(result.view, result.document);
-            requestedPath = data.SourcePath;
-            ReloadButton.IsEnabled = requestedPath is not null;
-            FileLabel.Text = data.SourcePath is null ? "붙여넣은 로그" : Path.GetFileName(data.SourcePath);
-            FileLabel.ToolTip = data.SourcePath ?? "줄 번호는 붙여넣은 텍스트의 첫 줄부터 1입니다.";
-            Title = $"{FileLabel.Text} — {AppTitle}";
-            EncodingStatus.Text = data.EncodingDescription;
-            ParseStatus.Text = $"기록: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
-            ParseStatus.ToolTip = $"헤더 기준 {data.Entries.Count:N0}건 · 이어지는 본문 {data.ContinuationCount:N0}줄\n시간 헤더부터 다음 시간 헤더 직전까지 같은 기록입니다.";
+            if (!work.IsCurrent(op.Version)) return false;
+            CommitLoadedSession(result.loaded, result.view, result.document, replaceSession);
             OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용";
+            return true;
         }
         catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) { RestoreFilters(); OperationStatus.Text = "열기 취소 · 이전 화면 유지"; } }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException or ArgumentException or OutOfMemoryException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or DecoderFallbackException or ArgumentException or OutOfMemoryException)
         {
             if (work.IsCurrent(op.Version)) { RestoreFilters(); ShowError(errorTitle, ex); }
         }
         finally { FinishWork(op.Version); }
+        return false;
     }
-    private void PublishView(LogProjection view, TextDocument document)
+    private void PublishView(LogProjection view, TextDocument document, bool preservePosition = true)
     {
+        positionMovedToNearest = false;
+        var anchor = preservePosition ? CapturePosition() : null;
+        restoringPosition = true;
+        ResetLineSelectionGesture();
         searchWork.Cancel();
-        searchRenderer.Hits = [];
+        searchRenderer.Index = HighlightIndex.Empty;
+        highlightWork.Cancel();
+        selectionWork.Cancel();
         projection = view;
+        viewVersion++;
         threadRenderer.Projection = margin.Projection = view;
+        UpdateLineActionIndicator();
         document.SetOwnerThread(Thread.CurrentThread);
         Editor.Document = document;
+        RefreshLineSelectionIndicator();
+        if (anchor is not null) RestorePosition(anchor);
+        restoringPosition = false;
+        UpdatePosition();
+        RefreshBookmarks(); UpdateTime();
         margin.InvalidateMeasure(); margin.InvalidateVisual();
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-        CountStatus.Text = $"{view.EntryCount:N0}/{view.Source.Entries.Count:N0}건 · 표시 {view.Count:N0}/{view.Source.Lines.Count:N0}줄";
-        EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 줄이 없습니다. 스레드 필터를 선택하세요.";
+        int totalLines = ActiveScope is { } scope ? scope.LastLineIndex - scope.FirstLineIndex + 1 : view.Source.Lines.Count;
+        int totalEntries = ActiveScope is { } entriesScope ? view.Source.Lines[entriesScope.LastLineIndex].EntryIndex - view.Source.Lines[entriesScope.FirstLineIndex].EntryIndex + 1 : view.Source.Entries.Count;
+        CountStatus.Text = $"{view.EntryCount:N0}/{totalEntries:N0}건 · 표시 {view.Count:N0}/{totalLines:N0}줄";
+        EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 기록이 없습니다. 필터 조건을 확인하세요.";
         EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyDetail.Text = view.Source.Lines.Count == 0 ? "다른 파일을 열거나 Ctrl+V로 로그를 붙여넣으세요." : "전체 선택 또는 왼쪽 스레드 체크박스를 사용하세요.";
         _ = SearchAsync();
+        _ = RefreshKeywordsAsync();
     }
     private void RestoreFilters()
     {
         if (projection is null) return;
         suppressFilters = true;
-        foreach (var item in threadItems) item.IsSelected = projection.SelectedThreads.Contains(item.Id);
+        var selected = contextActive && normalSelectedThreads is not null ? normalSelectedThreads : projection.SelectedThreads;
+        foreach (var item in threadItems) item.IsSelected = selected.Contains(item.Id);
         suppressFilters = false;
     }
     private async void Thread_Changed(object? sender, PropertyChangedEventArgs e)
     {
         if (!suppressFilters && e.PropertyName == nameof(ThreadItem.IsSelected)) await FilterAsync();
     }
-    private async Task FilterAsync()
+    private async Task FilterAsync(EntryFilter? requestedFilter = null, PositionAnchor? returnAnchor = null)
     {
         if (data is null) return;
         var captured = data;
+        var capturedScope = ActiveScope;
         var selected = threadItems.Where(t => t.IsSelected).Select(t => t.Id).ToArray();
+        var filter = requestedFilter ?? appliedFilter;
         var op = BeginWork("필터 적용 준비…", false);
         var timer = Stopwatch.StartNew();
         try
@@ -230,13 +251,22 @@ public partial class MainWindow : Window
             await Task.Delay(100, op.Token);
             var result = await Task.Run(() =>
             {
-                var view = LogProjection.Create(captured, selected, op.Token, op.Progress);
+                var view = LogProjection.CreateFiltered(captured, selected, filter, op.Token, op.Progress, capturedScope);
                 return (view, document: PrepareDocument(view.Text, op.Token, op.Progress));
             }, op.Token);
             op.Token.ThrowIfCancellationRequested();
             if (!work.IsCurrent(op.Version)) return;
+            appliedFilter = filter;
+            contextActive = false;
+            margin.ContextLineIndex = null;
+            threadRenderer.ContextEntryIndex = null;
+            ContextPanel.Visibility = Visibility.Collapsed;
+            UpdateExportLabel(false);
             PublishView(result.view, result.document);
-            OperationStatus.Text = $"필터 적용 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 원본 기록 순서";
+            if (returnAnchor is not null) RestorePosition(returnAnchor);
+            UpdateFilterSummary();
+            OperationStatus.Text = $"필터 적용 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 원본 기록 순서" +
+                (positionMovedToNearest ? " · 이전 위치가 숨겨져 가까운 원본 줄로 이동" : "");
         }
         catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) { RestoreFilters(); OperationStatus.Text = "필터 취소 · 이전 화면 유지"; } }
         catch (Exception ex) when (ex is OutOfMemoryException or ArgumentException)
@@ -256,15 +286,16 @@ public partial class MainWindow : Window
     {
         if ((sender as Button)?.Tag is ThreadItem item) await SetThreadsAsync(t => t.Id == item.Id);
     }
-    private void Cancel_Click(object sender, RoutedEventArgs e) { work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
+    private void Cancel_Click(object sender, RoutedEventArgs e) { fileBatchVersion++; work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
     private async void Export_Click(object sender, RoutedEventArgs e)
     {
         if (projection is null || busy) return;
         var captured = projection;
+        string exportScope = contextActive ? "주변 로그" : "필터 결과";
         string exportName = captured.Source.SourcePath is null ? "pasted-log" : Path.GetFileNameWithoutExtension(captured.Source.SourcePath);
-        var dialog = new SaveFileDialog { Title = "필터 결과 내보내기 — UTF-8 (BOM 없음), 새 파일만", Filter = "로그 파일 (*.log)|*.log|텍스트 파일 (*.txt)|*.txt", FileName = exportName + "-filtered.log", OverwritePrompt = false };
+        var dialog = new SaveFileDialog { Title = exportScope + " 내보내기 — UTF-8 (BOM 없음), 새 파일만", Filter = "로그 파일 (*.log)|*.log|텍스트 파일 (*.txt)|*.txt", FileName = exportName + (contextActive ? "-context.log" : "-filtered.log"), OverwritePrompt = false };
         if (dialog.ShowDialog(this) != true) return;
-        var op = BeginWork("필터 결과 내보내기…", true);
+        var op = BeginWork(exportScope + " 내보내기…", true);
         try
         {
             await Task.Run(() => LogExporter.ExportAsync(captured, dialog.FileName, op.Token, op.Progress), op.Token);
@@ -278,10 +309,10 @@ public partial class MainWindow : Window
     private void ShowError(string title, Exception ex)
     {
         OperationStatus.Text = $"{title} · 이전 화면 유지";
-        MessageBox.Show(this, ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        if (IsVisible) MessageBox.Show(this, ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
-    private void Wrap_Changed(object sender, RoutedEventArgs e) { if (Editor is not null) Editor.WordWrap = WrapBox.IsChecked == true; }
-    private void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) ApplyTheme(); }
+    private void Wrap_Changed(object sender, RoutedEventArgs e) { if (Editor is not null) Editor.WordWrap = WrapBox.IsChecked == true; ScheduleSettingsSave(); }
+    private void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) { ApplyTheme(); ScheduleSettingsSave(); } }
     private void ApplyTheme()
     {
         theme = new(ThemeBox.SelectedIndex != 1);
@@ -289,6 +320,7 @@ public partial class MainWindow : Window
         if (Application.Current is { } application) theme.Apply(application.Resources);
         theme.ApplyTitleBar(this);
         threadRenderer.Theme = margin.Theme = searchRenderer.Theme = theme;
+        keywordRenderer.IsDark = theme.IsDark;
         foreach (var item in threadItems) item.ApplyTheme(theme);
         Editor.TextArea.SelectionBrush = theme.Selection;
         Editor.TextArea.SelectionForeground = theme.SelectionText;
@@ -297,7 +329,7 @@ public partial class MainWindow : Window
         margin.InvalidateVisual();
         Editor.TextArea.TextView.Redraw();
     }
-    private void Density_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) ApplyTypography(); }
+    private void Density_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) { ApplyTypography(); ScheduleSettingsSave(); } }
     private void ApplyTypography()
     {
         Editor.FontFamily = LogTypography.Create(DensityBox.SelectedIndex == 1);
@@ -311,57 +343,6 @@ public partial class MainWindow : Window
         Editor.FontSize = double.Parse(item.Content.ToString()!, CultureInfo.InvariantCulture);
         margin.LogFontSize = Editor.FontSize;
         margin.InvalidateMeasure(); margin.InvalidateVisual();
-    }
-    private void ShowSearch() { SearchBar.Visibility = Visibility.Visible; SearchBox.Focus(); SearchBox.SelectAll(); _ = SearchAsync(); }
-    private void Search_Click(object sender, RoutedEventArgs e) => ShowSearch();
-    private void CloseSearch_Click(object sender, RoutedEventArgs e)
-    {
-        SearchBar.Visibility = Visibility.Collapsed; searchWork.Cancel(); searchRenderer.Hits = [];
-        Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background); Editor.Focus();
-    }
-    private async void Search_Changed(object sender, TextChangedEventArgs e) => await SearchAsync();
-    private async Task SearchAsync()
-    {
-        if (SearchBox is null || SearchStatus is null) return;
-        var op = searchWork.Begin();
-        searchRenderer.Hits = []; searchIndex = -1;
-        Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-        string query = SearchBox.Text;
-        var captured = projection;
-        if (captured is null || query.Length == 0 || SearchBar.Visibility != Visibility.Visible) { SearchStatus.Text = ""; return; }
-        SearchStatus.Text = "검색 중…";
-        try
-        {
-            await Task.Delay(180, op.Token);
-            var found = await Task.Run(() => LogSearch.Find(captured.Text, query, op.Token), op.Token);
-            if (!searchWork.IsCurrent(op.Version) || op.Token.IsCancellationRequested || captured != projection) return;
-            searchRenderer.Hits = found.Hits; searchLimited = found.Limited;
-            SearchStatus.Text = found.Hits.Length == 0 ? "결과 없음" : $"{found.Hits.Length:N0}개{(found.Limited ? " (첫 100,000개만 표시)" : "")}";
-            Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
-        }
-        catch (OperationCanceledException) { }
-        catch (OutOfMemoryException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = "검색 메모리 부족 · 검색어를 좁혀 주세요."; }
-    }
-    private void NavigateSearch(bool backwards)
-    {
-        var hits = searchRenderer.Hits;
-        if (hits.Length == 0) return;
-        searchIndex = searchIndex < 0 ? (backwards ? hits.Length - 1 : 0) : (searchIndex + (backwards ? -1 : 1) + hits.Length) % hits.Length;
-        var hit = hits[searchIndex];
-        Editor.Select(hit.Offset, hit.Length);
-        var location = Editor.Document.GetLocation(hit.Offset);
-        Editor.ScrollTo(location.Line, location.Column);
-        SearchStatus.Text = $"{searchIndex + 1:N0} / {hits.Length:N0}{(searchLimited ? " (첫 100,000개)" : "")}";
-    }
-    private void Previous_Click(object sender, RoutedEventArgs e) => NavigateSearch(true);
-    private void Next_Click(object sender, RoutedEventArgs e) => NavigateSearch(false);
-    private void Search_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { NavigateSearch(Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)); e.Handled = true; } }
-    private async void Window_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (LogTransfer.OpensLogOnPaste(e.Key, Keyboard.Modifiers, Keyboard.FocusedElement)) { e.Handled = true; await PasteAsync(); }
-        else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && e.Key == Key.F) { ShowSearch(); e.Handled = true; }
-        else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && e.Key == Key.O) { Open_Click(this, new()); e.Handled = true; }
-        else if (e.Key == Key.F3) { NavigateSearch(Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)); e.Handled = true; }
-        else if (e.Key == Key.Escape && SearchBar.Visibility == Visibility.Visible) { CloseSearch_Click(this, new()); e.Handled = true; }
+        ScheduleSettingsSave();
     }
 }

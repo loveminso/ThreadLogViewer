@@ -4,6 +4,7 @@ artifacts/
 .tools/
 .nuget/
 .dotnet-home/
+**/user-data/
 .vs/
 .idea/
 *.user
