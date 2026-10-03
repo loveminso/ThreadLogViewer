@@ -154,7 +154,8 @@ public partial class MainWindow
         ReleaseUnusedLineActionCaptureForKeyboard(Mouse.RightButton == MouseButtonState.Released);
         var modifiers = Keyboard.Modifiers;
         if (TryHandleMenuShortcut(e)) return;
-        if (modifiers == ModifierKeys.Control && e.Key == Key.W) { e.Handled = true; CloseActiveSession_Click(this, new()); }
+        if (modifiers == ModifierKeys.Control && e.Key == Key.N) { e.Handled = true; CreateBlankSession(); }
+        else if (modifiers == ModifierKeys.Control && e.Key == Key.W) { e.Handled = true; CloseActiveSession_Click(this, new()); }
         else if (e.Key == Key.Tab && (modifiers == ModifierKeys.Control || modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
         { e.Handled = true; CycleSession(modifiers.HasFlag(ModifierKeys.Shift)); }
         else if (LogTransfer.OpensLogOnPaste(e.Key, modifiers, Keyboard.FocusedElement)) { e.Handled = true; await PasteAsync(); }

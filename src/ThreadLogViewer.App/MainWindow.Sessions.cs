@@ -19,8 +19,9 @@ public partial class MainWindow
     private int? separationStartLine;
     private LogLineRange? ActiveScope => activeSession?.Scope;
 
-    private sealed class LogSession(LogData source, LogProjection view, TextDocument document, string title, LogLineRange? scope = null, string? sourceTitle = null)
+    private sealed class LogSession(LogData source, LogProjection view, TextDocument document, string title, LogLineRange? scope = null, string? sourceTitle = null, bool isBlank = false)
     {
+        public bool IsBlank { get; } = isBlank;
         public LogData Source { get; } = source;
         public LogLineRange? Scope { get; } = scope;
         public int? SeparationStart { get; set; }
@@ -28,7 +29,7 @@ public partial class MainWindow
         public TextDocument Document { get; set; } = document;
         public string DisplayTitle { get; } = title;
         public string SourceTitle { get; } = sourceTitle ?? title;
-        public string ToolTip => (Source.SourcePath ?? "클립보드에서 연 로그 · 이 실행 중에만 유지됩니다.") +
+        public string ToolTip => (IsBlank ? "새 빈 탭 · Ctrl+V로 로그 붙여넣기 / Ctrl+O로 파일 열기" : Source.SourcePath ?? "클립보드에서 연 로그 · 이 실행 중에만 유지됩니다.") +
             (Scope is { } range ? $"\n원본 {range.FirstLineIndex + 1:N0}~{range.LastLineIndex + 1:N0}줄 · 시작과 끝 포함 · 읽기 전용" : "");
         public List<ThreadItem> Threads { get; set; } = [];
         public Bookmark[] Bookmarks { get; set; } = [];
@@ -112,7 +113,7 @@ public partial class MainWindow
     }
 
     private void CommitLoadedSession(LogData source, LogProjection view, TextDocument document, LogSession? replace,
-        LogLineRange? scope = null, string? title = null, string? sourceTitle = null)
+        LogLineRange? scope = null, string? title = null, string? sourceTitle = null, bool isBlank = false)
     {
         CaptureActiveSession();
         DetachSessionHandlers();
@@ -132,11 +133,12 @@ public partial class MainWindow
             foreach (var item in threadItems) item.PropertyChanged += Thread_Changed;
             ThreadList.ItemsSource = threadItems;
             var session = new LogSession(source, view, document, title ??
-                (source.SourcePath is null ? $"붙여넣은 로그 {++pastedSessionNumber}" : Path.GetFileName(source.SourcePath)), scope, sourceTitle);
+                (source.SourcePath is null ? $"붙여넣은 로그 {++pastedSessionNumber}" : Path.GetFileName(source.SourcePath)), scope, sourceTitle, isBlank);
             selectingSession = true;
             if (replace is not null && sessions.IndexOf(replace) is var index && index >= 0) sessions[index] = session;
             else sessions.Add(session);
             activeSession = session; SessionTabs.SelectedItem = session; SessionTabs.Visibility = Visibility.Visible;
+            SessionTabs.ScrollIntoView(session);
             PublishView(view, document, false);
         }
         finally { selectingSession = false; restoringPosition = false; viewReady = true; }
@@ -197,15 +199,16 @@ public partial class MainWindow
         requestedPath = data?.SourcePath; ReloadButton.IsEnabled = requestedPath is not null && ActiveScope is null;
         FileLabel.Text = activeSession?.DisplayTitle ?? "로그 원문";
         FileLabel.ToolTip = activeSession?.ToolTip ?? "줄 번호는 붙여넣은 텍스트의 첫 줄부터 1입니다.";
-        ThreadScopeTitle.Text = ActiveScope is null ? "스레드 · 전체 파일" : "스레드 · 분리 세션";
-        ThreadScopeHint.Text = ActiveScope is { } scope ? $"원본 {scope.FirstLineIndex + 1:N0}~{scope.LastLineIndex + 1:N0}줄 기준입니다." : "건수와 시간은 전체 파일 기준입니다.";
+        ThreadScopeTitle.Text = IsBlankSession ? "스레드 · 입력 대기" : ActiveScope is null ? "스레드 · 전체 파일" : "스레드 · 분리 세션";
+        ThreadScopeHint.Text = IsBlankSession ? "파일을 열거나 로그를 붙여넣으면 스레드를 표시합니다." : ActiveScope is { } scope ? $"원본 {scope.FirstLineIndex + 1:N0}~{scope.LastLineIndex + 1:N0}줄 기준입니다." : "건수와 시간은 전체 파일 기준입니다.";
         ((ComboBoxItem)SearchScopeBox.Items[1]).Content = ActiveScope is null ? "전체 원본" : "전체 세션";
         Title = activeSession is null ? AppTitle : $"{FileLabel.Text} — {AppTitle}";
         ThreadCount.Text = $"{threadItems.Count:N0}개";
         EncodingStatus.Text = data?.EncodingDescription ?? "인코딩: 파일 없음";
-        ParseStatus.Text = data is null ? "파싱: 대기" : $"{(ActiveScope is null ? "기록" : "원본 전체 파싱")}: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
+        ParseStatus.Text = IsBlankSession ? "파싱: 입력 대기" : data is null ? "파싱: 대기" : $"{(ActiveScope is null ? "기록" : "원본 전체 파싱")}: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";
         ParseStatus.ToolTip = data is null ? null : $"헤더 기준 {data.Entries.Count:N0}건 · 이어지는 본문 {data.ContinuationCount:N0}줄\n시간 헤더부터 다음 시간 헤더 직전까지 같은 기록입니다.";
-        ExportButton.IsEnabled = !busy && projection is not null;
+        ExportButton.IsEnabled = !busy && projection is not null && !IsBlankSession;
+        UpdateBlankSessionHint();
     }
 
     private async Task<bool> OpenLineSessionAsync(int start, int end)
@@ -296,8 +299,8 @@ public partial class MainWindow
             searchRenderer.Index = keywordRenderer.Index = HighlightIndex.Empty; SearchStatus.Text = "";
             SearchBar.Visibility = ResultsPanel.Visibility = GoToPanel.Visibility = Visibility.Collapsed;
             CountStatus.Text = "0/0건 · 표시 0/0줄"; PositionStatus.Text = "읽기 전용";
-            EmptyPanel.Visibility = Visibility.Visible; EmptyHint.Text = "로그 파일을 열거나 클립보드 로그를 붙여넣으세요.";
-            EmptyDetail.Text = "파일 메뉴에서 여러 파일을 한 번에 열 수 있습니다.";
+            EmptyPanel.Visibility = Visibility.Visible; EmptyHint.Text = "로그 파일을 열거나 새 탭을 만드세요.";
+            EmptyDetail.Text = "+ 버튼 / Ctrl+N 새 탭 · Ctrl+O 파일 열기 · Ctrl+V 로그 붙여넣기";
         }
         finally { restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdateAnalysisInputState(); UpdateFilterSummary(); _ = RefreshKeywordsAsync();

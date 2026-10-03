@@ -44,7 +44,7 @@ public partial class MainWindow
     private void UpdateAnalysisInputState()
     {
         if (CurrentRecordStatus is null || ContextOpenButton is null) return;
-        CanChangeFilters = data is not null && !contextActive && !filtersLocked;
+        CanChangeFilters = data is not null && !IsBlankSession && !contextActive && !filtersLocked;
         FilterModeHint.Visibility = contextActive ? Visibility.Visible : Visibility.Collapsed;
         FilterModeHint.Text = "주변 보기에서는 스레드·내용 필터를 잠시 적용하지 않습니다. 북마크는 사용할 수 있습니다.";
         int? line = CurrentSourceLine();
@@ -69,7 +69,7 @@ public partial class MainWindow
             timeA is null ? "로그에서 기준 기록을 클릭하고 지정한 뒤, 비교할 기록을 클릭해 지정하세요." :
             timeB is null ? "기준이 지정되었습니다. 비교할 기록을 클릭하고 ‘현재 기록을 비교로 지정’을 누르세요." :
             "비교 (B) − 기준 (A)의 시간 차이입니다. 지정한 기록 버튼으로 해당 위치에 이동할 수 있습니다.";
-        KeywordAddButton.IsEnabled = !busy && projection is not null && KeywordBox.Text.Length > 0 && keywordRules.Count < 8;
+        KeywordAddButton.IsEnabled = !busy && projection is not null && !IsBlankSession && KeywordBox.Text.Length > 0 && keywordRules.Count < 8;
         KeywordEmptyHint.Visibility = keywordRules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     private void UpdateExportLabel(bool isContext)

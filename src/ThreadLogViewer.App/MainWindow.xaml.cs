@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.6.2";
+    private const string AppTitle = "ThreadLog Viewer v0.6.3";
 
     public MainWindow() : this(null, true) { }
     public MainWindow(string? settingsDirectory, bool persistSettings)
@@ -128,7 +128,7 @@ public partial class MainWindow : Window
         busy = false;
         WorkPanel.Visibility = Visibility.Collapsed;
         SetFilterLock(false);
-        ExportButton.IsEnabled = projection is not null;
+        ExportButton.IsEnabled = projection is not null && !IsBlankSession;
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Collapsed;
         UpdateMenus();
     }
@@ -168,6 +168,7 @@ public partial class MainWindow : Window
     private async Task<bool> LoadIntoSessionAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
         string startingMessage, string errorTitle, LogSession? replaceSession)
     {
+        if (replaceSession is null && IsBlankSession) replaceSession = activeSession;
         if (busy) RestoreFilters();
         var op = BeginWork(startingMessage, true);
         var timer = Stopwatch.StartNew();
@@ -222,6 +223,7 @@ public partial class MainWindow : Window
         EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 기록이 없습니다. 필터 조건을 확인하세요.";
         EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyDetail.Text = view.Source.Lines.Count == 0 ? "다른 파일을 열거나 Ctrl+V로 로그를 붙여넣으세요." : "전체 선택 또는 왼쪽 스레드 체크박스를 사용하세요.";
+        UpdateBlankSessionHint();
         _ = SearchAsync();
         _ = RefreshKeywordsAsync();
     }
@@ -239,7 +241,7 @@ public partial class MainWindow : Window
     }
     private async Task FilterAsync(EntryFilter? requestedFilter = null, PositionAnchor? returnAnchor = null)
     {
-        if (data is null) return;
+        if (data is null || IsBlankSession) return;
         var captured = data;
         var capturedScope = ActiveScope;
         var selected = threadItems.Where(t => t.IsSelected).Select(t => t.Id).ToArray();
@@ -289,7 +291,7 @@ public partial class MainWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) { fileBatchVersion++; work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
     private async void Export_Click(object sender, RoutedEventArgs e)
     {
-        if (projection is null || busy) return;
+        if (projection is null || busy || IsBlankSession) return;
         var captured = projection;
         string exportScope = contextActive ? "주변 로그" : "필터 결과";
         string exportName = captured.Source.SourcePath is null ? "pasted-log" : Path.GetFileNameWithoutExtension(captured.Source.SourcePath);

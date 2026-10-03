@@ -14,7 +14,7 @@ public partial class MainWindow
     private void UpdateMenus()
     {
         if (MainMenu is null) return;
-        bool hasLog = projection is not null;
+        bool hasLog = projection is not null && !IsBlankSession;
         EncodingMenu.IsEnabled = !busy && requestedPath is not null && ActiveScope is null;
         WrapMenu.IsChecked = WrapBox.IsChecked == true;
         foreach (var item in FontMenu.Items.OfType<MenuItem>())

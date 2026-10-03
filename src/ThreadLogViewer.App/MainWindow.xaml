@@ -1,4 +1,4 @@
-<Window x:Class="ThreadLogViewer.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit" Title="ThreadLog Viewer v0.6.2" Width="1360" Height="860" MinWidth="1040" MinHeight="600" FontFamily="Segoe UI, Malgun Gothic" FontSize="13" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" PreviewKeyDown="Window_KeyDown" UseLayoutRounding="True" SnapsToDevicePixels="True" AllowDrop="True" PreviewDragEnter="Window_DragOver" PreviewDragOver="Window_DragOver" PreviewDrop="Window_Drop">
+<Window x:Class="ThreadLogViewer.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit" Title="ThreadLog Viewer v0.6.3" Width="1360" Height="860" MinWidth="1040" MinHeight="600" FontFamily="Segoe UI, Malgun Gothic" FontSize="13" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" PreviewKeyDown="Window_KeyDown" UseLayoutRounding="True" SnapsToDevicePixels="True" AllowDrop="True" PreviewDragEnter="Window_DragOver" PreviewDragOver="Window_DragOver" PreviewDrop="Window_Drop">
   <Window.Resources>
     <Style x:Key="AnalysisToolTab" TargetType="RadioButton">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -17,8 +17,9 @@
     <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,2">
       <Menu x:Name="MainMenu" AutomationProperties.Name="주 메뉴">
         <MenuItem Header="파일(_F)" SubmenuOpened="MainMenu_Opened">
+          <MenuItem x:Name="NewSessionMenu" Header="새 탭" InputGestureText="Ctrl+N" Click="NewSession_Click" />
           <MenuItem Header="파일 열기…" InputGestureText="Ctrl+O" Click="Open_Click" />
-          <MenuItem Header="클립보드 로그 새 탭으로 열기" InputGestureText="Ctrl+Shift+V" Click="PasteLog_Click" />
+          <MenuItem Header="클립보드 로그 열기" InputGestureText="Ctrl+Shift+V" Click="PasteLog_Click" />
           <Separator />
           <MenuItem x:Name="ExportMenu" Header="필터 결과 내보내기…" Click="Export_Click" IsEnabled="{Binding IsEnabled, ElementName=ExportButton}" />
           <MenuItem x:Name="EncodingMenu" Header="인코딩으로 다시 읽기" IsEnabled="False" ToolTip="열 때 자동 판별합니다. 글자가 깨질 때만 인코딩을 직접 선택하세요.">
@@ -31,7 +32,7 @@
         </MenuItem>
         <MenuItem Header="편집(_E)" SubmenuOpened="MainMenu_Opened">
           <MenuItem Header="복사" InputGestureText="Ctrl+C" Click="Copy_Click" />
-          <MenuItem Header="붙여넣기" InputGestureText="Ctrl+V" Click="Paste_Click" ToolTip="클립보드의 로그를 새 탭으로 엽니다." />
+          <MenuItem Header="붙여넣기" InputGestureText="Ctrl+V" Click="Paste_Click" ToolTip="빈 탭에 로그를 넣거나 새 로그 탭으로 엽니다." />
           <MenuItem Header="전체 선택" InputGestureText="Ctrl+A" Click="SelectText_Click" />
           <Separator />
           <MenuItem x:Name="FindMenu" Header="찾기…" InputGestureText="Ctrl+F" Click="Search_Click" />
@@ -90,18 +91,23 @@
         </MenuItem>
       </Menu>
     </Border>
-    <ListBox x:Name="SessionTabs" DockPanel.Dock="Top" Visibility="Collapsed" SelectionChanged="SessionTab_Selected" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,4" Height="44" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="열린 로그 탭">
-      <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
-      <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}"><Setter Property="Margin" Value="0,0,5,0" /><Setter Property="ToolTip" Value="{Binding ToolTip}" /></Style></ListBox.ItemContainerStyle>
-      <ListBox.ItemTemplate>
-        <DataTemplate>
-          <DockPanel Margin="9,0,3,0" Height="30" MaxWidth="265">
-            <Button DockPanel.Dock="Right" Content="×" Tag="{Binding}" Click="CloseSession_Click" Padding="3,0" MinWidth="23" MinHeight="24" Margin="6,0,0,0" ToolTip="이 탭 닫기" AutomationProperties.Name="탭 닫기" />
-            <TextBlock Text="{Binding DisplayTitle}" MaxWidth="215" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-          </DockPanel>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
+    <Border x:Name="SessionTabBar" DockPanel.Dock="Top" MinHeight="44" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <Button x:Name="NewSessionButton" DockPanel.Dock="Right" Content="+" Click="NewSession_Click" FontSize="20" Width="34" Height="30" MinHeight="30" Padding="0" Margin="6,4,8,4" VerticalAlignment="Center" ToolTip="새 탭 (Ctrl+N)" AutomationProperties.Name="새 탭 만들기" />
+        <ListBox x:Name="SessionTabs" Visibility="Collapsed" SelectionChanged="SessionTab_Selected" Background="Transparent" BorderThickness="0" Padding="8,4" MinHeight="44" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="열린 로그 탭">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}"><Setter Property="Margin" Value="0,0,5,0" /><Setter Property="ToolTip" Value="{Binding ToolTip}" /></Style></ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <DockPanel Margin="9,0,3,0" Height="30" MaxWidth="265">
+                <Button DockPanel.Dock="Right" Content="×" Tag="{Binding}" Click="CloseSession_Click" Padding="3,0" MinWidth="23" MinHeight="24" Margin="6,0,0,0" ToolTip="이 탭 닫기" AutomationProperties.Name="탭 닫기" />
+                <TextBlock Text="{Binding DisplayTitle}" MaxWidth="215" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              </DockPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
     <StackPanel Visibility="Collapsed" DockPanel.Dock="Top">
       <ToggleButton x:Name="WrapBox" Checked="Wrap_Changed" Unchecked="Wrap_Changed" />
       <ComboBox x:Name="FontSizeBox" SelectionChanged="FontSize_Changed" SelectedIndex="3"><ComboBoxItem Content="11" /><ComboBoxItem Content="12" /><ComboBoxItem Content="13" /><ComboBoxItem Content="14" /><ComboBoxItem Content="16" /><ComboBoxItem Content="18" /><ComboBoxItem Content="20" /><ComboBoxItem Content="24" /></ComboBox>
@@ -389,15 +395,15 @@
               <MenuItem Header="텍스트">
                 <MenuItem Header="복사" InputGestureText="Ctrl+C" Click="Copy_Click" />
                 <MenuItem Header="전체 선택" InputGestureText="Ctrl+A" Click="SelectText_Click" />
-                <MenuItem Header="클립보드 로그 새 탭으로 열기" InputGestureText="Ctrl+V / Ctrl+Shift+V" Click="PasteLog_Click" />
+                <MenuItem Header="클립보드 로그 열기" InputGestureText="Ctrl+V / Ctrl+Shift+V" Click="PasteLog_Click" />
               </MenuItem>
             </ContextMenu>
           </avalon:TextEditor.ContextMenu>
         </avalon:TextEditor>
         <StackPanel x:Name="EmptyPanel" Grid.Row="4" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
           <TextBlock Text="" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="34" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,0,0,18" />
-          <TextBlock x:Name="EmptyHint" Text="로그 파일을 여기에 끌어 놓으세요" TextAlignment="Center" Foreground="{DynamicResource TextBrush}" FontSize="17" />
-          <TextBlock x:Name="EmptyDetail" Text=".log / .txt 파일 열기  ·  Ctrl+V로 로그 붙여넣기" TextAlignment="Center" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,10,0,0" />
+          <TextBlock x:Name="EmptyHint" Text="로그 파일을 열거나 새 탭을 만드세요." TextAlignment="Center" Foreground="{DynamicResource TextBrush}" FontSize="17" />
+          <TextBlock x:Name="EmptyDetail" Text="+ 버튼 / Ctrl+N 새 탭 · Ctrl+O 파일 열기 · Ctrl+V 로그 붙여넣기" TextAlignment="Center" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,10,0,0" />
         </StackPanel>
         <Border x:Name="ResultsPanel" Grid.Row="5" Visibility="Collapsed" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6">
           <DockPanel>
