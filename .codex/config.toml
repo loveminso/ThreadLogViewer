@@ -1,0 +1,4 @@
+# Project-scoped custom agents; model and reasoning settings inherit from the parent.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
