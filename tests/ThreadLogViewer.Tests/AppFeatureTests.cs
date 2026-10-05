@@ -19,7 +19,7 @@ public sealed class AppFeatureTests
         Assert.True(defaults.Success);
         Assert.True(defaults.CanSave);
         Assert.Equal(UiSettings.Default, defaults.Settings);
-        var values = new UiSettings { Dark = false, Compact = true, WordWrap = true, FontSize = 18, PanelWidth = 420 };
+        var values = new UiSettings { Dark = false, Compact = true, WordWrap = true, FontSize = 18, PanelWidth = 420, ResultsHeight = 360, ResultsCollapsed = true };
         Assert.True(store.Save(values).Success);
         Assert.Equal(values, store.Load().Settings);
         Assert.True(store.Save(values with { FontSize = 20 }).Success);
@@ -27,7 +27,7 @@ public sealed class AppFeatureTests
         using var json = JsonDocument.Parse(File.ReadAllBytes(store.FilePath));
         Assert.Equal(SettingsStore.OwnerMarker, json.RootElement.GetProperty("Owner").GetString());
         Assert.Equal(SettingsStore.SchemaVersion, json.RootElement.GetProperty("Schema").GetInt32());
-        Assert.Equal(5, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
+        Assert.Equal(7, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
         Assert.Empty(Directory.EnumerateFiles(System.IO.Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
     }
 
@@ -77,8 +77,16 @@ public sealed class AppFeatureTests
         Assert.False(load.Settings.Dark);
         Assert.Equal(14, load.Settings.FontSize);
         Assert.Equal(295, load.Settings.PanelWidth);
+        Assert.Equal(180, load.Settings.ResultsHeight);
+        Assert.False(load.Settings.ResultsCollapsed);
         Assert.Equal(14, new UiSettings { FontSize = double.NaN }.Normalize().FontSize);
         Assert.Equal(295, new UiSettings { PanelWidth = double.PositiveInfinity }.Normalize().PanelWidth);
+        Assert.Equal(180, new UiSettings { ResultsHeight = double.NaN }.Normalize().ResultsHeight);
+        Assert.Equal(180, new UiSettings { ResultsHeight = double.PositiveInfinity }.Normalize().ResultsHeight);
+        Assert.Equal(180, new UiSettings { ResultsHeight = 79 }.Normalize().ResultsHeight);
+        Assert.Equal(180, new UiSettings { ResultsHeight = 1201 }.Normalize().ResultsHeight);
+        Assert.Equal(80, new UiSettings { ResultsHeight = 80 }.Normalize().ResultsHeight);
+        Assert.Equal(1200, new UiSettings { ResultsHeight = 1200 }.Normalize().ResultsHeight);
     }
 
     [Fact]

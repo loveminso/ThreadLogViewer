@@ -25,6 +25,7 @@ public partial class MainWindow
         FontSizeBox.SelectedIndex = Array.IndexOf(new double[] { 11, 12, 13, 14, 16, 18, 20, 24 }, settings.FontSize);
         WrapBox.IsChecked = settings.WordWrap;
         ThreadColumn.Width = new GridLength(settings.PanelWidth);
+        InitializeResultsLayout(settings.ResultsHeight, settings.ResultsCollapsed);
         KeywordList.ItemsSource = keywordRules;
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdatePosition();
         Editor.TextArea.SelectionChanged += (_, _) => UpdatePosition();
@@ -43,7 +44,7 @@ public partial class MainWindow
         double height = ActualHeight > 0 ? ActualHeight : Height;
         double contextSpace = ContextPanel.Visibility == Visibility.Visible ? 50 : 0;
         ToolsScroll.MaxHeight = Math.Clamp(height - 600 - contextSpace, contextSpace > 0 ? 80 : 130, 230);
-        ResultsList.Height = Math.Clamp(height - 650, 70, 135);
+        UpdateResultsLayout();
     }
     private void ScheduleSettingsSave()
     {
@@ -59,7 +60,8 @@ public partial class MainWindow
         {
             Dark = ThemeBox.SelectedIndex != 1, Compact = DensityBox.SelectedIndex == 1,
             WordWrap = WrapBox.IsChecked == true, FontSize = Editor.FontSize,
-            PanelWidth = ThreadColumn.ActualWidth > 0 ? ThreadColumn.ActualWidth : ThreadColumn.Width.Value
+            PanelWidth = ThreadColumn.ActualWidth > 0 ? ThreadColumn.ActualWidth : ThreadColumn.Width.Value,
+            ResultsHeight = preferredResultsHeight, ResultsCollapsed = resultsCollapsed
         };
         var result = settingsStore.Save(settings.Normalize(), data?.SourcePath);
         if (!result.Success) OperationStatus.Text = "화면 설정 저장 안 됨 · " + result.Message;
@@ -81,6 +83,7 @@ public partial class MainWindow
     {
         ResetLineSelectionGesture();
         SaveSettingsNow(); settingsTimer.Stop();
+        DisposeResultsLayout();
         if (widthChanged is not null) widthDescriptor?.RemoveValueChanged(ThreadColumn, widthChanged);
         highlightWork.Dispose(); selectionWork.Dispose();
     }

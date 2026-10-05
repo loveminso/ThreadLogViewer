@@ -151,6 +151,7 @@ public partial class MainWindow
     { if (e.Key == Key.Enter) { e.Handled = true; await NavigateSearchAsync(Keyboard.Modifiers == ModifierKeys.Shift); } }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (TryCancelResultsResize(e)) return;
         ReleaseUnusedLineActionCaptureForKeyboard(Mouse.RightButton == MouseButtonState.Released);
         var modifiers = Keyboard.Modifiers;
         if (TryHandleMenuShortcut(e)) return;
