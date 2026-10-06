@@ -103,9 +103,9 @@ public partial class MainWindow
             Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
         catch (OperationCanceledException) { }
-        catch (RegexMatchTimeoutException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = "정규식 시간 제한 · 패턴을 좁혀 주세요."; }
-        catch (ArgumentException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = "올바르지 않은 정규식입니다."; }
-        catch (OutOfMemoryException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = "검색 메모리 부족 · 검색어를 좁혀 주세요."; }
+        catch (RegexMatchTimeoutException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "정규식 시간 제한 · 패턴을 좁히거나 정규식 옵션을 끄고 다시 검색하세요."; }
+        catch (ArgumentException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "올바르지 않은 정규식입니다. 패턴을 수정하거나 정규식 옵션을 끄세요."; }
+        catch (OutOfMemoryException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "검색 메모리 부족 · 검색어를 좁히거나 다른 탭을 닫고 다시 검색하세요."; }
     }
     private async Task NavigateSearchAsync(bool backwards)
     {
@@ -131,6 +131,7 @@ public partial class MainWindow
     private async Task NavigateHitAsync(LocatedSearchHit hit)
     {
         if (ActiveScope is { } scope && !scope.Contains(hit.SourceLineIndex)) return;
+        using var navigation = BeginNavigation();
         var source = data;
         if (projection?.FindDisplayLine(hit.SourceLineIndex + 1) is null && !await ShowContextAsync(hit.SourceLineIndex)) return;
         if (source != data || projection is null) return;
@@ -154,6 +155,7 @@ public partial class MainWindow
         if (TryCancelResultsResize(e)) return;
         ReleaseUnusedLineActionCaptureForKeyboard(Mouse.RightButton == MouseButtonState.Released);
         var modifiers = Keyboard.Modifiers;
+        if (TryHandleRecoveryShortcut(e, modifiers)) return;
         if (TryHandleMenuShortcut(e)) return;
         if (modifiers == ModifierKeys.Control && e.Key == Key.N) { e.Handled = true; CreateBlankSession(); }
         else if (modifiers == ModifierKeys.Control && e.Key == Key.W) { e.Handled = true; CloseActiveSession_Click(this, new()); }

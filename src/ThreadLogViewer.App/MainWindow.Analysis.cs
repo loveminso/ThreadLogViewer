@@ -72,7 +72,7 @@ public partial class MainWindow
         if (timeA is null || timeB is null) return;
         UpdateTime();
         try { Clipboard.SetText($"{TimeLabel("A", timeA)}\n{TimeLabel("B", timeB)}\n{TimeDifferenceStatus.Text}"); }
-        catch (System.Runtime.InteropServices.ExternalException) { TimeDifferenceStatus.Text = "클립보드 사용 중 · 다시 복사하세요."; }
+        catch (System.Runtime.InteropServices.ExternalException) { TimeDifferenceStatus.Text = OperationStatus.Text = "클립보드 사용 중 · 다시 복사하세요."; }
     }
     private sealed class KeywordRuleItem(string keyword, int colorIndex) : INotifyPropertyChanged
     {
@@ -88,8 +88,8 @@ public partial class MainWindow
     }
     private void AddKeyword_Click(object sender, RoutedEventArgs e)
     {
-        if (KeywordBox.Text.Length == 0) { KeywordStatus.Text = "키워드를 입력하세요."; return; }
-        if (keywordRules.Count >= 8) { KeywordStatus.Text = "강조 규칙은 최대 8개입니다."; return; }
+        if (HighlightPrompt.PhraseError(KeywordBox.Text) is { } error) { KeywordStatus.Text = OperationStatus.Text = error; return; }
+        if (keywordRules.Count >= HighlightPrompt.MaximumRules) { KeywordStatus.Text = OperationStatus.Text = "강조 규칙은 최대 8개입니다. ‘강조 문구 관리’에서 기존 문구를 수정하거나 삭제하세요. 사용을 끄는 것만으로는 빈자리가 생기지 않습니다."; return; }
         var rule = new KeywordRuleItem(KeywordBox.Text, Math.Clamp(KeywordColorBox.SelectedIndex, 0, 5));
         rule.PropertyChanged += Keyword_Changed; keywordRules.Add(rule); KeywordBox.Clear(); _ = RefreshKeywordsAsync();
     }
@@ -134,9 +134,10 @@ public partial class MainWindow
             keywordRenderer.RuleColors = rules.Select(r => r.ColorIndex).ToArray();
             keywordRenderer.Index = result.Index;
             KeywordStatus.Text = $"{keywordRules.Count}/8 규칙 · {result.Index.Count:N0}곳{(result.Limited ? " (첫 100,000곳)" : "")}";
+            if (result.Limited) OperationStatus.Text = "문구 강조 제한 · 첫 100,000곳만 표시합니다. 강조 문구나 필터 범위를 좁혀 주세요.";
             Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
         catch (OperationCanceledException) { }
-        catch (OutOfMemoryException) { if (highlightWork.IsCurrent(op.Version)) KeywordStatus.Text = "강조 메모리 부족 · 규칙을 줄여 주세요."; }
+        catch (OutOfMemoryException) { if (highlightWork.IsCurrent(op.Version)) KeywordStatus.Text = OperationStatus.Text = "강조 메모리 부족 · 규칙을 줄여 주세요."; }
     }
 }

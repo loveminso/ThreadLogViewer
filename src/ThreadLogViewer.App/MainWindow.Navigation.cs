@@ -25,11 +25,13 @@ public partial class MainWindow
         if (projection.Count == 0) return emptyAnchor;
         int caret = CurrentSourceLine() ?? projection.SourceIndexes[^1];
         var textView = Editor.TextArea.TextView;
-        var top = textView.VisualLinesValid ? textView.VisualLines.FirstOrDefault() : null;
-        int topLine = top?.FirstDocumentLine.LineNumber ?? 1;
+        // Capture the actual offset without forcing layout, which may consume a pending
+        // scroll request and change the viewport while the snapshot is being taken.
+        double vertical = textView.VerticalOffset;
+        int topLine = Math.Min(textView.GetDocumentLineByVisualTop(vertical).LineNumber, projection.Count);
         int topSource = projection.AtDisplayLine(topLine)?.OriginalLineNumber - 1 ?? caret;
         return new(caret, Editor.TextArea.Caret.Column, topSource,
-            top is null ? 0 : textView.VerticalOffset - top.VisualTop, textView.HorizontalOffset);
+            vertical - textView.GetVisualTopByDocumentLine(topLine), textView.HorizontalOffset);
     }
     private void RestorePosition(PositionAnchor anchor)
     {
@@ -100,6 +102,7 @@ public partial class MainWindow
     {
         int? line = projection?.FindDisplayLine(sourceLineIndex + 1);
         if (line is null) return false;
+        using var navigation = BeginNavigation();
         var row = Editor.Document.GetLineByNumber(line.Value);
         int offset = row.Offset + Math.Clamp(column - 1, 0, row.Length);
         Editor.Select(offset, Math.Clamp(length, 0, Editor.Document.TextLength - offset));
@@ -109,6 +112,7 @@ public partial class MainWindow
     private async Task NavigateOriginalAsync(int sourceLine, int column = 1, int length = 0)
     {
         if (ActiveScope is { } scope && !scope.Contains(sourceLine)) return;
+        using var navigation = BeginNavigation();
         var source = data;
         if (NavigateVisible(sourceLine, column, length)) return;
         if (await ShowContextAsync(sourceLine) && source == data) NavigateVisible(sourceLine, column, length);
@@ -167,6 +171,7 @@ public partial class MainWindow
             !draft.Includes.SequenceEqual(appliedFilter.Includes, StringComparer.Ordinal) ||
             !draft.Excludes.SequenceEqual(appliedFilter.Excludes, StringComparer.Ordinal);
         FilterDirtyStatus.Text = pending ? "변경 사항 미적용 · ‘필터 적용’을 누르세요." : "입력한 조건과 현재 적용 조건이 같습니다.";
+        ContentFilterHeader.Text = "내용 필터" + (HasContentFilter ? " · 적용 중" : " · 없음") + (pending ? " · 미적용 변경" : "");
     }
     private void UpdateFilterSummary()
     {
@@ -177,6 +182,7 @@ public partial class MainWindow
         if (details.Count > 0 && appliedFilter.MatchCase) details.Add("대소문자 구분");
         FilterSummary.Text = details.Count == 0 ? "현재 적용: 내용 필터 없음" : "현재 적용: " + string.Join(" · ", details);
         UpdateFilterDraftStatus();
+        UpdateEmptyResultState();
     }
     private async void Context_Click(object sender, RoutedEventArgs e)
     {
@@ -204,6 +210,7 @@ public partial class MainWindow
     {
         if (data is null || sourceLine < 0 || sourceLine >= data.Lines.Count) return false;
         if (ActiveScope is { } scope && !scope.Contains(sourceLine)) return false;
+        using var navigation = BeginNavigation();
         if (!int.TryParse(ContextRadiusBox.Text, out int radius) || radius < 0 || radius > 10000)
         { ContextInputStatus.Text = "앞뒤 기록 수는 0~10,000 사이로 입력하세요."; ShowAnalysisTool(0); return false; }
         var captured = data;

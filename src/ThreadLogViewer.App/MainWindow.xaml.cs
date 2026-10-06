@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.6.4";
+    private const string AppTitle = "ThreadLog Viewer v0.7.0";
 
     public MainWindow() : this(null, true) { }
     public MainWindow(string? settingsDirectory, bool persistSettings)
@@ -112,12 +112,15 @@ public partial class MainWindow : Window
         SetFilterLock(lockFilters);
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Visible;
         ProgressBar.Value = 0;
-        OperationStatus.Text = label;
+        WorkStatus.Text = label;
+        workStartingStatus = OperationStatus.Text;
+        workLabel = label;
+        UpdateEmptyResultState();
         UpdateMenus();
         var progress = new Progress<WorkProgress>(p =>
         {
             if (!work.IsCurrent(operation.Version) || operation.Token.IsCancellationRequested || !busy) return;
-            OperationStatus.Text = $"{p.Phase}… {p.Percent:F0}%";
+            WorkStatus.Text = $"{p.Phase}… {p.Percent:F0}%";
             ProgressBar.Value = p.Percent;
         });
         return (operation.Version, operation.Token, progress);
@@ -126,10 +129,13 @@ public partial class MainWindow : Window
     {
         if (!work.IsCurrent(version)) return;
         busy = false;
+        if (OperationStatus.Text == workStartingStatus)
+            OperationStatus.Text = workLabel.TrimEnd('…', '.', ' ') + " 완료 · 읽기 전용";
         WorkPanel.Visibility = Visibility.Collapsed;
         SetFilterLock(false);
         ExportButton.IsEnabled = projection is not null && !IsBlankSession;
         CancelButton.Visibility = ProgressBar.Visibility = Visibility.Collapsed;
+        UpdateEmptyResultState();
         UpdateMenus();
     }
     private static TextDocument PrepareDocument(string text, CancellationToken token, IProgress<WorkProgress> progress)
@@ -154,19 +160,19 @@ public partial class MainWindow : Window
         if (existing is not null && mode == EncodingMode.Auto)
         { if (existing == activeSession && busy) CancelSessionWork(); ActivateSession(existing); return Task.FromResult(true); }
         return LoadIntoSessionAsync((token, progress) => LogFileReader.ReadAsync(fullPath, mode, token, progress),
-            "파일 읽기 준비…", "파일을 열 수 없습니다", existing);
+            "파일 읽기 준비…", "파일을 열 수 없습니다", existing, mode);
     }
     private Task ReloadCurrentAsync(EncodingMode mode)
     {
         if (ActiveScope is not null || activeSession?.Source.SourcePath is not { } path) return Task.CompletedTask;
         return LoadIntoSessionAsync((token, progress) => LogFileReader.ReadAsync(path, mode, token, progress),
-            "인코딩으로 다시 읽기…", "파일을 다시 읽을 수 없습니다", activeSession);
+            "인코딩으로 다시 읽기…", "파일을 다시 읽을 수 없습니다", activeSession, mode);
     }
     private Task<bool> LoadAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
         string startingMessage, string errorTitle) => LoadIntoSessionAsync(load, startingMessage, errorTitle, null);
 
     private async Task<bool> LoadIntoSessionAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
-        string startingMessage, string errorTitle, LogSession? replaceSession)
+        string startingMessage, string errorTitle, LogSession? replaceSession, EncodingMode encodingMode = EncodingMode.Auto)
     {
         if (replaceSession is null && IsBlankSession) replaceSession = activeSession;
         if (busy) RestoreFilters();
@@ -182,7 +188,7 @@ public partial class MainWindow : Window
             }, op.Token);
             op.Token.ThrowIfCancellationRequested();
             if (!work.IsCurrent(op.Version)) return false;
-            CommitLoadedSession(result.loaded, result.view, result.document, replaceSession);
+            CommitLoadedSession(result.loaded, result.view, result.document, replaceSession, encodingMode: encodingMode);
             OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용";
             return true;
         }
@@ -220,9 +226,8 @@ public partial class MainWindow : Window
         int totalLines = ActiveScope is { } scope ? scope.LastLineIndex - scope.FirstLineIndex + 1 : view.Source.Lines.Count;
         int totalEntries = ActiveScope is { } entriesScope ? view.Source.Lines[entriesScope.LastLineIndex].EntryIndex - view.Source.Lines[entriesScope.FirstLineIndex].EntryIndex + 1 : view.Source.Entries.Count;
         CountStatus.Text = $"{view.EntryCount:N0}/{totalEntries:N0}건 · 표시 {view.Count:N0}/{totalLines:N0}줄";
-        EmptyHint.Text = view.Source.Lines.Count == 0 ? "빈 파일입니다." : "표시할 기록이 없습니다. 필터 조건을 확인하세요.";
         EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        EmptyDetail.Text = view.Source.Lines.Count == 0 ? "다른 파일을 열거나 Ctrl+V로 로그를 붙여넣으세요." : "전체 선택 또는 왼쪽 스레드 체크박스를 사용하세요.";
+        UpdateEmptyResultState();
         UpdateBlankSessionHint();
         _ = SearchAsync();
         _ = RefreshKeywordsAsync();
@@ -310,7 +315,17 @@ public partial class MainWindow : Window
     }
     private void ShowError(string title, Exception ex)
     {
-        OperationStatus.Text = $"{title} · 이전 화면 유지";
+        string action = ex switch
+        {
+            OutOfMemoryException => "다른 탭을 닫거나 더 작은 로그 범위를 열어 다시 시도하세요.",
+            UnauthorizedAccessException => "파일·폴더의 읽기/쓰기 권한을 확인한 뒤 다시 시도하세요.",
+            DecoderFallbackException => "파일 → 인코딩으로 다시 읽기에서 한국어(CP949)를 선택하세요.",
+            EncoderFallbackException => "원본의 잘못된 문자를 확인하거나 다른 범위를 내보내세요.",
+            IOException when title.Contains("내보내기", StringComparison.Ordinal) => "원본과 다른 새 파일 이름·저장 폴더를 선택하세요.",
+            IOException => "파일 위치와 다른 프로그램의 사용 여부를 확인한 뒤 다시 시도하세요.",
+            _ => "입력 값이나 파일 형식을 확인한 뒤 다시 시도하세요."
+        };
+        OperationStatus.Text = $"{title} · {action} · 이전 화면 유지 · {ex.Message}";
         if (IsVisible) MessageBox.Show(this, ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
     private void Wrap_Changed(object sender, RoutedEventArgs e) { if (Editor is not null) Editor.WordWrap = WrapBox.IsChecked == true; ScheduleSettingsSave(); }

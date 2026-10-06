@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Editing;
 using ThreadLogViewer.Core;
@@ -12,16 +13,22 @@ public partial class MainWindow
 {
     // Sessions live in memory only. Each keeps its immutable source and its own view state.
     private readonly ObservableCollection<LogSession> sessions = [];
+    private readonly ClosedSessionRetention<LogSession> closedSessions = new(SessionResources);
     private LogSession? activeSession;
     private bool selectingSession;
     private long fileBatchVersion;
     private int pastedSessionNumber;
     private int? separationStartLine;
     private LogLineRange? ActiveScope => activeSession?.Scope;
+    private bool CanRestoreClosedSession => closedSessions.Count > 0;
+    private bool CanRefreshCurrentSession => activeSession is { IsBlank: false, Scope: null } session && session.Source.SourcePath is not null;
 
     private sealed class LogSession(LogData source, LogProjection view, TextDocument document, string title, LogLineRange? scope = null, string? sourceTitle = null, bool isBlank = false)
     {
         public bool IsBlank { get; } = isBlank;
+        public EncodingMode EncodingMode { get; set; } = EncodingMode.Auto;
+        public NavigationHistory History { get; set; } = new();
+        public string ThreadSearchQuery { get; set; } = "";
         public LogData Source { get; } = source;
         public LogLineRange? Scope { get; } = scope;
         public int? SeparationStart { get; set; }
@@ -71,12 +78,17 @@ public partial class MainWindow
         public bool FilterExpanded { get; set; }
     }
 
-    private void InitializeSessions() => SessionTabs.ItemsSource = sessions;
+    private void InitializeSessions()
+    {
+        SessionTabs.ItemsSource = sessions;
+        Closed += (_, _) => closedSessions.Clear();
+    }
 
     private void CaptureActiveSession()
     {
         if (activeSession is not { } session || data is null || projection is null) return;
         session.View = projection; session.Document = Editor.Document; session.Threads = threadItems;
+        session.ThreadSearchQuery = ThreadSearchQuery;
         session.Position = CapturePosition(); session.EmptyPosition = emptyAnchor;
         session.SelectionStart = Editor.SelectionStart; session.SelectionLength = Editor.SelectionLength;
         session.WholeLineSelection = CaptureWholeLineSelection();
@@ -113,7 +125,8 @@ public partial class MainWindow
     }
 
     private void CommitLoadedSession(LogData source, LogProjection view, TextDocument document, LogSession? replace,
-        LogLineRange? scope = null, string? title = null, string? sourceTitle = null, bool isBlank = false)
+        LogLineRange? scope = null, string? title = null, string? sourceTitle = null, bool isBlank = false,
+        EncodingMode encodingMode = EncodingMode.Auto)
     {
         CaptureActiveSession();
         DetachSessionHandlers();
@@ -132,8 +145,10 @@ public partial class MainWindow
             threadItems = LogSlice.GetThreadSummaries(source, scope).Select(t => new ThreadItem(t, theme)).ToList();
             foreach (var item in threadItems) item.PropertyChanged += Thread_Changed;
             ThreadList.ItemsSource = threadItems;
+            ThreadSearchQuery = ""; RefreshThreadSearch();
             var session = new LogSession(source, view, document, title ??
-                (source.SourcePath is null ? $"붙여넣은 로그 {++pastedSessionNumber}" : Path.GetFileName(source.SourcePath)), scope, sourceTitle, isBlank);
+                (source.SourcePath is null ? $"붙여넣은 로그 {++pastedSessionNumber}" : Path.GetFileName(source.SourcePath)), scope, sourceTitle, isBlank)
+                { EncodingMode = encodingMode };
             selectingSession = true;
             if (replace is not null && sessions.IndexOf(replace) is var index && index >= 0) sessions[index] = session;
             else sessions.Add(session);
@@ -144,6 +159,7 @@ public partial class MainWindow
         finally { selectingSession = false; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdatePosition(); UpdateTime(); UpdateSplitStatus(); UpdateFilterSummary();
         _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus(); CaptureActiveSession();
+        closedSessions.Trim(sessions);
     }
 
     private void ActivateSession(LogSession session)
@@ -158,6 +174,7 @@ public partial class MainWindow
             threadItems = session.Threads;
             foreach (var item in threadItems) { item.ApplyTheme(theme); item.PropertyChanged += Thread_Changed; }
             ThreadList.ItemsSource = threadItems;
+            ThreadSearchQuery = session.ThreadSearchQuery; RefreshThreadSearch();
             bookmarks.Clear(); foreach (var bookmark in session.Bookmarks) bookmarks.Toggle(bookmark.SourceLineIndex, bookmark.Label);
             timeA = session.TimeA; timeB = session.TimeB;
             separationStartLine = session.SeparationStart;
@@ -186,12 +203,40 @@ public partial class MainWindow
             int end = Math.Clamp(start + session.SelectionLength, start, Editor.Document.TextLength);
             Editor.TextArea.Selection = Selection.Create(Editor.TextArea, start, end);
             if (session.WholeLineSelection is { } selectedLines) RestoreWholeLineSelection(selectedLines);
+            RestoreSessionViewport(session);
         }
         finally { selectingSession = wasSelectingSession; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdateExportLabel(contextActive); UpdateFilterSummary();
         UpdatePosition(); RefreshBookmarks(); UpdateTime(); UpdateSplitStatus(); UpdateAnalysisInputState();
         _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus();
         OperationStatus.Text = $"{session.DisplayTitle} · 탭 전환 완료";
+    }
+
+    private void RestoreSessionViewport(LogSession session)
+    {
+        if (session.Position is not { } anchor || projection is not { Count: > 0 } view) return;
+        void RestoreViewport()
+        {
+            if (Editor.ActualWidth <= 0 || Editor.ActualHeight <= 0) return;
+            Editor.UpdateLayout(); Editor.TextArea.TextView.EnsureVisualLines();
+            int top = view.FindDisplayLine(anchor.TopSourceLine + 1, true) ?? 1;
+            Editor.ScrollToVerticalOffset(Editor.TextArea.TextView.GetVisualTopByDocumentLine(top) + anchor.TopDelta);
+            Editor.ScrollToHorizontalOffset(anchor.Horizontal);
+        }
+        // Document replacement and selection can clamp against the previous document's empty extent.
+        // Restore after selection, then once more after WPF has rebuilt the visible document's layout.
+        RestoreViewport();
+        long expectedView = viewVersion;
+        int caret = Editor.TextArea.Caret.Offset, start = Editor.SelectionStart, length = Editor.SelectionLength;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (!viewReady || activeSession != session || projection != view || viewVersion != expectedView ||
+                Editor.Document != session.Document || Editor.TextArea.Caret.Offset != caret ||
+                Editor.SelectionStart != start || Editor.SelectionLength != length) return;
+            bool previousRestoring = restoringPosition; restoringPosition = true;
+            try { RestoreViewport(); }
+            finally { restoringPosition = previousRestoring; }
+        }));
     }
 
     private void UpdateSourceHeader()
@@ -233,7 +278,8 @@ public partial class MainWindow
             if (!work.IsCurrent(op.Version) || source != data || parentScope != ActiveScope) return false;
             separationStartLine = null;
             CommitLoadedSession(source, result.view, result.document, null, range,
-                $"{baseTitle} · {range.FirstLineIndex + 1:N0}~{range.LastLineIndex + 1:N0}줄", baseTitle);
+                $"{baseTitle} · {range.FirstLineIndex + 1:N0}~{range.LastLineIndex + 1:N0}줄", baseTitle,
+                encodingMode: activeSession?.EncodingMode ?? EncodingMode.Auto);
             OperationStatus.Text = "세션 분리 완료 · 시작과 끝 포함 · 숨겨진 원본 줄도 포함 · 원본 번호 유지";
             return true;
         }
@@ -279,11 +325,53 @@ public partial class MainWindow
                 if (next is not null) ActivateSession(next); else ClearLastSession();
             }
             sessions.Remove(session);
+            bool retained = closedSessions.Add(session, index, sessions, out int evicted);
             SessionTabs.SelectedItem = activeSession;
             SessionTabs.Visibility = sessions.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            OperationStatus.Text = retained ? $"{session.DisplayTitle} · 탭 닫기 완료 · Ctrl+Shift+T로 복원" +
+                (evicted > 0 ? " · 보관 한도로 오래된 닫은 탭을 정리했습니다." : "") :
+                $"{session.DisplayTitle} · 탭을 닫았습니다. 복원 보관의 추정 메모리 128MiB 한도를 넘어 보관하지 않았습니다. " +
+                (session.Source.SourcePath is null ? "붙여넣은 원문을 다시 복사해 열어 주세요." : "원본 파일을 다시 열어 주세요.");
         }
         finally { selectingSession = false; }
         UpdateMenus();
+    }
+    private void RestoreClosedSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (!closedSessions.TryPop(out var session, out int index) || session is null) return;
+        fileBatchVersion++;
+        selectingSession = true;
+        try
+        {
+            sessions.Insert(Math.Clamp(index, 0, sessions.Count), session);
+            SessionTabs.Visibility = Visibility.Visible;
+            ActivateSession(session);
+            SessionTabs.SelectedItem = session;
+        }
+        finally { selectingSession = false; }
+        closedSessions.Trim(sessions);
+        UpdateMenus();
+        OperationStatus.Text = $"{session.DisplayTitle} · 닫은 탭 복원 완료 · 원문과 분석 상태 유지";
+    }
+
+    private static IEnumerable<RetainedResource> SessionResources(LogSession session)
+    {
+        // Conservative estimates, not process working-set measurements. Shared immutable snapshots count once.
+        yield return new(session.Source, 256L + 2L * session.Source.Text.Length +
+            132L * session.Source.Lines.Count + 16L * session.Source.Entries.Count + 96L * session.Source.Threads.Count);
+        yield return new(session.View, 128L + 8L * session.View.Count + 4L * session.View.EntryCount);
+        if (!ReferenceEquals(session.View.Text, session.Source.Text)) yield return new(session.View.Text, 32L + 2L * session.View.Text.Length);
+        yield return new(session.Document, 256L + 2L * session.Document.TextLength + 80L * session.View.Count);
+        yield return new(session.Threads, 64L + 160L * session.Threads.Count);
+        yield return new(session.History, 64L + 128L * (session.History.Back.Count + session.History.Forward.Count));
+        if (session.WholeLineSelection is { } selection) yield return new(selection, 32L + 4L * selection.Length);
+        yield return new(session, 2048L + 64L * session.Bookmarks.Length + 32L * (session.SearchRanges?.Count ?? 0));
+        foreach (string text in new[] { session.Includes, session.Excludes, session.Query, session.KeywordInput,
+            session.ThreadSearchQuery, session.ContextText, session.ContextInput, session.ContextRadius,
+            session.DisplayTitle, session.SourceTitle }.Concat(session.Filter.Includes).Concat(session.Filter.Excludes)
+            .Concat(session.Bookmarks.Select(bookmark => bookmark.Label)).Concat(session.Keywords.Select(rule => rule.Keyword)))
+            yield return new(text, 32L + 2L * text.Length);
+        foreach (var rule in session.Keywords) yield return new(rule, 96);
     }
     private void ClearLastSession()
     {
@@ -292,6 +380,7 @@ public partial class MainWindow
         {
             activeSession = null; data = null; projection = null; threadItems = [];
             ThreadList.ItemsSource = null; keywordRules.Clear(); KeywordBox.Clear();
+            ThreadSearchQuery = ""; RefreshThreadSearch();
             threadRenderer.Projection = margin.Projection = null;
             ResetDocumentFeatures(); Editor.Document = new TextDocument();
             SearchBox.Clear(); ResultsList.ItemsSource = null;

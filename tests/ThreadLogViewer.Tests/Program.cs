@@ -11,6 +11,8 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length == 3 && args[0] == "--workbench-benchmark")
+            return await WorkbenchPerformanceProbe.RunAsync(args[1], int.Parse(args[2]));
         if (args.Length != 3 || args[0] != "--benchmark")
         {
             Console.WriteLine("Automated tests: dotnet test. Benchmark: --benchmark <output-directory> <MiB>");

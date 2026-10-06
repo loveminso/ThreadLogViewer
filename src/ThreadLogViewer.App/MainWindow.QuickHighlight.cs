@@ -7,7 +7,7 @@ namespace ThreadLogViewer.App;
 
 public partial class MainWindow
 {
-    private const int MaximumQuickHighlightPhraseLength = 4096;
+    private const int MaximumQuickHighlightPhraseLength = HighlightPrompt.MaximumPhraseLength;
     private static readonly string[] QuickHighlightColorNames = ["주황", "보라", "청록", "파랑", "분홍", "초록"];
 
     private void ToggleHighlight_Click(object sender, RoutedEventArgs e) => ToggleHighlightAtSelection();
@@ -48,7 +48,7 @@ public partial class MainWindow
             return true;
         }
         if (keywordRules.Count >= HighlightPrompt.MaximumRules)
-        { OperationStatus.Text = "강조 문구는 최대 8개입니다. 기존 문구에서 Shift+F8로 해제하거나 ‘강조 문구 관리’를 여세요."; return false; }
+        { OperationStatus.Text = "강조 문구는 최대 8개입니다. 기존 문구에서 Shift+F8로 해제하거나 ‘강조 문구 관리’에서 문구를 삭제·수정하세요. 사용만 끄면 등록 수는 유지됩니다."; return false; }
         int colorIndex = Enumerable.Range(0, QuickHighlightColorNames.Length)
             .FirstOrDefault(color => keywordRules.All(rule => rule.ColorIndex != color), -1);
         if (colorIndex < 0) colorIndex = keywordRules.Count % QuickHighlightColorNames.Length;

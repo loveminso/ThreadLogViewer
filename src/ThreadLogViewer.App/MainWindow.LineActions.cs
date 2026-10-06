@@ -261,7 +261,14 @@ public partial class MainWindow
     }
     private bool ApplyHighlightRules(IReadOnlyList<HighlightRuleDraft> rules)
     {
-        if (!HighlightPrompt.IsValid(rules)) { OperationStatus.Text = "강조 문구는 비어 있지 않아야 하며 최대 8개까지 등록할 수 있습니다."; return false; }
+        if (!HighlightPrompt.IsValid(rules))
+        {
+            OperationStatus.Text = rules.Count > HighlightPrompt.MaximumRules
+                ? "강조 문구는 최대 8개입니다. ‘강조 문구 관리’에서 기존 문구를 수정하거나 삭제하세요."
+                : rules.Select(rule => rule is null ? "강조 규칙이 유효하지 않습니다. ‘강조 문구 관리’에서 다시 등록하세요." : HighlightPrompt.PhraseError(rule.Phrase)).FirstOrDefault(error => error is not null)
+                    ?? "강조 색이 유효하지 않습니다. ‘강조 문구 관리’에서 각 규칙의 색을 다시 선택하세요.";
+            return false;
+        }
         foreach (var item in keywordRules) item.PropertyChanged -= Keyword_Changed;
         keywordRules.Clear();
         foreach (var draft in rules)

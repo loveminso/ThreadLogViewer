@@ -12,6 +12,7 @@ namespace ThreadLogViewer.App;
 
 public sealed class ThreadBackgroundRenderer : IBackgroundRenderer
 {
+    public bool Enabled { get; set; } = true;
     public LogProjection? Projection { get; set; }
     public int? ContextEntryIndex { get; set; }
     public int? ActionLineIndex { get; set; }
@@ -63,9 +64,9 @@ public sealed class ThreadBackgroundRenderer : IBackgroundRenderer
         {
             var line = Projection.AtDisplayLine(visual.FirstDocumentLine.LineNumber);
             if (line is null) continue;
-            Brush brush = Theme.ThreadBackground(line.Value.ThreadId);
             double top = visual.VisualTop - textView.VerticalOffset;
-            drawingContext.DrawRectangle(brush, null, new Rect(0, top, textView.ActualWidth, visual.Height));
+            if (Enabled)
+                drawingContext.DrawRectangle(Theme.ThreadBackground(line.Value.ThreadId), null, new Rect(0, top, textView.ActualWidth, visual.Height));
             drawingContext.DrawRectangle(Theme.ThreadMarker(line.Value.ThreadId), null, new Rect(0, top, 2, visual.Height));
             if (ContextEntryIndex == line.Value.EntryIndex)
             {

@@ -42,7 +42,7 @@ public sealed class WorkbenchTheme(bool dark)
         {
             Color marker = ((SolidColorBrush)ThreadMarker(id)).Color;
             Color background = ((SolidColorBrush)Background).Color;
-            const double opacity = 0.085;
+            double opacity = IsDark ? 0.18 : 0.16;
             byte Blend(byte a, byte b) => (byte)Math.Round(a * opacity + b * (1 - opacity));
             var mixed = new SolidColorBrush(Color.FromRgb(Blend(marker.R, background.R), Blend(marker.G, background.G), Blend(marker.B, background.B)));
             mixed.Freeze(); rows[key] = brush = mixed;

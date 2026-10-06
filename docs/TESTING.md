@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-현재 기능의 수동 확인 절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md), 키 조작은 [단축키 표](SHORTCUTS.md), 실제 빌드·회귀·배포 결과는 [v0.6.2 검증 기록](VALIDATION-v0.6.2.md)을 따른다. 기대 결과와 실제 통과 기록을 구분한다.
+현재 기능의 수동 확인 절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md), 키 조작은 [단축키 표](SHORTCUTS.md), 실제 빌드·회귀·배포 결과는 [v0.7.0 검증 기록](VALIDATION-v0.7.0.md)을 따른다. 기대 결과와 실제 통과 기록을 구분한다.
 
 ## 자동 회귀
 
@@ -24,3 +24,11 @@ $env:NUGET_PACKAGES = Join-Path $PWD '.nuget\packages'
 사용자가 합성 샘플로 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 화면 조작을 직접 확인한다. 자동 테스트 통과나 숨긴 창의 PNG 생성은 실제 GUI 통과를 의미하지 않는다. 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
+
+Release 빌드 뒤 합성 작업 측정은 테스트 실행 파일의 별도 경로를 사용한다. 아래 결과 경로가 없을 때 실행하며 첫 실행의 OS 캐시·GC 상태 영향을 함께 기록한다.
+
+```powershell
+& .\.tools\dotnet\dotnet.exe .\tests\ThreadLogViewer.Tests\bin\Release\net10.0-windows\ThreadLogViewer.Tests.dll --workbench-benchmark TestResults\my-workbench-run 100
+```
+
+100 MiB 읽기/필터, 세 탭, 1 MiB 한 줄, 10만 검색 결과와 실제 reader 진행 후 취소를 실행한다. JSON에 시간·메모리·25ms dispatcher 대기·취소 확인을 구분하고 작은 창의 비표시 렌더를 생성한다. 높은 bitmap DPI는 실제 모니터 DPI 검증을 대신하지 않는다. 창을 닫은 뒤 GC 값과 약한 참조 회수 여부는 별도 지표이며, 미회수 원인 확인 없이 누수 여부를 결론내리지 않는다.

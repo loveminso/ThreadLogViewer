@@ -16,6 +16,11 @@ public partial class MainWindow
         if (MainMenu is null) return;
         bool hasLog = projection is not null && !IsBlankSession;
         EncodingMenu.IsEnabled = !busy && requestedPath is not null && ActiveScope is null;
+        RefreshSessionMenu.IsEnabled = CanRefreshCurrentSession;
+        RestoreSessionMenu.IsEnabled = CanRestoreClosedSession;
+        BackNavigationMenu.IsEnabled = !busy && activeSession?.History.Back.Count > 0;
+        ForwardNavigationMenu.IsEnabled = !busy && activeSession?.History.Forward.Count > 0;
+        ThreadBackgroundMenu.IsChecked = threadRenderer.Enabled;
         WrapMenu.IsChecked = WrapBox.IsChecked == true;
         foreach (var item in FontMenu.Items.OfType<MenuItem>())
             if (item.Tag is string tag && tag.StartsWith("font:", StringComparison.Ordinal))
@@ -66,6 +71,13 @@ public partial class MainWindow
     {
         WrapBox.IsChecked = WrapMenu.IsChecked;
         UpdateMenus();
+    }
+    private void ThreadBackgroundMenu_Click(object sender, RoutedEventArgs e)
+    {
+        threadRenderer.Enabled = ThreadBackgroundMenu.IsChecked;
+        Editor.TextArea.TextView.InvalidateLayer(ICSharpCode.AvalonEdit.Rendering.KnownLayer.Background);
+        ScheduleSettingsSave();
+        OperationStatus.Text = threadRenderer.Enabled ? "스레드별 배경색 켜짐" : "스레드별 배경색 꺼짐";
     }
 
     private void MenuAppearance_Click(object sender, RoutedEventArgs e)

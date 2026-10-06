@@ -10,6 +10,7 @@ public sealed record UiSettings
     public double PanelWidth { get; init; } = 295;
     public double ResultsHeight { get; init; } = 180;
     public bool ResultsCollapsed { get; init; }
+    public bool ThreadBackgrounds { get; init; } = true;
     public static UiSettings Default { get; } = new();
 
     public UiSettings Normalize() => this with
