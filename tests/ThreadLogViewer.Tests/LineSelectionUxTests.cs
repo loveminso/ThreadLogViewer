@@ -39,8 +39,7 @@ public sealed class LineSelectionUxTests
                 Assert.Equal(line.Offset, editor.TextArea.Caret.Offset);
                 Assert.Equal(display, editor.TextArea.Caret.Line);
             }
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-            Assert.Equal(4, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
+            Assert.Equal(4, (int?)Invoke(window, "CurrentSourceLine"));
             Assert.True(editor.IsReadOnly);
             Assert.Equal(text, source.Text);
             Assert.Equal(text, editor.Text);
@@ -133,8 +132,7 @@ public sealed class LineSelectionUxTests
             Assert.True(margin.SelectLineAtPoint(wrappedPoint));
             Assert.Equal(body + "\r\n", editor.SelectedText);
             Assert.Equal(2, editor.TextArea.Caret.Line);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-            Assert.Equal(1, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
+            Assert.Equal(1, (int?)Invoke(window, "CurrentSourceLine"));
             string selected = editor.SelectedText;
             view.EnsureVisualLines();
             var last = view.VisualLines.Last();

@@ -5,7 +5,6 @@ using System.Text.Json;
 namespace ThreadLogViewer.Core;
 
 public sealed record SavedHighlight(string Phrase, int Color, bool Enabled = true);
-public sealed record SavedBookmark(int Line, string Label);
 public sealed record SavedPosition(int Line, int Column, int TopLine, double TopDelta, double Horizontal);
 public sealed record SavedNavigation(SavedPosition Position, int? ContextLine);
 public sealed record SourceStamp(string Hash, int Characters, int Lines);
@@ -28,7 +27,6 @@ public sealed record SavedAnalysis
     public string? SourceTitle { get; init; }
     public LogLineRange? Scope { get; init; }
     public AnalysisPreset Preset { get; init; } = new();
-    public SavedBookmark[] Bookmarks { get; init; } = [];
     public SavedPosition? Position { get; init; }
     public SavedPosition? EmptyPosition { get; init; }
     public SavedPosition? NormalPosition { get; init; }
@@ -55,7 +53,6 @@ public sealed record SavedAnalysis
     public int? TimeB { get; init; }
     public int? SeparationStart { get; init; }
     public bool FilterExpanded { get; init; }
-    public bool BookmarksExpanded { get; init; }
     public int AnalysisTool { get; init; }
     public SavedNavigation[] Back { get; init; } = [];
     public SavedNavigation[] Forward { get; init; } = [];
@@ -230,7 +227,7 @@ public static class AnalysisFiles
             value.IncludesDraft is null || value.IncludesDraft.Length > 1024 * 1024 || value.ExcludesDraft is null || value.ExcludesDraft.Length > 1024 * 1024 ||
             value.KeywordDraft is null || value.KeywordDraft.Length > 4096 || value.KeywordColor is < 0 or > 5 ||
             value.SearchScope is < 0 or > 2 || value.AnalysisTool is < 0 or > 2 || value.ContextRadius is < 0 or > 10000 ||
-            value.Bookmarks is null || value.Bookmarks.Length > 100000 || value.Selection is null || value.Selection.Length > 100000 ||
+            value.Selection is null || value.Selection.Length > 100000 ||
             value.Back is null || value.Forward is null || value.Back.Length > 100 || value.Forward.Length > 100 ||
             value.SourcePath is null && value.PastedText is null)
             throw new InvalidDataException("분석 파일의 값 또는 원문 정보가 올바르지 않습니다.");
@@ -242,8 +239,6 @@ public static class AnalysisFiles
         bool Position(SavedPosition? point) => point is null || Line(point.Line) && Line(point.TopLine) && point.Column >= 1 &&
             double.IsFinite(point.TopDelta) && point.TopDelta is >= 0 and <= 10000000 && double.IsFinite(point.Horizontal) && point.Horizontal >= 0;
         if (value.Scope is { } scope && (scope.FirstLineIndex < 0 || scope.LastLineIndex < scope.FirstLineIndex || scope.LastLineIndex >= value.Source.Lines) ||
-            value.Bookmarks.Any(bookmark => bookmark is null || !Line(bookmark.Line) || bookmark.Label is null || bookmark.Label.Length > 4096) ||
-            value.Bookmarks.Select(bookmark => bookmark.Line).Distinct().Count() != value.Bookmarks.Length ||
             !Position(value.Position) || !Position(value.EmptyPosition) || !Position(value.NormalPosition) ||
             !OptionalLine(value.ContextLine) || !OptionalLine(value.TimeA) || !OptionalLine(value.TimeB) || !OptionalLine(value.SeparationStart) ||
             value.TimeA is null && value.TimeB is not null || value.WholeLines?.Any(line => !Line(line)) == true ||

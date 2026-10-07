@@ -54,7 +54,6 @@ public partial class MainWindow
     {
         SourcePath = session.Source.SourcePath, PastedText = session.Source.SourcePath is null ? session.Source.Text : null,
         Encoding = session.EncodingMode, Title = session.DisplayTitle, SourceTitle = session.SourceTitle, Scope = session.Scope, Preset = CapturePreset(session),
-        Bookmarks = session.Bookmarks.Select(bookmark => new SavedBookmark(bookmark.SourceLineIndex, bookmark.Label)).ToArray(),
         Position = SavePosition(session.Position), EmptyPosition = SavePosition(session.EmptyPosition), NormalPosition = SavePosition(session.NormalPosition),
         Selection = SelectionSourceRanges.Map(session.View, [new(session.SelectionStart, session.SelectionLength)]).ToArray(),
         WholeLines = session.WholeLineSelection?.ToArray(), IncludesDraft = session.Includes, ExcludesDraft = session.Excludes,
@@ -65,7 +64,7 @@ public partial class MainWindow
         ContextLine = session.Context ? session.ContextLine : null,
         ContextRadius = int.TryParse(session.ContextRadius, out int radius) ? Math.Clamp(radius, 0, 10000) : 20,
         TimeA = session.TimeA?.SourceLineIndex, TimeB = session.TimeB?.SourceLineIndex, SeparationStart = session.SeparationStart,
-        FilterExpanded = session.FilterExpanded, BookmarksExpanded = session.BookmarksExpanded, AnalysisTool = session.AnalysisTool,
+        FilterExpanded = session.FilterExpanded, AnalysisTool = session.AnalysisTool,
         Back = session.History.Back.Select(point => new SavedNavigation(SavePosition(point.Position)!, point.Context ? point.ContextLine : null)).ToArray(),
         Forward = session.History.Forward.Select(point => new SavedNavigation(SavePosition(point.Position)!, point.Context ? point.ContextLine : null)).ToArray()
     };
@@ -132,7 +131,7 @@ public partial class MainWindow
                 if (SameRefreshState(latest, previous, back, forward)) break;
             }
             int evicted = InstallAnalysisSession(next, previous);
-            OperationStatus.Text = "필터·강조 프리셋 적용 완료 · 북마크와 원문 유지" + ClosedRetentionNotice(evicted);
+            OperationStatus.Text = "필터·강조 프리셋 적용 완료 · 원문과 탐색 상태 유지" + ClosedRetentionNotice(evicted);
         }
         catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) OperationStatus.Text = "프리셋 불러오기 취소 · 이전 분석 유지"; }
         catch (Exception ex) when (AnalysisFileFailure(ex)) { if (work.IsCurrent(op.Version)) ShowError("프리셋 불러오기 실패", ex); }
@@ -158,7 +157,7 @@ public partial class MainWindow
             }, op.Token);
             if (!work.IsCurrent(op.Version) || op.Token.IsCancellationRequested || previous != activeSession || existing != data) return;
             int evicted = InstallAnalysisSession(next, previous is { IsBlank: true } || next.Source == existing && next.Scope == previous?.Scope ? previous : null);
-            OperationStatus.Text = "분석 상태 복원 완료 · 원문 일치 확인 · 북마크·조건·강조·위치 복원" + ClosedRetentionNotice(evicted);
+            OperationStatus.Text = "분석 상태 복원 완료 · 원문 일치 확인 · 조건·강조·위치 복원" + ClosedRetentionNotice(evicted);
         }
         catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) OperationStatus.Text = "분석 상태 불러오기 취소 · 이전 분석 유지"; }
         catch (Exception ex) when (AnalysisFileFailure(ex)) { if (work.IsCurrent(op.Version)) ShowError("분석 상태 불러오기 실패", ex); }
@@ -183,13 +182,12 @@ public partial class MainWindow
             NormalPosition = ReadPosition(state.NormalPosition), NormalThreads = state.ContextLine is null ? null : selected,
             Keywords = state.Preset.Highlights.Select(rule => new KeywordRuleItem(rule.Phrase, rule.Color) { Enabled = rule.Enabled }).ToArray(),
             KeywordInput = state.KeywordDraft, KeywordColor = state.KeywordColor, ThreadSearchQuery = state.ThreadQuery,
-            Bookmarks = state.Bookmarks.Select(bookmark => new Bookmark(bookmark.Line, bookmark.Label)).ToArray(),
             Query = state.Query, SearchCase = state.SearchCase, SearchWord = state.SearchWord, SearchRegex = state.SearchRegex, SearchScope = state.SearchScope,
             SearchRanges = state.SearchRanges, LastHit = state.LastHit, SearchVisible = state.SearchVisible, Context = state.ContextLine is not null,
             ContextLine = state.ContextLine, ContextRadius = state.ContextRadius.ToString(),
             TimeA = state.TimeA is { } a ? LogTimeAnalysis.ResolveAnchor(source, a) : null,
             TimeB = state.TimeB is { } b ? LogTimeAnalysis.ResolveAnchor(source, b) : null, SeparationStart = state.SeparationStart,
-            FilterExpanded = state.FilterExpanded, BookmarksExpanded = state.BookmarksExpanded, AnalysisTool = state.AnalysisTool,
+            FilterExpanded = state.FilterExpanded, AnalysisTool = state.AnalysisTool,
             WholeLineSelection = state.WholeLines?.Where(line => view.FindDisplayLine(line + 1) is not null).ToArray()
         };
         if (state.ContextLine is { } context)

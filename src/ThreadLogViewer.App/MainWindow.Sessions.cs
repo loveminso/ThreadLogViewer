@@ -45,7 +45,6 @@ public partial class MainWindow
         public string ToolTip => (IsBlank ? "새 빈 탭 · Ctrl+V로 로그 붙여넣기 / Ctrl+O로 파일 열기" : Source.SourcePath ?? "클립보드에서 연 로그 · 이 실행 중에만 유지됩니다.") +
             (Scope is { } range ? $"\n원본 {range.FirstLineIndex + 1:N0}~{range.LastLineIndex + 1:N0}줄 · 시작과 끝 포함 · 읽기 전용" : "");
         public List<ThreadItem> Threads { get; set; } = [];
-        public Bookmark[] Bookmarks { get; set; } = [];
         public PositionAnchor? Position { get; set; }
         public int SelectionStart { get; set; }
         public int SelectionLength { get; set; }
@@ -80,7 +79,6 @@ public partial class MainWindow
         public bool SearchVisible { get; set; }
         public bool AnalysisExpanded { get; set; }
         public int AnalysisTool { get; set; }
-        public bool BookmarksExpanded { get; set; }
         public bool FilterExpanded { get; set; }
     }
 
@@ -99,11 +97,10 @@ public partial class MainWindow
         SessionTabs.ItemsSource = null; sessions.Clear(); activeSession = null;
         data = null; projection = null; requestedPath = null;
         ThreadList.ItemsSource = null; threadItems = [];
-        keywordRules.Clear(); bookmarks.Clear(); BookmarkList.ItemsSource = null;
+        keywordRules.Clear();
         ResultsList.ItemsSource = null; searchHits = []; fixedSearchRanges = null; lastSearchLocation = null;
         searchRenderer.Index = keywordRenderer.Index = HighlightIndex.Empty;
         threadRenderer.Projection = margin.Projection = null;
-        margin.Bookmarks = new HashSet<int>();
         emptyAnchor = normalAnchor = null; normalSelectedThreads = null;
         timeA = timeB = null; separationStartLine = null; contextActive = false;
         viewVersion++;
@@ -119,7 +116,7 @@ public partial class MainWindow
         session.SelectionStart = Editor.SelectionStart; session.SelectionLength = Editor.SelectionLength;
         session.WholeLineSelection = CaptureWholeLineSelection();
         session.NormalPosition = normalAnchor; session.NormalThreads = normalSelectedThreads;
-        session.Bookmarks = bookmarks.Items.ToArray(); session.TimeA = timeA; session.TimeB = timeB;
+        session.TimeA = timeA; session.TimeB = timeB;
         session.SeparationStart = separationStartLine;
         session.Filter = appliedFilter; session.Includes = IncludeBox.Text; session.Excludes = ExcludeBox.Text;
         session.IncludeAll = IncludeModeBox.SelectedIndex == 1; session.FilterCase = FilterCaseBox.IsChecked == true;
@@ -133,7 +130,7 @@ public partial class MainWindow
         session.LastHit = lastSearchLocation; session.SearchVisible = SearchBar.Visibility == Visibility.Visible;
         session.AnalysisExpanded = AnalysisPanel.IsExpanded;
         session.AnalysisTool = TimeToolButton.IsChecked == true ? 1 : HighlightToolButton.IsChecked == true ? 2 : 0;
-        session.BookmarksExpanded = BookmarkPanel.IsExpanded; session.FilterExpanded = ContentFilterExpander.IsExpanded;
+        session.FilterExpanded = ContentFilterExpander.IsExpanded;
     }
 
     private void DetachSessionHandlers()
@@ -201,7 +198,6 @@ public partial class MainWindow
             foreach (var item in threadItems) { item.ApplyTheme(theme); item.PropertyChanged += Thread_Changed; }
             ThreadList.ItemsSource = threadItems;
             ThreadSearchQuery = session.ThreadSearchQuery; RefreshThreadSearch();
-            bookmarks.Clear(); foreach (var bookmark in session.Bookmarks) bookmarks.Toggle(bookmark.SourceLineIndex, bookmark.Label);
             timeA = session.TimeA; timeB = session.TimeB;
             separationStartLine = session.SeparationStart;
             appliedFilter = session.Filter; IncludeBox.Text = session.Includes; ExcludeBox.Text = session.Excludes;
@@ -220,7 +216,7 @@ public partial class MainWindow
             SearchBar.Visibility = session.SearchVisible ? Visibility.Visible : Visibility.Collapsed;
             ResultsPanel.Visibility = GoToPanel.Visibility = HiddenContextButton.Visibility = Visibility.Collapsed; hiddenTargetLine = null;
             SetAnalysisTool(session.AnalysisTool, false); AnalysisPanel.IsExpanded = false;
-            BookmarkPanel.IsExpanded = session.BookmarksExpanded; ContentFilterExpander.IsExpanded = session.FilterExpanded;
+            ContentFilterExpander.IsExpanded = session.FilterExpanded;
             SessionTabs.SelectedItem = session; SessionTabs.ScrollIntoView(session);
             PublishView(session.View, session.Document, false);
             restoringPosition = true;
@@ -233,7 +229,7 @@ public partial class MainWindow
         }
         finally { selectingSession = wasSelectingSession; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdateExportLabel(contextActive); UpdateFilterSummary();
-        UpdatePosition(); RefreshBookmarks(); UpdateTime(); UpdateSplitStatus(); UpdateAnalysisInputState();
+        UpdatePosition(); UpdateTime(); UpdateSplitStatus(); UpdateAnalysisInputState();
         _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus();
         OperationStatus.Text = $"{session.DisplayTitle} · 탭 전환 완료";
     }
@@ -429,11 +425,11 @@ public partial class MainWindow
         yield return new(session.Threads, 64L + 160L * session.Threads.Count);
         yield return new(session.History, 64L + 128L * (session.History.Back.Count + session.History.Forward.Count));
         if (session.WholeLineSelection is { } selection) yield return new(selection, 32L + 4L * selection.Length);
-        yield return new(session, 2048L + 64L * session.Bookmarks.Length + 32L * (session.SearchRanges?.Count ?? 0));
+        yield return new(session, 2048L + 32L * (session.SearchRanges?.Count ?? 0));
         foreach (string text in new[] { session.Includes, session.Excludes, session.Query, session.KeywordInput,
             session.ThreadSearchQuery, session.ContextText, session.ContextInput, session.ContextRadius,
             session.DisplayTitle, session.SourceTitle }.Concat(session.Filter.Includes).Concat(session.Filter.Excludes)
-            .Concat(session.Bookmarks.Select(bookmark => bookmark.Label)).Concat(session.Keywords.Select(rule => rule.Keyword)))
+            .Concat(session.Keywords.Select(rule => rule.Keyword)))
             yield return new(text, 32L + 2L * text.Length);
         foreach (var rule in session.Keywords) yield return new(rule, 96);
     }

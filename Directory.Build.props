@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.8.0</Version>
+    <Version>0.8.1</Version>
     <RestorePackagesPath>$(MSBuildThisFileDirectory).nuget/packages</RestorePackagesPath>
   </PropertyGroup>
 </Project>

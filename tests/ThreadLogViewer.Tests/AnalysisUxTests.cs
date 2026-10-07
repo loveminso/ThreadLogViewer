@@ -16,7 +16,7 @@ namespace ThreadLogViewer.Tests;
 public sealed class AnalysisUxTests
 {
     [Fact]
-    public Task ContextKeepsBookmarksAvailableAndDisplaysActualCountsAndExportScope() => InSta(async () =>
+    public Task ContextDisplaysActualCountsAndExportScopeWhileKeepingThreadListAvailable() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
         var window = new MainWindow(folder.Path, false);
@@ -25,7 +25,6 @@ public sealed class AnalysisUxTests
             await Load(window, SixtyRecords());
             var editor = Control<TextEditor>(window, "Editor");
             editor.TextArea.Caret.Line = 16;
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             Assert.True(await (Task<bool>)Invoke(window, "ShowContextAsync", 15)!);
             // Dependency-property values are immediate; their bindings drain at dispatcher DataBind priority.
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
@@ -35,8 +34,6 @@ public sealed class AnalysisUxTests
             Assert.False((bool)typeof(MainWindow).GetProperty("CanChangeFilters")!.GetValue(window)!);
             Assert.False(Control<StackPanel>(window, "ThreadFilterControls").IsEnabled);
             Assert.False(Control<StackPanel>(window, "TextFilterControls").IsEnabled);
-            Assert.True(Control<Expander>(window, "BookmarkPanel").IsEnabled);
-            Assert.Single(Field<BookmarkState>(window, "bookmarks").Items);
             var threadList = Control<ListBox>(window, "ThreadList");
             threadList.Measure(new Size(275, 400));
             threadList.Arrange(new Rect(0, 0, 275, 400));

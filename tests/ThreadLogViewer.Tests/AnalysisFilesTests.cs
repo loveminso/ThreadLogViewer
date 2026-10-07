@@ -54,12 +54,12 @@ public sealed class AnalysisFilesTests
         var source = LogParser.ParsePastedText(Text); var other = LogParser.ParsePastedText(Text.Replace("\r\n", "\n"));
         Assert.NotEqual(AnalysisFiles.Stamp(source), AnalysisFiles.Stamp(other));
         var valid = new SavedAnalysis { Source = AnalysisFiles.Stamp(source), PastedText = Text };
-        Assert.Throws<InvalidDataException>(() => AnalysisFiles.Validate(valid with { Bookmarks = [new(source.Lines.Count, "out of bounds")] }));
+        Assert.Throws<InvalidDataException>(() => AnalysisFiles.Validate(valid with { TimeA = source.Lines.Count }));
         Assert.Throws<InvalidDataException>(() => AnalysisFiles.Validate(valid with { Selection = [new(0, source.Text.Length + 1)] }));
         Assert.Throws<InvalidDataException>(() => AnalysisFiles.Validate(valid with { Position = new(0, 1, 0, 0, double.NaN) }));
     }
     [Fact]
-    public Task PastedAnalysisRestoresAfterClosingIncludingBookmarksFilterHighlightsAndSelection() => InSta(async () =>
+    public Task PastedAnalysisRestoresAfterClosingIncludingFilterHighlightsAndSelection() => InSta(async () =>
     {
         using var folder = new Folder(); string statePath = folder.File("state.json");
         var window = new MainWindow(folder.Path, false);
@@ -68,7 +68,6 @@ public sealed class AnalysisFilesTests
             await Load(window, Text); await (Task)Invoke(window, "SetThreadsAsync", (Func<ThreadItem, bool>)(thread => thread.Id == 1))!;
             await (Task)Invoke(window, "FilterAsync", new EntryFilter(["alpha"], []), null)!;
             var editor = Control<TextEditor>(window, "Editor"); editor.Select(editor.Text.IndexOf("alpha", StringComparison.Ordinal), 5);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs()); Field<BookmarkState>(window, "bookmarks").SetLabel(0, "synthetic checkpoint");
             Control<TextBox>(window, "KeywordBox").Text = "alpha"; Invoke(window, "AddKeyword_Click", window, new RoutedEventArgs());
             Control<TextBox>(window, "IncludeBox").Text = "unapplied synthetic draft";
             await (Task)Invoke(window, "SaveAnalysisFileAsync", statePath)!;
@@ -81,7 +80,6 @@ public sealed class AnalysisFilesTests
             await (Task)Invoke(restored, "LoadAnalysisFileAsync", statePath)!;
             Assert.Equal(Text, Field<LogData>(restored, "data").Text);
             Assert.Equal(new int?[] { 1 }, Field<LogProjection>(restored, "projection").SelectedThreads);
-            Assert.Equal("synthetic checkpoint", Assert.Single(Field<BookmarkState>(restored, "bookmarks").Items).Label);
             Assert.Equal("unapplied synthetic draft", Control<TextBox>(restored, "IncludeBox").Text);
             Assert.Equal("alpha", Control<TextEditor>(restored, "Editor").SelectedText);
             Assert.Contains("복원 완료", Control<TextBlock>(restored, "OperationStatus").Text);
@@ -89,16 +87,17 @@ public sealed class AnalysisFilesTests
         finally { restored.Close(); }
     });
     [Fact]
-    public Task LoadingPresetAppliesOnlyItsConditionsAndKeepsExistingBookmarks() => InSta(async () =>
+    public Task LoadingPresetAppliesOnlyItsConditionsAndKeepsSourceAndSelection() => InSta(async () =>
     {
         using var folder = new Folder(); string path = folder.File("preset.json");
         await AnalysisFiles.SavePresetAsync(new() { Filter = new(["alpha"], []), AllThreads = false, Threads = [1], Highlights = [new("alpha", 4)] }, path);
         var window = new MainWindow(folder.Path, false);
         try
         {
-            await Load(window, Text); Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
+            await Load(window, Text);
+            var editor = Control<TextEditor>(window, "Editor"); editor.Select(Text.IndexOf("alpha", StringComparison.Ordinal), 5);
             await (Task)Invoke(window, "LoadPresetFileAsync", path)!;
-            Assert.Single(Field<BookmarkState>(window, "bookmarks").Items);
+            Assert.Equal("alpha", editor.SelectedText);
             Assert.Equal(new int?[] { 1 }, Field<LogProjection>(window, "projection").SelectedThreads);
             Assert.Equal(new[] { "alpha" }, Field<EntryFilter>(window, "appliedFilter").Includes);
             Assert.Equal("alpha", Control<TextBox>(window, "IncludeBox").Text);
@@ -116,7 +115,7 @@ public sealed class AnalysisFilesTests
             Source = AnalysisFiles.Stamp(source), PastedText = Text, Scope = new(1, 3),
             Preset = new() { AllThreads = false, Threads = [1] }, ContextLine = 2, ContextRadius = 1,
             Position = new(2, 1, 1, 0, 0), NormalPosition = new(1, 1, 1, 0, 0),
-            Bookmarks = [new(1, "synthetic body"), new(3, "synthetic finish")], TimeA = 1, TimeB = 3,
+            TimeA = 1, TimeB = 3,
             Back = [new(new(1, 1, 1, 0, 0), null)], Forward = [new(new(3, 1, 1, 0, 0), 3)]
         };
         await AnalysisFiles.SaveAnalysisAsync(saved, path);
@@ -126,7 +125,6 @@ public sealed class AnalysisFilesTests
             await (Task)Invoke(window, "LoadAnalysisFileAsync", path)!;
             Assert.True(Field<bool>(window, "contextActive"));
             Assert.Equal(new int?[] { 1 }, Field<IReadOnlySet<int?>>(window, "normalSelectedThreads"));
-            Assert.Equal(new[] { 1, 3 }, Field<BookmarkState>(window, "bookmarks").Items.Select(bookmark => bookmark.SourceLineIndex));
             Assert.Equal(1, Field<TimeAnchor>(window, "timeA").SourceLineIndex);
             Assert.Equal(3, Field<TimeAnchor>(window, "timeB").SourceLineIndex);
             var view = Field<LogProjection>(window, "projection");
@@ -154,12 +152,10 @@ public sealed class AnalysisFilesTests
             pending = (Task)Invoke(window, "LoadPresetFileAsync", path)!; await started.Task;
             Control<TextBox>(window, "SearchBox").Text = "alpha finish";
             var editor = Control<TextEditor>(window, "Editor"); editor.Select(Text.LastIndexOf("alpha", StringComparison.Ordinal), 5);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             release.SetResult(); await pending;
             Assert.True(checkpoints >= 2);
             Assert.Equal("alpha finish", Control<TextBox>(window, "SearchBox").Text);
             Assert.Equal("alpha", editor.SelectedText);
-            Assert.Single(Field<BookmarkState>(window, "bookmarks").Items);
             Assert.Equal(new[] { "alpha" }, Field<EntryFilter>(window, "appliedFilter").Includes);
         }
         finally { release.TrySetResult(); if (pending is not null) await pending; window.Close(); }

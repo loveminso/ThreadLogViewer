@@ -18,7 +18,7 @@ public sealed class ConcurrentRefreshTests
     private const string Prefix = "[000:00:00] [T9] synthetic inserted\n";
 
     [Fact]
-    public Task SuccessfulRefreshKeepsSearchSelectionViewportBookmarksRulesAndDraftsChangedDuringRead() => InSta(async () =>
+    public Task SuccessfulRefreshKeepsSearchSelectionViewportRulesAndDraftsChangedDuringRead() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
         var window = new MainWindow(folder.Path, false);
@@ -145,7 +145,6 @@ public sealed class ConcurrentRefreshTests
     private static object ChangeInputs(MainWindow window, string query, int selectedLine)
     {
         Invoke(window, "NavigateVisible", 80, 1, 0);
-        Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
         Control<TextBox>(window, "SearchBox").Text = query;
         Control<CheckBox>(window, "SearchCaseBox").IsChecked = true;
         Control<CheckBox>(window, "SearchWordBox").IsChecked = true;
@@ -176,8 +175,6 @@ public sealed class ConcurrentRefreshTests
         Assert.Equal(4, Control<ComboBox>(window, "KeywordColorBox").SelectedIndex);
         object rule = Assert.Single(Field<IEnumerable>(window, "keywordRules").Cast<object>());
         Assert.Equal("keep", Property<string>(rule, "Keyword")); Assert.False(Property<bool>(rule, "Enabled"));
-        bool refreshed = selectedLine is 76 or 86;
-        Assert.Equal(refreshed ? 81 : 80, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
         var editor = Control<TextEditor>(window, "Editor");
         Assert.Equal("target", editor.SelectedText);
         Assert.Equal(selectedLine, Field<LogData>(window, "data").GetLineIndexAtOffset(editor.SelectionStart));

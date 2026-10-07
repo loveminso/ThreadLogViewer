@@ -124,7 +124,5 @@ public partial class MainWindow
         if (sender is MenuItem { Tag: string tag } && int.TryParse(tag, out int tool)) ShowAnalysisTool(tool);
     }
     private void CloseAnalysis_Click(object sender, RoutedEventArgs e) => AnalysisPanel.IsExpanded = false;
-    private async void NextBookmark_Click(object sender, RoutedEventArgs e) => await NavigateBookmarkAsync(false);
-    private async void PreviousBookmark_Click(object sender, RoutedEventArgs e) => await NavigateBookmarkAsync(true);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 }

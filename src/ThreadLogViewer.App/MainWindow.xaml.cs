@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.8.0";
+    private const string AppTitle = "ThreadLog Viewer v0.8.1";
 
     public MainWindow() : this(null, true) { }
     public MainWindow(string? settingsDirectory, bool persistSettings)
@@ -215,7 +215,7 @@ public partial class MainWindow : Window
         if (anchor is not null) RestorePosition(anchor);
         restoringPosition = false;
         UpdatePosition();
-        RefreshBookmarks(); UpdateTime();
+        UpdateTime();
         margin.InvalidateMeasure(); margin.InvalidateVisual();
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         int totalLines = ActiveScope is { } scope ? scope.LastLineIndex - scope.FirstLineIndex + 1 : view.Source.Lines.Count;

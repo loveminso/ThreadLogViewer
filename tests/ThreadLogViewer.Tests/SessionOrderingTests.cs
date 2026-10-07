@@ -33,7 +33,6 @@ public sealed class SessionOrderingTests
             var editor = Control<TextEditor>(window, "Editor");
             editor.TextArea.Caret.Line = 2;
             editor.TextArea.Caret.Column = 5;
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             Invoke(window, "SetTimePoint", true);
             var source = Field<LogData>(window, "data");
             var view = Field<LogProjection>(window, "projection");
@@ -65,7 +64,6 @@ public sealed class SessionOrderingTests
             Assert.Same(source, Field<LogData>(window, "data"));
             Assert.Same(view, Field<LogProjection>(window, "projection"));
             Assert.Same(time, Field<TimeAnchor>(window, "timeA"));
-            Assert.Equal(1, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
             Assert.Equal(first, Field<string>(window, "requestedPath"));
             Assert.Equal(firstText, editor.Text);
             Assert.Equal(2, editor.TextArea.Caret.Line);

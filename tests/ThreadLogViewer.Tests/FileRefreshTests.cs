@@ -69,8 +69,6 @@ public sealed class FileRefreshTests
             await (Task)Invoke(window, "FilterAsync", new EntryFilter(["keep"], ["absent"]), null)!;
             Invoke(window, "NavigateVisible", 0, 4, 0); Invoke(window, "SetTimePoint", true);
             Invoke(window, "NavigateVisible", 5, 3, 0); Invoke(window, "SetTimePoint", false);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-            Field<BookmarkState>(window, "bookmarks").SetLabel(5, "synthetic body checkpoint");
             Control<TextBox>(window, "KeywordBox").Text = "keep";
             Invoke(window, "AddKeyword_Click", window, new RoutedEventArgs());
             Control<TextBox>(window, "KeywordBox").Text = "pending highlight";
@@ -95,8 +93,6 @@ public sealed class FileRefreshTests
             var source = Field<LogData>(window, "data");
             Assert.NotSame(oldSource, source); Assert.Equal(replacement, source.Text);
             Assert.Equal(new[] { 2, 3, 6, 7 }, Field<LogProjection>(window, "projection").SourceIndexes);
-            Assert.Equal(7, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
-            Assert.Equal("synthetic body checkpoint", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
             Assert.Equal(2, Field<TimeAnchor>(window, "timeA").SourceLineIndex);
             Assert.Equal(7, Field<TimeAnchor>(window, "timeB").SourceLineIndex);
             Assert.Equal("body C", editor.SelectedText);
@@ -170,7 +166,7 @@ public sealed class FileRefreshTests
         try
         {
             Assert.True(await Open(window, path));
-            Invoke(window, "NavigateVisible", 1, 2, 0); Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
+            Invoke(window, "NavigateVisible", 1, 2, 0);
             Invoke(window, "SetTimePoint", true);
             Control<TextBox>(window, "ContextRadiusBox").Text = "20";
             Assert.True(await (Task<bool>)Invoke(window, "ShowContextAsync", 1)!);
@@ -179,7 +175,6 @@ public sealed class FileRefreshTests
             Set(window, "fixedSearchRanges", new SourceTextRange[] { new(Field<LogData>(window, "data").GetLineOffset(1), 4) });
             File.WriteAllText(path, "[000:00:00] [T9] inserted\n" + oldText, new UTF8Encoding(false, true));
             await Refresh(window);
-            Assert.Empty(Field<BookmarkState>(window, "bookmarks").Items);
             Assert.Null(Field<object?>(window, "timeA")); Assert.Null(Field<object?>(window, "separationStartLine"));
             Assert.False(Field<bool>(window, "contextActive"));
             Assert.Empty(Field<IReadOnlyList<SourceTextRange>>(window, "fixedSearchRanges"));
@@ -205,7 +200,7 @@ public sealed class FileRefreshTests
             Assert.True(await Open(window, path));
             var original = Field<LogData>(window, "data");
             var document = Control<TextEditor>(window, "Editor").Document;
-            Invoke(window, "NavigateVisible", 1, 3, 0); Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
+            Invoke(window, "NavigateVisible", 1, 3, 0);
             var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
             Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> delayed = async (token, _) =>
             { started.SetResult(token); await release.Task; return LogParser.Parse("[000:00:99] [T9] obsolete refresh", path); };
@@ -217,7 +212,8 @@ public sealed class FileRefreshTests
             if (switchTab) Control<ListBox>(window, "SessionTabs").SelectedIndex = 0;
             Assert.Same(original, Field<LogData>(window, "data"));
             Assert.Same(document, Control<TextEditor>(window, "Editor").Document);
-            Assert.Equal(1, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
+            Assert.Equal(1, (int?)Invoke(window, "CurrentSourceLine"));
+            Assert.Equal(3, Control<TextEditor>(window, "Editor").TextArea.Caret.Column);
             Assert.Equal(Original, File.ReadAllText(path));
         }
         finally { release.TrySetResult(); if (pending is not null) await pending; window.Close(); }

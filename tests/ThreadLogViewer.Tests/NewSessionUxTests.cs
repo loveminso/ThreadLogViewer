@@ -70,7 +70,7 @@ public sealed class NewSessionUxTests
     });
 
     [Fact]
-    public Task BlankTabSwitchingPreservesLoadedFilterDisjointSelectionSearchBookmarksTimeAndKeywords() => InSta(async () =>
+    public Task BlankTabSwitchingPreservesLoadedFilterDisjointSelectionSearchTimeAndKeywords() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
         string path = await folder.Write("synthetic-A.log", First);
@@ -86,7 +86,6 @@ public sealed class NewSessionUxTests
             Control<TextBox>(window, "IncludeBox").Text = "pending synthetic include";
             Control<TextBox>(window, "SearchBox").Text = "synthetic A";
             Invoke(window, "NavigateVisible", 1, 3, 0);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             Invoke(window, "SetTimePoint", true);
             var time = Field<TimeAnchor>(window, "timeA");
             Assert.True((bool)Invoke(window, "ApplyHighlightRules", (object)new HighlightRuleDraft[] { new("synthetic A", 3) })!);
@@ -99,7 +98,6 @@ public sealed class NewSessionUxTests
             AssertBlank(window, "새 탭 1");
             Assert.Empty(SelectedRows(window));
             Assert.Empty(Field<IEnumerable>(window, "keywordRules").Cast<object>());
-            Assert.Empty(Field<BookmarkState>(window, "bookmarks").Items);
             Assert.Null(Field<object?>(window, "timeA"));
             Assert.Equal("", Control<TextBox>(window, "SearchBox").Text);
             await (Task)Invoke(window, "FilterAsync", null, null)!;
@@ -113,7 +111,6 @@ public sealed class NewSessionUxTests
             Assert.Equal("pending synthetic include", Control<TextBox>(window, "IncludeBox").Text);
             Assert.Equal("synthetic A", Control<TextBox>(window, "SearchBox").Text);
             Assert.Same(time, Field<TimeAnchor>(window, "timeA"));
-            Assert.Equal(1, Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).SourceLineIndex);
             object rule = Assert.Single(Field<IEnumerable>(window, "keywordRules").Cast<object>());
             Assert.Equal("synthetic A", Property<string>(rule, "Keyword"));
             tabs.SelectedItem = blank;

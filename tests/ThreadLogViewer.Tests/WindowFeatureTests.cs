@@ -26,15 +26,12 @@ public sealed class WindowFeatureTests
             await Load(window, text);
             var editor = Control<TextEditor>(window, "Editor");
             editor.TextArea.Caret.Line = 2;
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             Invoke(window, "SetTimePoint", true);
             Set(window, "fixedSearchRanges", new SourceTextRange[] { new(0, 5) });
-            var bookmarks = Field<BookmarkState>(window, "bookmarks");
             var previousData = Field<LogData>(window, "data");
             var previousProjection = Field<LogProjection>(window, "projection");
             var previousTime = Field<TimeAnchor>(window, "timeA");
             var previousSelection = Field<IReadOnlyList<SourceTextRange>>(window, "fixedSearchRanges");
-            Assert.Single(bookmarks.Items);
             Assert.Equal(1, previousTime.SourceLineIndex);
 
             Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> cancel = (_, _) =>
@@ -44,11 +41,9 @@ public sealed class WindowFeatureTests
             Assert.Same(previousProjection, Field<LogProjection>(window, "projection"));
             Assert.Same(previousTime, Field<TimeAnchor>(window, "timeA"));
             Assert.Same(previousSelection, Field<IReadOnlyList<SourceTextRange>>(window, "fixedSearchRanges"));
-            Assert.Single(bookmarks.Items);
             Assert.Equal(text, editor.Text);
 
             await Load(window, "[000:00:03] [T7] synthetic replacement");
-            Assert.Empty(bookmarks.Items);
             Assert.Null(Field<object?>(window, "timeA"));
             Assert.Null(Field<object?>(window, "timeB"));
             Assert.Null(Field<object?>(window, "fixedSearchRanges"));

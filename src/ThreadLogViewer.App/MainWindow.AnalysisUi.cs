@@ -46,7 +46,7 @@ public partial class MainWindow
         if (CurrentRecordStatus is null || ContextOpenButton is null) return;
         CanChangeFilters = data is not null && !IsBlankSession && !contextActive && !filtersLocked;
         FilterModeHint.Visibility = contextActive ? Visibility.Visible : Visibility.Collapsed;
-        FilterModeHint.Text = "주변 보기에서는 스레드·내용 필터를 잠시 적용하지 않습니다. 북마크는 사용할 수 있습니다.";
+        FilterModeHint.Text = "주변 보기에서는 스레드·내용 필터를 잠시 적용하지 않습니다.";
         int? line = CurrentSourceLine();
         if (projection?.Source != data) line = null;
         TimeAnchor? point = null;

@@ -8,7 +8,6 @@ namespace ThreadLogViewer.App;
 
 public partial class MainWindow
 {
-    private readonly BookmarkState bookmarks = new();
     private readonly LatestOperation selectionWork = new();
     private bool restoringPosition, contextActive;
     private long viewVersion;
@@ -116,36 +115,6 @@ public partial class MainWindow
         var source = data;
         if (NavigateVisible(sourceLine, column, length)) return;
         if (await ShowContextAsync(sourceLine) && source == data) NavigateVisible(sourceLine, column, length);
-    }
-    private void BookmarkToggle_Click(object sender, RoutedEventArgs e)
-    {
-        if (LineActionSourceLine() is not { } line) return;
-        bookmarks.Toggle(line); RefreshBookmarks(); BookmarkPanel.IsExpanded = true;
-    }
-    private sealed record BookmarkRow(Bookmark Bookmark, bool Hidden) { public string Label => $"{(Hidden ? "[숨김 · 문맥에서 열기] " : "")}{Bookmark.SourceLineIndex + 1:N0}줄{(Bookmark.Label.Length == 0 ? "" : " · " + Bookmark.Label)}"; }
-    private void RefreshBookmarks()
-    {
-        BookmarkList.ItemsSource = bookmarks.Items.Select(b => new BookmarkRow(b, projection?.FindDisplayLine(b.SourceLineIndex + 1) is null)).ToArray();
-        margin.Bookmarks = bookmarks.Items.Select(b => b.SourceLineIndex).ToHashSet(); margin.InvalidateVisual();
-    }
-    private async void Bookmark_Selected(object sender, SelectionChangedEventArgs e)
-    { if (BookmarkList.SelectedItem is BookmarkRow row) await NavigateOriginalAsync(row.Bookmark.SourceLineIndex); }
-    private void BookmarkRename_Click(object sender, RoutedEventArgs e)
-    {
-        int? line = lineActionMenuOpen || lineActionPointerPending ? LineActionSourceLine() : (BookmarkList.SelectedItem as BookmarkRow)?.Bookmark.SourceLineIndex ?? CurrentSourceLine();
-        if (line is null) return;
-        var current = bookmarks.Items.FirstOrDefault(b => b.SourceLineIndex == line);
-        var source = data;
-        string? label = NamePrompt.Ask(this, $"원본 {line + 1:N0}줄 북마크 이름", current?.Label ?? "");
-        if (label is null || source != data) return;
-        if (current is null) bookmarks.Toggle(line.Value, label); else bookmarks.SetLabel(line.Value, label);
-        RefreshBookmarks();
-    }
-    private async Task NavigateBookmarkAsync(bool backwards)
-    {
-        int line = CurrentSourceLine() ?? -1;
-        var bookmark = backwards ? bookmarks.Previous(line) : bookmarks.Next(line);
-        if (bookmark is not null) await NavigateOriginalAsync(bookmark.SourceLineIndex);
     }
     private EntryFilter ReadDraftFilter() => new(Conditions(IncludeBox.Text), Conditions(ExcludeBox.Text),
         IncludeModeBox.SelectedIndex == 1, FilterCaseBox.IsChecked == true);

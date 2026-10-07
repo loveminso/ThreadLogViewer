@@ -148,27 +148,6 @@ public sealed class AppFeatureTests
     }
 
     [Fact]
-    public void BookmarksRemainSortedAndCycleByOriginalLinesIncludingHiddenPositions()
-    {
-        var bookmarks = new BookmarkState();
-        Assert.Null(bookmarks.Next(0));
-        Assert.True(bookmarks.Toggle(104, "synthetic error"));
-        Assert.True(bookmarks.Toggle(99, "synthetic start"));
-        Assert.True(bookmarks.Toggle(200));
-        Assert.Equal(new[] { 99, 104, 200 }, bookmarks.Items.Select(b => b.SourceLineIndex));
-        Assert.Equal(104, bookmarks.Next(99)!.SourceLineIndex);
-        Assert.Equal(99, bookmarks.Next(200)!.SourceLineIndex);
-        Assert.Equal(200, bookmarks.Previous(99)!.SourceLineIndex);
-        Assert.Equal(104, bookmarks.Previous(110)!.SourceLineIndex);
-        Assert.True(bookmarks.SetLabel(104, "  synthetic recovered  "));
-        Assert.Equal("synthetic recovered", bookmarks.Items[1].Label);
-        Assert.False(bookmarks.Toggle(104));
-        Assert.Equal(new[] { 99, 200 }, bookmarks.Items.Select(b => b.SourceLineIndex));
-        bookmarks.Clear();
-        Assert.Empty(bookmarks.Items);
-    }
-
-    [Fact]
     public void SelectionCountsScalarsNewlinesRealEmptyRowsAndExcludesVirtualFinalRow()
     {
         const string text = "한😀\t\r\n\r\nZ\n";

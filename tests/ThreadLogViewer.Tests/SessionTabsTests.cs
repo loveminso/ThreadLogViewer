@@ -21,7 +21,7 @@ public sealed class SessionTabsTests
     private const string Third = "[000:00:20] [T9] synthetic C first\n[000:00:21] [T10] synthetic C last";
 
     [Fact]
-    public Task MultiFileTabsKeepIndependentFiltersSelectionBookmarksTimeSearchKeywordsAndContext() => InSta(async () =>
+    public Task MultiFileTabsKeepIndependentFiltersSelectionTimeSearchKeywordsAndContext() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
         string first = await folder.Write("synthetic-A.log", First);
@@ -39,7 +39,6 @@ public sealed class SessionTabsTests
             await SetThreads(window, t => t.Id == 7);
             await Filter(window, new EntryFilter(["first"], [], true, true));
             Invoke(window, "NavigateVisible", 1, 3, 0);
-            Bookmark(window, "B checkpoint");
             Invoke(window, "SetTimePoint", true);
             Control<TextBox>(window, "KeywordBox").Text = "first";
             Control<ComboBox>(window, "KeywordColorBox").SelectedIndex = 3;
@@ -71,7 +70,6 @@ public sealed class SessionTabsTests
             Invoke(window, "NavigateVisible", 1, 4, 0);
             Invoke(window, "SetTimePoint", true);
             Invoke(window, "NavigateVisible", 4, 3, 0);
-            Bookmark(window, "A checkpoint");
             Invoke(window, "SetTimePoint", false);
             int? normalLine = CurrentLine(window);
             int normalColumn = editor.TextArea.Caret.Column;
@@ -110,7 +108,6 @@ public sealed class SessionTabsTests
             Assert.Equal(new[] { 0, 1 }, bView.SourceIndexes);
             Assert.Equal(bLine, CurrentLine(window));
             Assert.Equal(bStart, editor.SelectionStart); Assert.Equal(bLength, editor.SelectionLength);
-            Assert.Equal("B checkpoint", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
             Assert.Same(bTime, Field<TimeAnchor>(window, "timeA"));
             Assert.Null(Field<object?>(window, "timeB"));
             Assert.Equal("first", Assert.Single(Field<EntryFilter>(window, "appliedFilter").Includes));
@@ -133,7 +130,6 @@ public sealed class SessionTabsTests
             Assert.Same(aView, Field<LogProjection>(window, "projection"));
             Assert.Equal(aLine, CurrentLine(window));
             Assert.Equal(aStart, editor.SelectionStart); Assert.Equal(aLength, editor.SelectionLength);
-            Assert.Equal("A checkpoint", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
             Assert.Same(aTimeA, Field<TimeAnchor>(window, "timeA"));
             Assert.Same(aTimeB, Field<TimeAnchor>(window, "timeB"));
             Assert.Equal("pending A include", Control<TextBox>(window, "IncludeBox").Text);
@@ -178,7 +174,6 @@ public sealed class SessionTabsTests
             tabs.SelectedIndex = 0;
             await SetThreads(window, t => t.Id == 1);
             Invoke(window, "NavigateVisible", 4, 4, 0);
-            Bookmark(window, "existing A state");
             var source = Field<LogData>(window, "data");
             var view = Field<LogProjection>(window, "projection");
             tabs.SelectedIndex = 1;
@@ -188,7 +183,6 @@ public sealed class SessionTabsTests
             Assert.Same(source, Field<LogData>(window, "data"));
             Assert.Same(view, Field<LogProjection>(window, "projection"));
             Assert.Equal(4, CurrentLine(window));
-            Assert.Equal("existing A state", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
             Assert.Equal(First, await File.ReadAllTextAsync(first));
         }
         finally { window.Close(); }
@@ -279,7 +273,6 @@ public sealed class SessionTabsTests
             Assert.False(Control<MenuItem>(window, "FindNextMenu").IsEnabled);
             Assert.False(Control<MenuItem>(window, "FindPreviousMenu").IsEnabled);
             Assert.Null(Control<ListBox>(window, "ResultsList").ItemsSource);
-            Assert.Empty(Control<ListBox>(window, "BookmarkList").Items.Cast<object>());
             Assert.Equal(Visibility.Visible, Control<StackPanel>(window, "EmptyPanel").Visibility);
             Assert.Equal(Visibility.Collapsed, Control<Border>(window, "ContextPanel").Visibility);
             Assert.False(window.CanChangeFilters);
@@ -302,14 +295,15 @@ public sealed class SessionTabsTests
             var tabs = Control<ListBox>(window, "SessionTabs");
             var previous = Field<LogData>(window, "data");
             var previousView = Field<LogProjection>(window, "projection");
-            Invoke(window, "NavigateVisible", 1, 3, 0); Bookmark(window, "before cancellation");
+            Invoke(window, "NavigateVisible", 1, 3, 0);
             Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> cancel = (_, _) =>
                 Task.FromCanceled<LogData>(new CancellationToken(true));
             await Load(window, cancel);
             Assert.Equal(2, tabs.Items.Count); Assert.Equal(1, tabs.SelectedIndex);
             Assert.Same(previous, Field<LogData>(window, "data"));
             Assert.Same(previousView, Field<LogProjection>(window, "projection"));
-            Assert.Equal("before cancellation", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
+            Assert.Equal(1, CurrentLine(window));
+            Assert.Equal(3, Control<TextEditor>(window, "Editor").TextArea.Caret.Column);
 
             var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource<LogData>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -348,7 +342,7 @@ public sealed class SessionTabsTests
             var source = Field<LogData>(window, "data");
             var view = Field<LogProjection>(window, "projection");
             var active = tabs.SelectedItem;
-            Invoke(window, "NavigateVisible", 1, 3, 0); Bookmark(window, "safe prior tab");
+            Invoke(window, "NavigateVisible", 1, 3, 0);
             byte[][] failures = [
                 [0xFF, 0xFE, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00], // Unsupported UTF-32 LE.
                 [0x81], // Invalid in strict UTF-8 and strict CP949.
@@ -364,7 +358,6 @@ public sealed class SessionTabsTests
                 Assert.Same(source, Field<LogData>(window, "data"));
                 Assert.Same(view, Field<LogProjection>(window, "projection"));
                 Assert.Equal(second, Field<string>(window, "requestedPath"));
-                Assert.Equal("safe prior tab", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
                 Assert.Equal(1, CurrentLine(window));
                 Assert.Contains("이전 화면 유지", Control<TextBlock>(window, "OperationStatus").Text);
                 Assert.Equal(failures[i], await File.ReadAllBytesAsync(invalid));
@@ -438,11 +431,6 @@ public sealed class SessionTabsTests
         (Task)Invoke(window, "LoadAsync", loader, "synthetic session load", "synthetic session failure")!;
     private static Task SetThreads(MainWindow window, Func<ThreadItem, bool> predicate) => (Task)Invoke(window, "SetThreadsAsync", predicate)!;
     private static Task Filter(MainWindow window, EntryFilter filter) => (Task)Invoke(window, "FilterAsync", filter, null)!;
-    private static void Bookmark(MainWindow window, string name)
-    {
-        Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-        Field<BookmarkState>(window, "bookmarks").SetLabel(CurrentLine(window)!.Value, name);
-    }
     private static void AssertRule(MainWindow window, string keyword, int color, bool enabled)
     {
         object rule = Assert.Single(Field<IEnumerable>(window, "keywordRules").Cast<object>());

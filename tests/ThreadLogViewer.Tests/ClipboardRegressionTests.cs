@@ -88,14 +88,13 @@ public sealed class ClipboardRegressionTests
             var initial = Field<LogProjection>(window, "projection");
             var editor = Control<TextEditor>(window, "Editor");
             editor.TextArea.Caret.Offset = editor.Document.GetLineByNumber(2).Offset;
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             foreach (var failure in ProviderFailures())
             {
                 bool accepted = await Paste(window, () => throw failure);
                 Assert.False(accepted);
                 Assert.Same(initial, Field<LogProjection>(window, "projection"));
                 Assert.Equal(initial.Text, editor.Text);
-                Assert.Single(Field<BookmarkState>(window, "bookmarks").Items);
+                Assert.Equal(2, editor.TextArea.Caret.Line);
                 string status = Control<TextBlock>(window, "OperationStatus").Text;
                 Assert.Contains("붙여넣기 실패", status);
                 Assert.DoesNotContain("synthetic private payload", status);
@@ -104,7 +103,7 @@ public sealed class ClipboardRegressionTests
             deferred.Payloads[DataFormats.UnicodeText] = "synthetic text";
             Assert.False(await Paste(window, () => deferred));
             Assert.Same(initial, Field<LogProjection>(window, "projection"));
-            Assert.Single(Field<BookmarkState>(window, "bookmarks").Items);
+            Assert.Equal(2, editor.TextArea.Caret.Line);
             Assert.False(await Paste(window, () => throw new OutOfMemoryException("synthetic memory failure")));
             Assert.Same(initial, Field<LogProjection>(window, "projection"));
             Assert.Contains("메모리", Control<TextBlock>(window, "OperationStatus").Text);
@@ -150,7 +149,6 @@ public sealed class ClipboardRegressionTests
             Assert.True(await Paste(window, () => TextProvider(longer)));
             var editor = Control<TextEditor>(window, "Editor");
             editor.Select(editor.Document.GetLineByNumber(100).Offset, 4);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
             Invoke(window, "TimeA_Click", window, new RoutedEventArgs());
             Assert.NotNull(Field<TimeAnchor?>(window, "timeA"));
             Assert.True(await Paste(window, () => TextProvider("[000:00:02] [T2] short\r\n")));

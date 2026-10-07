@@ -158,6 +158,17 @@ public partial class MainWindow
     private async void Next_Click(object sender, RoutedEventArgs e) => await NavigateSearchAsync(false);
     private async void Search_KeyDown(object sender, KeyEventArgs e)
     { if (e.Key == Key.Enter) { e.Handled = true; await NavigateSearchAsync(Keyboard.Modifiers == ModifierKeys.Shift); } }
+    private static bool TryHandleSearchNavigationShortcut(KeyEventArgs e, ModifierKeys modifiers, out bool backwards)
+    {
+        backwards = false;
+        if ((modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift) && e.Key == Key.F3)
+            backwards = modifiers == ModifierKeys.Shift;
+        else if (modifiers == ModifierKeys.None && e.Key == Key.F4)
+            backwards = true;
+        else return false;
+        e.Handled = true;
+        return true;
+    }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (TryCancelResultsResize(e)) return;
@@ -173,10 +184,7 @@ public partial class MainWindow
         else if (modifiers == ModifierKeys.Control && e.Key == Key.F) { ShowSearch(); e.Handled = true; }
         else if (modifiers == ModifierKeys.Control && e.Key == Key.O) { Open_Click(this, new()); e.Handled = true; }
         else if (modifiers == ModifierKeys.Control && e.Key == Key.G) { GoTo_Click(this, new()); e.Handled = true; }
-        else if (modifiers == ModifierKeys.Control && e.Key == Key.F2) { BookmarkToggle_Click(this, new()); e.Handled = true; }
-        else if ((modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift) && e.Key == Key.F2) { e.Handled = true; await NavigateBookmarkAsync(modifiers == ModifierKeys.Shift); }
-        else if ((modifiers == ModifierKeys.None || modifiers == ModifierKeys.Shift) && e.Key == Key.F3) { e.Handled = true; await NavigateSearchAsync(modifiers == ModifierKeys.Shift); }
-        else if (modifiers == ModifierKeys.None && e.Key == Key.F4) { e.Handled = true; await NavigateSearchAsync(true); }
+        else if (TryHandleSearchNavigationShortcut(e, modifiers, out bool backwards)) { await NavigateSearchAsync(backwards); }
         else if (modifiers == ModifierKeys.Shift && e.Key == Key.F8) { e.Handled = true; ToggleHighlightAtSelection(); }
         else if (modifiers == ModifierKeys.None && e.Key == Key.F1) { Help_Click(this, new()); e.Handled = true; }
         else if (modifiers == ModifierKeys.None && e.Key == Key.Escape)

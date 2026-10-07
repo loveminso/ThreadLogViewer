@@ -51,7 +51,7 @@ public sealed class ResponsiveEditingTests
     [InlineData(1040, 600, false)]
     [InlineData(944, 484, true)]
     [InlineData(944, 484, false)]
-    public Task ExpandedFiltersBookmarksAndSearchKeepBodyAndThreadControlsInsideSmallClientArea(int width, int height, bool dark) => InSta(async () =>
+    public Task ExpandedFiltersAndSearchKeepBodyAndThreadControlsInsideSmallClientArea(int width, int height, bool dark) => InSta(async () =>
     {
         using var folder = new Folder(); var window = new MainWindow(folder.Path, false);
         try
@@ -59,13 +59,7 @@ public sealed class ResponsiveEditingTests
             await Load(window);
             Control<ComboBox>(window, "ThemeBox").SelectedIndex = dark ? 0 : 1;
             Control<Expander>(window, "ContentFilterExpander").IsExpanded = true;
-            Control<Expander>(window, "BookmarkPanel").IsExpanded = true;
             var editor = Control<TextEditor>(window, "Editor");
-            for (int line = 1; line <= 6; line++)
-            {
-                editor.TextArea.Caret.Line = line;
-                Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-            }
             Control<Border>(window, "SearchBar").Visibility = Visibility.Visible;
             Control<TextBox>(window, "SearchBox").Text = "target";
             await (Task)Invoke(window, "SearchAsync")!;
@@ -80,7 +74,6 @@ public sealed class ResponsiveEditingTests
             var results = Control<Border>(window, "ResultsPanel");
             Assert.True(list.ActualHeight >= 96, $"Thread list height: {list.ActualHeight:0.##}.");
             Assert.True(editor.ActualHeight >= 120, $"Editor height: {editor.ActualHeight:0.##}.");
-            Assert.True(settings.ScrollableHeight > 0);
             AssertContained(Bounds(list, filters), new Rect(filters.RenderSize));
             Assert.True(Bounds(settings, filters).Bottom <= Bounds(list, filters).Top + 1);
             Assert.True(Bounds(controls, grid).Bottom <= Bounds(editor, grid).Top + 1);
@@ -90,7 +83,7 @@ public sealed class ResponsiveEditingTests
             Assert.NotSame(settings, VisualTreeHelper.GetParent(list));
             Assert.NotNull(list.ItemContainerGenerator.ContainerFromIndex(0));
 
-            // A real routed row action remains usable while both configuration sections are expanded.
+            // A real routed row action remains usable while content filters are expanded.
             var row = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0)!;
             var only = Descendants<Button>(row).Single(button => Equals(button.Content, "단독"));
             Assert.True(only.IsEnabled);
@@ -111,8 +104,8 @@ public sealed class ResponsiveEditingTests
             AssertContained(Bounds(search, controls), new Rect(controls.RenderSize));
             Assert.True(editor.ActualHeight >= 120);
             settings.ScrollToEnd(); await Layout(window, width, height, clientHeight);
-            Assert.True(settings.VerticalOffset > 0);
-            AssertContained(Rect.Intersect(Bounds(Control<Expander>(window, "BookmarkPanel"), settings), new Rect(settings.RenderSize)), new Rect(settings.RenderSize));
+            Assert.InRange(settings.VerticalOffset, 0, settings.ScrollableHeight);
+            AssertContained(Rect.Intersect(Bounds(Control<Expander>(window, "ContentFilterExpander"), settings), new Rect(settings.RenderSize)), new Rect(settings.RenderSize));
             SaveImage(window, width, clientHeight, $"responsive-{width}x{height}-{(dark ? "dark" : "light")}.png");
             Assert.Equal(SyntheticText, Field<LogData>(window, "data").Text);
             Assert.True(editor.IsReadOnly);
@@ -234,7 +227,7 @@ public sealed class ResponsiveEditingTests
     private static void SaveImage(MainWindow window, int width, int height, string name)
     {
         string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
-        string directory = System.IO.Path.Combine(root, "TestResults", "v0.8.0", "responsive-layout"); Directory.CreateDirectory(directory);
+        string directory = System.IO.Path.Combine(root, "TestResults", "v0.8.1", "responsive-layout"); Directory.CreateDirectory(directory);
         var image = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); image.Render((FrameworkElement)window.Content);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
         using var output = File.Create(System.IO.Path.Combine(directory, name)); encoder.Save(output);

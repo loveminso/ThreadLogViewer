@@ -117,7 +117,6 @@ public sealed class OriginalLineMargin : AbstractMargin
     private int dragLastLine;
     private Point dragPoint, dragStartPoint;
     private bool dragMoved;
-    public IReadOnlySet<int> Bookmarks { get; set; } = new HashSet<int>();
     public IReadOnlySet<int> SelectedLineIndexes { get; set; } = new HashSet<int>();
     private int? timeALineIndex, timeBLineIndex;
     public int? TimeALineIndex
@@ -282,8 +281,6 @@ public sealed class OriginalLineMargin : AbstractMargin
             double top = visual.VisualTop - TextView.VerticalOffset;
             if (selected) drawingContext.DrawRectangle(Theme.Selection, null, new Rect(0, top, ActualWidth, visual.Height));
             if (action) drawingContext.DrawRectangle(Theme.Accent, null, new Rect(0, top, ActualWidth, visual.Height));
-            if (Bookmarks.Contains(sourceLine))
-                drawingContext.DrawEllipse(action ? Theme.AccentText : selected ? Theme.SelectionText : Theme.Accent, null, new Point(5, top + 8), 3, 3);
             string badgeText = TimeALineIndex == sourceLine && TimeBLineIndex == sourceLine ? "A/B" : TimeALineIndex == sourceLine ? "A" : TimeBLineIndex == sourceLine ? "B" : "";
             if (ContextLineIndex == sourceLine) badgeText += (badgeText.Length > 0 ? " " : "") + "기준";
             if (badgeText.Length > 0)

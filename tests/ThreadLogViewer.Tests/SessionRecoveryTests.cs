@@ -27,8 +27,6 @@ public sealed class SessionRecoveryTests
             Control<TextBox>(window, "ContextRadiusBox").Text = "20";
             Assert.True(await (Task<bool>)Invoke(window, "ShowContextAsync", 24)!);
             Invoke(window, "NavigateVisible", 24, 5, 0);
-            Invoke(window, "BookmarkToggle_Click", window, new RoutedEventArgs());
-            Field<BookmarkState>(window, "bookmarks").SetLabel(24, "synthetic checkpoint");
             Invoke(window, "SetTimePoint", true);
             Invoke(window, "NavigateVisible", 26, 3, 0);
             Invoke(window, "SetTimePoint", false);
@@ -73,7 +71,6 @@ public sealed class SessionRecoveryTests
                 $"extent={editor.ExtentHeight:F2}, caret={editor.TextArea.Caret.Offset}, " +
                 $"selection={editor.SelectionStart}+{editor.SelectionLength}, " +
                 $"visualLinesValid={editor.TextArea.TextView.VisualLinesValid}");
-            Assert.Equal("synthetic checkpoint", Assert.Single(Field<BookmarkState>(window, "bookmarks").Items).Label);
             Assert.Same(timeA, Field<TimeAnchor>(window, "timeA")); Assert.Same(timeB, Field<TimeAnchor>(window, "timeB"));
             Assert.Equal("keep", Assert.Single(Field<EntryFilter>(window, "appliedFilter").Includes));
             Assert.Equal("unfinished include", Control<TextBox>(window, "IncludeBox").Text);
