@@ -74,6 +74,7 @@ public static class WorkbenchPerformanceProbe
             ElapsedMs = total.Elapsed.TotalMilliseconds, Completed = failure is null,
             Successful = failure is null && records.All(r => r.Error is null) && probe?.CancellationConfirmed == true,
             Failure = failure, ActualCancellationConfirmed = probe?.CancellationConfirmed,
+            LiveTabResourcesCollected = probe?.LiveTabResourcesCollected,
             InterruptedCase = probe?.CurrentCase,
             Scope = "Synthetic unhosted WPF MainWindow APIs, background work, UI publication, Measure/Arrange/EnsureVisualLines; no visible window, native input, clipboard, compositor frame rate, monitor DPI or user settings. One process run; generated files may be in the OS cache.",
             HeartbeatScope = "A worker posts timestamp probes at DispatcherPriority.Input every 25 ms. Delays are synthetic dispatcher queue latency, not native input latency or rendered frame time. p95 describes probes in one operation, not repeated-run statistics.",
@@ -94,6 +95,7 @@ public static class WorkbenchPerformanceProbe
     {
         public string? CurrentCase { get; private set; }
         public bool CancellationConfirmed { get; private set; }
+        public bool LiveTabResourcesCollected { get; private set; }
 
         public async Task RunAsync()
         {
@@ -113,6 +115,28 @@ public static class WorkbenchPerformanceProbe
                     await (Task)Invoke(window, "SetThreadsAsync", selected)!;
                     await Layout(window, 1360, 860);
                     return new { IncludesDebounceMs = 100, State = State(window) };
+                });
+                string small = Path.Combine(folder, "synthetic-live-close-baseline.log");
+                WriteNew(small, "[000:00:00.000] [T1] synthetic small tab remains open\n");
+                await Open(window, small);
+                await Layout(window, 1360, 860);
+                var closedResources = CloseFirstTabAndClearRecovery(window);
+                await Measure("live-window-close-large-tab-and-release-recovery", async () =>
+                {
+                    // The same production window remains open with its small tab. Only the
+                    // documented closed-tab recovery cache is cleared; no source fields are reset.
+                    await Layout(window, 1360, 860);
+                    await dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+                    await Task.Delay(250, lifetime);
+                    await Task.Run(() => { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); });
+                    await dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+                    LiveTabResourcesCollected = !closedResources.Source.IsAlive && !closedResources.Projection.IsAlive && !closedResources.Document.IsAlive;
+                    return new { SourceCollected = !closedResources.Source.IsAlive,
+                        ProjectionCollected = !closedResources.Projection.IsAlive,
+                        DocumentCollected = !closedResources.Document.IsAlive,
+                        BeforeClose = closedResources.BeforeClose,
+                        AfterCloseAndForcedGc = Memory(), State = State(window),
+                        Scope = "Same live MainWindow; close the large tab through its production API, explicitly clear closed-tab recovery, retain one small tab, then test weak references after idle and forced GC. Working set can remain reserved by the runtime." };
                 });
             });
 
@@ -158,6 +182,17 @@ public static class WorkbenchPerformanceProbe
                     Control<ToggleButton>(window, "WrapBox").IsChecked = true;
                     await Layout(window, 1040, 600);
                     return State(window);
+                });
+                await Measure("long-line-search-last-chunk-and-layout", async () =>
+                {
+                    await Search(window, "target");
+                    var hit = Field<LocatedSearchHit[]>(window, "searchHits").Single();
+                    await (Task)Invoke(window, "NavigateHitAsync", hit)!;
+                    await Layout(window, 1040, 600);
+                    var editor = Control<TextEditor>(window, "Editor");
+                    return new { SelectedText = editor.SelectedText, SourceOffset = hit.SourceOffset,
+                        RawDocumentLength = editor.Document.TextLength,
+                        VisualColumns = editor.TextArea.TextView.VisualLines.Sum(line => line.VisualLength), State = State(window) };
                 });
             });
 
@@ -370,6 +405,7 @@ public static class WorkbenchPerformanceProbe
     }
 
     private sealed record MemorySnapshot(long WorkingSetBytes, long PrivateBytes, long PeakWorkingSetBytes, long ManagedHeapBytes);
+    private sealed record ClosedResourceReferences(WeakReference Source, WeakReference Projection, WeakReference Document, MemorySnapshot BeforeClose);
     private sealed record CaseRecord(string Name, double ElapsedMs, MemorySnapshot Before, MemorySnapshot After,
         long SampledPeakWorkingSetBytes, long SampledPeakPrivateBytes, int DispatcherProbeCount,
         double? DispatcherP95DelayMs, double? DispatcherMaximumDelayMs, object? Details, string? Error);
@@ -379,6 +415,21 @@ public static class WorkbenchPerformanceProbe
         using var process = Process.GetCurrentProcess();
         process.Refresh();
         return new(process.WorkingSet64, process.PrivateMemorySize64, process.PeakWorkingSet64, GC.GetTotalMemory(false));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static ClosedResourceReferences CloseFirstTabAndClearRecovery(MainWindow window)
+    {
+        var tabs = Control<ListBox>(window, "SessionTabs");
+        object session = tabs.Items[0];
+        object source = session.GetType().GetProperty("Source")!.GetValue(session)!;
+        object projection = session.GetType().GetProperty("View")!.GetValue(session)!;
+        object document = session.GetType().GetProperty("Document")!.GetValue(session)!;
+        var references = new ClosedResourceReferences(new(source), new(projection), new(document), Memory());
+        Invoke(window, "CloseSession", session);
+        object recovery = typeof(MainWindow).GetField("closedSessions", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        recovery.GetType().GetMethod("Clear")!.Invoke(recovery, null);
+        return references;
     }
 
     private static async Task Layout(MainWindow window, double width, double height)

@@ -21,6 +21,10 @@ public partial class MainWindow
         BackNavigationMenu.IsEnabled = !busy && activeSession?.History.Back.Count > 0;
         ForwardNavigationMenu.IsEnabled = !busy && activeSession?.History.Forward.Count > 0;
         ThreadBackgroundMenu.IsChecked = threadRenderer.Enabled;
+        LargeLineMenu.IsChecked = largeLineGenerator.Enabled;
+        SaveAnalysisMenu.IsEnabled = SavePresetMenu.IsEnabled = !busy && hasLog;
+        LoadAnalysisMenu.IsEnabled = !busy;
+        LoadPresetMenu.IsEnabled = !busy && hasLog;
         WrapMenu.IsChecked = WrapBox.IsChecked == true;
         foreach (var item in FontMenu.Items.OfType<MenuItem>())
             if (item.Tag is string tag && tag.StartsWith("font:", StringComparison.Ordinal))

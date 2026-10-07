@@ -13,12 +13,13 @@ public sealed class SourceLineRemap
     public int? Map(int oldSourceLineIndex) => oldSourceLineIndex >= 0 && oldSourceLineIndex < indexes.Length && indexes[oldSourceLineIndex] >= 0
         ? indexes[oldSourceLineIndex] : null;
 
-    public int? FindNearestMappedLine(int oldSourceLineIndex)
+    public int? FindNearestMappedLine(int oldSourceLineIndex, CancellationToken token = default)
     {
         if (indexes.Length == 0) return null;
         int origin = Math.Clamp(oldSourceLineIndex, 0, indexes.Length - 1);
         for (int distance = 0; distance < indexes.Length; distance++)
         {
+            if ((distance & 4095) == 0) token.ThrowIfCancellationRequested();
             // A tie goes forward in the previous source order, matching the viewer's navigation policy.
             if (origin + distance < indexes.Length && indexes[origin + distance] >= 0) return indexes[origin + distance];
             if (origin - distance >= 0 && indexes[origin - distance] >= 0) return indexes[origin - distance];
@@ -74,16 +75,26 @@ public sealed class SourceLineRemap
         return Updated.GetLineOffset(target) + column;
     }
 
-    public SourceTextRange? MapRange(SourceTextRange range)
+    public SourceTextRange? MapRange(SourceTextRange range, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         if (range.Offset < 0 || range.Length < 0 || range.Offset + (long)range.Length > Original.Text.Length) return null;
         if (MapOffset(range.Offset) is not { } first || MapOffset(range.Offset + range.Length, range.Length > 0) is not { } last || last < first) return null;
         int firstLine = Original.GetLineIndexAtOffset(range.Offset);
         int lastLine = Original.GetLineIndexAtOffset(range.Length == 0 ? range.Offset : range.Offset + range.Length - 1);
         if (Map(firstLine) is not { } firstTarget) return null;
         for (int line = firstLine; line <= lastLine; line++)
+        {
+            if ((line & 4095) == 0) token.ThrowIfCancellationRequested();
             if (Map(line) != firstTarget + line - firstLine) return null;
-        if (!Original.Text.AsSpan(range.Offset, range.Length).SequenceEqual(Updated.Text.AsSpan(first, last - first))) return null;
+        }
+        if (range.Length != last - first) return null;
+        for (int offset = 0; offset < range.Length; offset += 65536)
+        {
+            token.ThrowIfCancellationRequested();
+            int length = Math.Min(65536, range.Length - offset);
+            if (!Original.Text.AsSpan(range.Offset + offset, length).SequenceEqual(Updated.Text.AsSpan(first + offset, length))) return null;
+        }
         return new(first, last - first);
     }
 

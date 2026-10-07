@@ -20,8 +20,10 @@ public sealed class LogProjection
         EntryIndexes = Array.AsReadOnly(entryIndexes);
         Text = text;
         SelectedThreads = new HashSet<int?>(selectedThreads);
-        displayOffsets = new int[sourceIndexes.Length + 1];
-        for (int i = 0; i < sourceIndexes.Length; i++)
+        bool identity = sourceIndexes.Length == source.Lines.Count;
+        for (int i = 0; identity && i < sourceIndexes.Length; i++) identity = sourceIndexes[i] == i;
+        displayOffsets = identity ? source.LineOffsets : new int[sourceIndexes.Length + 1];
+        for (int i = 0; !identity && i < sourceIndexes.Length; i++)
         {
             var line = source.Lines[sourceIndexes[i]];
             displayOffsets[i + 1] = checked(displayOffsets[i] + line.RawText.Length + line.LineEnding.Length);
@@ -126,8 +128,18 @@ public sealed class LogProjection
     {
         bool all = entries.Length == source.Entries.Count &&
             (lineRange is null || lineRange.Value.FirstLineIndex == 0 && lineRange.Value.LastLineIndex == source.Lines.Count - 1);
+        int count = 0;
+        if (all) count = source.Lines.Count;
+        else foreach (int index in entries)
+        {
+            token.ThrowIfCancellationRequested();
+            var entry = source.Entries[index];
+            count += Math.Min(entry.StartLineIndex + entry.LineCount - 1, lineRange?.LastLineIndex ?? source.Lines.Count - 1)
+                - Math.Max(entry.StartLineIndex, lineRange?.FirstLineIndex ?? 0) + 1;
+        }
         var builder = all ? null : new StringBuilder();
-        var lines = new List<int>();
+        var lines = new int[count];
+        int lineCount = 0;
         for (int index = 0; index < entries.Length; index++)
         {
             token.ThrowIfCancellationRequested();
@@ -141,13 +153,13 @@ public sealed class LogProjection
                     token.ThrowIfCancellationRequested();
                     progress?.Report(new("필터 적용", 50 + 50.0 * index / Math.Max(1, entries.Length)));
                 }
-                lines.Add(i);
+                lines[lineCount++] = i;
                 var line = source.Lines[i];
                 builder?.Append(line.RawText.Span).Append(line.LineEnding.Span);
             }
         }
         token.ThrowIfCancellationRequested();
-        var result = new LogProjection(source, lines.ToArray(), all ? source.Text : builder!.ToString(), selected, entries);
+        var result = new LogProjection(source, lines, all ? source.Text : builder!.ToString(), selected, entries);
         token.ThrowIfCancellationRequested();
         progress?.Report(new("필터 적용", 100));
         return result;

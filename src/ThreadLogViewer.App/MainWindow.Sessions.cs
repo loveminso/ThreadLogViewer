@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -17,6 +18,11 @@ public partial class MainWindow
     private LogSession? activeSession;
     private bool selectingSession;
     private long fileBatchVersion;
+    private long fileOpenAttemptVersion;
+    private long? explicitlyCancelledFileBatch;
+    private bool lastFileOpenCancelled;
+    private long? lastFileOpenWorkVersion;
+    private long closedSessionEvictionCount;
     private int pastedSessionNumber;
     private int? separationStartLine;
     private LogLineRange? ActiveScope => activeSession?.Scope;
@@ -84,6 +90,26 @@ public partial class MainWindow
         Closed += (_, _) => closedSessions.Clear();
     }
 
+    private void DisposeSessions()
+    {
+        viewReady = false;
+        DetachSessionHandlers();
+        ClearLineActionTarget(); ResetLineSelectionGesture();
+        closedSessions.Clear();
+        SessionTabs.ItemsSource = null; sessions.Clear(); activeSession = null;
+        data = null; projection = null; requestedPath = null;
+        ThreadList.ItemsSource = null; threadItems = [];
+        keywordRules.Clear(); bookmarks.Clear(); BookmarkList.ItemsSource = null;
+        ResultsList.ItemsSource = null; searchHits = []; fixedSearchRanges = null; lastSearchLocation = null;
+        searchRenderer.Index = keywordRenderer.Index = HighlightIndex.Empty;
+        threadRenderer.Projection = margin.Projection = null;
+        margin.Bookmarks = new HashSet<int>();
+        emptyAnchor = normalAnchor = null; normalSelectedThreads = null;
+        timeA = timeB = null; separationStartLine = null; contextActive = false;
+        viewVersion++;
+        Editor.Document = new TextDocument { UndoStack = { SizeLimit = 0 } };
+    }
+
     private void CaptureActiveSession()
     {
         if (activeSession is not { } session || data is null || projection is null) return;
@@ -124,7 +150,7 @@ public partial class MainWindow
         searchWork.Begin(); highlightWork.Begin(); selectionWork.Begin();
     }
 
-    private void CommitLoadedSession(LogData source, LogProjection view, TextDocument document, LogSession? replace,
+    private int CommitLoadedSession(LogData source, LogProjection view, TextDocument document, LogSession? replace,
         LogLineRange? scope = null, string? title = null, string? sourceTitle = null, bool isBlank = false,
         EncodingMode encodingMode = EncodingMode.Auto)
     {
@@ -159,7 +185,7 @@ public partial class MainWindow
         finally { selectingSession = false; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdatePosition(); UpdateTime(); UpdateSplitStatus(); UpdateFilterSummary();
         _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus(); CaptureActiveSession();
-        closedSessions.Trim(sessions);
+        return TrimClosedSessions();
     }
 
     private void ActivateSession(LogSession session)
@@ -277,10 +303,10 @@ public partial class MainWindow
             op.Token.ThrowIfCancellationRequested();
             if (!work.IsCurrent(op.Version) || source != data || parentScope != ActiveScope) return false;
             separationStartLine = null;
-            CommitLoadedSession(source, result.view, result.document, null, range,
+            int evicted = CommitLoadedSession(source, result.view, result.document, null, range,
                 $"{baseTitle} · {range.FirstLineIndex + 1:N0}~{range.LastLineIndex + 1:N0}줄", baseTitle,
                 encodingMode: activeSession?.EncodingMode ?? EncodingMode.Auto);
-            OperationStatus.Text = "세션 분리 완료 · 시작과 끝 포함 · 숨겨진 원본 줄도 포함 · 원본 번호 유지";
+            OperationStatus.Text = "세션 분리 완료 · 시작과 끝 포함 · 숨겨진 원본 줄도 포함 · 원본 번호 유지" + ClosedRetentionNotice(evicted);
             return true;
         }
         catch (OperationCanceledException) { return false; }
@@ -290,17 +316,45 @@ public partial class MainWindow
     }
 
     private async Task<bool> OpenFilesAsync(IEnumerable<string> paths)
+        => await OpenFileBatchAsync(paths.ToArray(), path => OpenAsync(path, EncodingMode.Auto));
+
+    private void MarkFileBatchCancellation() => explicitlyCancelledFileBatch = fileBatchVersion;
+
+    // The injected opener is used only by synthetic delay/cancellation regression tests.
+    private async Task<bool> OpenFileBatchAsync(string[] snapshot, Func<string, Task<bool>> open)
     {
-        string[] snapshot = paths.ToArray();
         if (snapshot.Length == 0) return false;
         long batch = ++fileBatchVersion;
-        bool success = true;
+        long evictionsBefore = closedSessionEvictionCount;
+        int success = 0, processed = 0;
+        var failed = new List<string>();
+        LogSession? expectedSession = activeSession;
+        long? expectedWork = null;
         foreach (string path in snapshot)
         {
-            if (batch != fileBatchVersion) return false;
-            success &= await OpenAsync(path, EncodingMode.Auto);
+            if (batch != fileBatchVersion) break;
+            expectedSession = activeSession;
+            fileOpenAttemptVersion++; lastFileOpenCancelled = false; lastFileOpenWorkVersion = null;
+            var opening = open(path);
+            expectedWork = lastFileOpenWorkVersion;
+            bool opened = await opening;
+            if (opened) { success++; processed++; expectedSession = activeSession; }
+            else if (lastFileOpenCancelled || batch != fileBatchVersion) break;
+            else { processed++; failed.Add(Path.GetFileName(path)); }
         }
-        return success;
+        int unprocessed = snapshot.Length - processed;
+        bool explicitlyCancelled = explicitlyCancelledFileBatch == batch && fileBatchVersion == batch + 1;
+        if (viewReady && !busy && (expectedWork is null || work.IsCurrent(expectedWork.Value)) &&
+            (batch == fileBatchVersion || explicitlyCancelled && activeSession == expectedSession))
+        {
+            string result = explicitlyCancelled ? "파일 묶음 열기 취소" : unprocessed > 0 ? "파일 묶음 열기 중단" : "파일 묶음 열기 완료";
+            OperationStatus.Text = $"{result} · 성공 {success:N0}개 · 실패 {failed.Count:N0}개 · 미처리 {unprocessed:N0}개" +
+                (success == 0 ? " · 이전 화면 유지" : "") +
+                (failed.Count > 0 ? $" · 실패한 파일: {string.Join(", ", failed)}. 경로와 파일 잠금을 확인한 뒤 다시 열어 주세요." : "") +
+                (unprocessed > 0 ? " · 미처리 파일은 다시 선택해 열어 주세요." : "") +
+                ClosedRetentionNotice((int)Math.Min(int.MaxValue, closedSessionEvictionCount - evictionsBefore));
+        }
+        return success == snapshot.Length;
     }
 
     private void SessionTab_Selected(object sender, SelectionChangedEventArgs e)
@@ -349,16 +403,26 @@ public partial class MainWindow
             SessionTabs.SelectedItem = session;
         }
         finally { selectingSession = false; }
-        closedSessions.Trim(sessions);
+        int evicted = TrimClosedSessions();
         UpdateMenus();
-        OperationStatus.Text = $"{session.DisplayTitle} · 닫은 탭 복원 완료 · 원문과 분석 상태 유지";
+        OperationStatus.Text = $"{session.DisplayTitle} · 닫은 탭 복원 완료 · 원문과 분석 상태 유지" + ClosedRetentionNotice(evicted);
+    }
+
+    private static string ClosedRetentionNotice(int evicted) => evicted <= 0 ? "" :
+        $" · 열린 탭의 원본 공유 상태가 바뀌어 추정 보관 한도를 초과한 닫은 탭 {evicted:N0}개를 정리했습니다. 필요한 원본 파일이나 붙여넣은 원문을 다시 여세요.";
+
+    private int TrimClosedSessions()
+    {
+        int evicted = closedSessions.Trim(sessions);
+        closedSessionEvictionCount += evicted;
+        return evicted;
     }
 
     private static IEnumerable<RetainedResource> SessionResources(LogSession session)
     {
         // Conservative estimates, not process working-set measurements. Shared immutable snapshots count once.
         yield return new(session.Source, 256L + 2L * session.Source.Text.Length +
-            132L * session.Source.Lines.Count + 16L * session.Source.Entries.Count + 96L * session.Source.Threads.Count);
+            (Unsafe.SizeOf<LogLine>() + 4L) * session.Source.Lines.Count + 16L * session.Source.Entries.Count + 96L * session.Source.Threads.Count);
         yield return new(session.View, 128L + 8L * session.View.Count + 4L * session.View.EntryCount);
         if (!ReferenceEquals(session.View.Text, session.Source.Text)) yield return new(session.View.Text, 32L + 2L * session.View.Text.Length);
         yield return new(session.Document, 256L + 2L * session.Document.TextLength + 80L * session.View.Count);

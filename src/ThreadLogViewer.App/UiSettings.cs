@@ -11,6 +11,7 @@ public sealed record UiSettings
     public double ResultsHeight { get; init; } = 180;
     public bool ResultsCollapsed { get; init; }
     public bool ThreadBackgrounds { get; init; } = true;
+    public bool LargeLinePreview { get; init; } = true;
     public static UiSettings Default { get; } = new();
 
     public UiSettings Normalize() => this with

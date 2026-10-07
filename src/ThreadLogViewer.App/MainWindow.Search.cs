@@ -102,10 +102,18 @@ public partial class MainWindow
             SearchStatus.Text = searchHits.Length == 0 ? "결과 없음" : $"{searchHits.Length:N0}개{(found.Limited ? " (첫 100,000개)" : "")}";
             Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
-        catch (OperationCanceledException) { }
-        catch (RegexMatchTimeoutException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "정규식 시간 제한 · 패턴을 좁히거나 정규식 옵션을 끄고 다시 검색하세요."; }
-        catch (ArgumentException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "올바르지 않은 정규식입니다. 패턴을 수정하거나 정규식 옵션을 끄세요."; }
-        catch (OutOfMemoryException) { if (searchWork.IsCurrent(op.Version)) SearchStatus.Text = OperationStatus.Text = "검색 메모리 부족 · 검색어를 좁히거나 다른 탭을 닫고 다시 검색하세요."; }
+        catch (OperationCanceledException) { if (searchWork.IsCurrent(op.Version)) FinishSearchWithoutResults("검색 취소", false); }
+        catch (RegexMatchTimeoutException) { if (searchWork.IsCurrent(op.Version)) FinishSearchWithoutResults("정규식 시간 제한 · 패턴을 좁히거나 정규식 옵션을 끄고 다시 검색하세요.", true); }
+        catch (ArgumentException) { if (searchWork.IsCurrent(op.Version)) FinishSearchWithoutResults("올바르지 않은 정규식입니다. 패턴을 수정하거나 정규식 옵션을 끄세요.", true); }
+        catch (OutOfMemoryException) { if (searchWork.IsCurrent(op.Version)) FinishSearchWithoutResults("검색 메모리 부족 · 검색어를 좁히거나 다른 탭을 닫고 다시 검색하세요.", true); }
+    }
+    private void FinishSearchWithoutResults(string message, bool announce)
+    {
+        searchHits = []; searchIndex = -1; searchLimited = false;
+        ResultsList.ItemsSource = null; ResultsPanel.Visibility = Visibility.Collapsed;
+        searchRenderer.Index = HighlightIndex.Empty; SearchStatus.Text = message;
+        if (announce) OperationStatus.Text = message;
+        Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background); UpdateMenus();
     }
     private async Task NavigateSearchAsync(bool backwards)
     {

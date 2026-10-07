@@ -1,4 +1,4 @@
-<Window x:Class="ThreadLogViewer.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit" Title="ThreadLog Viewer v0.7.0" Width="1360" Height="860" MinWidth="1040" MinHeight="600" FontFamily="Segoe UI, Malgun Gothic" FontSize="13" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" PreviewKeyDown="Window_KeyDown" UseLayoutRounding="True" SnapsToDevicePixels="True" AllowDrop="True" PreviewDragEnter="Window_DragOver" PreviewDragOver="Window_DragOver" PreviewDrop="Window_Drop">
+<Window x:Class="ThreadLogViewer.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit" Title="ThreadLog Viewer v0.8.0" Width="1360" Height="860" FontFamily="Segoe UI, Malgun Gothic" FontSize="13" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" PreviewKeyDown="Window_KeyDown" UseLayoutRounding="True" SnapsToDevicePixels="True" AllowDrop="True" PreviewDragEnter="Window_DragOver" PreviewDragOver="Window_DragOver" PreviewDrop="Window_Drop">
   <Window.Resources>
     <Style x:Key="AnalysisToolTab" TargetType="RadioButton">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -23,6 +23,8 @@
           <MenuItem x:Name="RefreshSessionMenu" Header="현재 파일 새로 고침" InputGestureText="F5" Click="RefreshSession_Click" IsEnabled="False" />
           <Separator />
           <MenuItem x:Name="ExportMenu" Header="필터 결과 내보내기…" Click="Export_Click" IsEnabled="{Binding IsEnabled, ElementName=ExportButton}" />
+          <MenuItem x:Name="SaveAnalysisMenu" Header="분석 상태 저장…" Click="SaveAnalysis_Click" IsEnabled="False" />
+          <MenuItem x:Name="LoadAnalysisMenu" Header="분석 상태 불러오기…" Click="LoadAnalysis_Click" IsEnabled="False" />
           <MenuItem x:Name="EncodingMenu" Header="인코딩으로 다시 읽기" IsEnabled="False" ToolTip="열 때 자동 판별합니다. 글자가 깨질 때만 인코딩을 직접 선택하세요.">
             <MenuItem Header="자동 판별" Click="ReloadAuto_Click" />
             <MenuItem x:Name="ReloadButton" Header="한국어 (CP949)" Click="Reload_Click" IsEnabled="False" />
@@ -33,9 +35,9 @@
           <MenuItem Header="종료" InputGestureText="Alt+F4" Click="Exit_Click" />
         </MenuItem>
         <MenuItem Header="편집(_E)" SubmenuOpened="MainMenu_Opened">
-          <MenuItem Header="복사" InputGestureText="Ctrl+C" Click="Copy_Click" />
-          <MenuItem Header="붙여넣기" InputGestureText="Ctrl+V" Click="Paste_Click" ToolTip="빈 탭에 로그를 넣거나 새 로그 탭으로 엽니다." />
-          <MenuItem Header="전체 선택" InputGestureText="Ctrl+A" Click="SelectText_Click" />
+          <MenuItem x:Name="FocusCopyMenu" Header="복사" InputGestureText="Ctrl+C" Click="FocusCopy_Click" />
+          <MenuItem x:Name="FocusPasteMenu" Header="붙여넣기" InputGestureText="Ctrl+V" Click="FocusPaste_Click" ToolTip="마지막 활성 입력칸에 붙여넣기 · 로그 열기는 Ctrl+Shift+V" ToolTipService.ShowOnDisabled="True" />
+          <MenuItem x:Name="FocusSelectAllMenu" Header="전체 선택" InputGestureText="Ctrl+A" Click="FocusSelectAll_Click" />
           <Separator />
           <MenuItem x:Name="FindMenu" Header="찾기…" InputGestureText="Ctrl+F" Click="Search_Click" />
           <MenuItem x:Name="FindNextMenu" Header="다음 검색 결과" InputGestureText="F3" Click="Next_Click" />
@@ -48,6 +50,7 @@
         <MenuItem Header="보기(_V)" SubmenuOpened="MainMenu_Opened">
           <MenuItem x:Name="WrapMenu" Header="자동 줄바꿈" IsCheckable="True" Click="MenuWrap_Click" />
           <MenuItem x:Name="ThreadBackgroundMenu" Header="스레드 배경색" IsCheckable="True" IsChecked="True" Click="ThreadBackgroundMenu_Click" />
+          <MenuItem x:Name="LargeLineMenu" Header="긴 줄 나눠보기" IsCheckable="True" IsChecked="True" Click="LargeLineMenu_Click" ToolTip="긴 줄을 구간별로 표시합니다. 검색·복사·내보내기는 전체 원문을 유지합니다." />
           <MenuItem x:Name="FontMenu" Header="글자 크기">
             <MenuItem Header="11" Tag="font:11" IsCheckable="True" Click="MenuAppearance_Click" />
             <MenuItem Header="12" Tag="font:12" IsCheckable="True" Click="MenuAppearance_Click" />
@@ -78,6 +81,9 @@
           <MenuItem Header="현재 줄 주변 로그 보기" Tag="line" Click="Context_Click" />
           <MenuItem Header="문구 강조 / 해제" InputGestureText="Shift+F8" Tag="highlight" Click="ToggleHighlight_Click" />
           <MenuItem Header="강조 문구 관리…" Tag="highlight-manager" Click="HighlightSelection_Click" />
+          <Separator />
+          <MenuItem x:Name="SavePresetMenu" Header="필터·강조 프리셋 저장…" Click="SavePreset_Click" IsEnabled="False" />
+          <MenuItem x:Name="LoadPresetMenu" Header="필터·강조 프리셋 불러오기…" Click="LoadPreset_Click" IsEnabled="False" />
           <Separator />
           <MenuItem Header="세션 분리 시작 줄 지정" Tag="line" Click="SplitStart_Click" />
           <MenuItem Header="여기까지 새 탭으로 분리" Tag="split-end" Click="SplitEnd_Click" />
@@ -143,7 +149,7 @@
         <TextBlock x:Name="WorkStatus" Text="작업 준비 중…" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
       </DockPanel>
     </Border>
-    <Grid>
+    <Grid x:Name="WorkspaceGrid">
       <Grid.ColumnDefinitions>
         <ColumnDefinition x:Name="ThreadColumn" Width="295" MinWidth="275" MaxWidth="600" />
         <ColumnDefinition Width="4" />
@@ -151,7 +157,7 @@
       </Grid.ColumnDefinitions>
       <Border Background="{DynamicResource PanelBrush}">
         <DockPanel x:Name="FilterPanel" Margin="12,18,12,10">
-          <StackPanel DockPanel.Dock="Top">
+          <StackPanel x:Name="ThreadScopeControls" DockPanel.Dock="Top">
             <DockPanel Margin="6,0,6,12">
               <TextBlock x:Name="ThreadScopeTitle" Text="스레드 · 전체 파일" FontWeight="SemiBold" />
               <TextBlock x:Name="ThreadCount" Text="0개" HorizontalAlignment="Right" Foreground="{DynamicResource MutedBrush}" FontSize="12" />
@@ -173,6 +179,9 @@
               <Button Content="전체 선택" Click="SelectAll_Click" FontSize="12" Padding="7,5" MinHeight="28" />
               <Button Content="전체 해제" Click="SelectNone_Click" FontSize="12" Padding="7,5" MinHeight="28" />
             </StackPanel>
+          </StackPanel>
+          <ScrollViewer x:Name="SidebarSettingsScroll" DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" ClipToBounds="True">
+          <StackPanel>
             <Expander x:Name="ContentFilterExpander" Margin="4,0,4,12" Foreground="{DynamicResource TextBrush}">
               <Expander.Header><TextBlock x:Name="ContentFilterHeader" Text="내용 필터" TextWrapping="Wrap" /></Expander.Header>
               <StackPanel x:Name="TextFilterControls" Margin="0,8,0,0" IsEnabled="{Binding CanChangeFilters, RelativeSource={RelativeSource AncestorType=Window}}">
@@ -190,8 +199,7 @@
                 <TextBlock x:Name="FilterSummary" Text="현재 적용: 내용 제한 없음" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
               </StackPanel>
             </Expander>
-          </StackPanel>
-          <Expander x:Name="BookmarkPanel" DockPanel.Dock="Bottom" Header="북마크 · Ctrl+F2 / F2" Foreground="{DynamicResource TextBrush}" Margin="4,8" MaxHeight="220">
+          <Expander x:Name="BookmarkPanel" Header="북마크 · Ctrl+F2 / F2" Foreground="{DynamicResource TextBrush}" Margin="4,8" MaxHeight="220">
             <StackPanel Margin="0,6,0,0">
               <StackPanel Orientation="Horizontal">
                 <Button Content="표시 / 해제" Click="BookmarkToggle_Click" FontSize="11" />
@@ -200,7 +208,9 @@
               <ListBox x:Name="BookmarkList" MaxHeight="140" DisplayMemberPath="Label" SelectionChanged="Bookmark_Selected" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0" />
             </StackPanel>
           </Expander>
-          <TextBlock DockPanel.Dock="Bottom" Text="최초 → 마지막 기록 · 파일 순서" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="6,12,0,0" />
+          <TextBlock Text="최초 → 마지막 기록 · 파일 순서" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="6,12,0,0" />
+          </StackPanel>
+          </ScrollViewer>
           <ListBox x:Name="ThreadList" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
             <ListBox.ItemTemplate>
               <DataTemplate>
@@ -232,6 +242,8 @@
           <RowDefinition x:Name="ResultsSplitterRow" Height="0" />
           <RowDefinition x:Name="ResultsRow" Height="0" />
         </Grid.RowDefinitions>
+        <ScrollViewer x:Name="LogControlsScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ClipToBounds="True">
+        <StackPanel>
         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="15,9">
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -246,7 +258,7 @@
             <TextBlock x:Name="FileLabel" Text="로그 원문" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
           </DockPanel>
         </Border>
-        <Border x:Name="ContextPanel" Grid.Row="1" Visibility="Collapsed" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3,0,0,0" Padding="12,8">
+        <Border x:Name="ContextPanel" Visibility="Collapsed" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3,0,0,0" Padding="12,8">
           <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <StackPanel>
@@ -256,7 +268,7 @@
             <Button Grid.Column="1" Content="기존 필터로 돌아가기" Click="ReturnContext_Click" Margin="10,0,0,0" VerticalAlignment="Center" />
           </Grid>
         </Border>
-        <Border x:Name="SearchBar" Grid.Row="2" Visibility="Collapsed" Padding="15,9" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+        <Border x:Name="SearchBar" Visibility="Collapsed" Padding="15,7" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
           <StackPanel>
           <Grid>
             <Grid.ColumnDefinitions>
@@ -264,18 +276,13 @@
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="SearchBox" TextChanged="Search_Changed" KeyDown="Search_KeyDown" AutomationProperties.Name="현재 표시 중인 로그 검색" ToolTip="현재 표시 중인 로그에서 검색" />
+            <TextBox x:Name="SearchBox" TextChanged="Search_Changed" KeyDown="Search_KeyDown" AutomationProperties.Name="현재 표시 중인 로그 검색" ToolTip="현재 표시 중인 로그에서 검색" MinWidth="80" />
             <Button Grid.Column="1" Content="↑" Click="Previous_Click" ToolTip="이전 결과 · F4 / Shift+F3" AutomationProperties.Name="이전 검색 결과" Margin="8,0,3,0" />
             <Button Grid.Column="2" Content="↓" Click="Next_Click" ToolTip="다음 결과 · F3" AutomationProperties.Name="다음 검색 결과" />
-            <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="4,0,12,0">
-              <TextBlock x:Name="SearchStatus" FontSize="11" Foreground="{DynamicResource TextBrush}" />
-              <TextBlock x:Name="SearchScopeStatus" Text="현재 표시 중인 기록" FontSize="11" Foreground="{DynamicResource MutedBrush}" />
-            </StackPanel>
-            <Button Grid.Column="4" Content="×" Click="CloseSearch_Click" ToolTip="검색 닫기 · Esc" AutomationProperties.Name="검색 닫기" Margin="0" />
+            <Button Grid.Column="3" Content="×" Click="CloseSearch_Click" ToolTip="검색 닫기 · Esc" AutomationProperties.Name="검색 닫기" Margin="0" />
           </Grid>
-          <WrapPanel Margin="0,8,0,0">
+          <WrapPanel Margin="0,5,0,0">
             <CheckBox x:Name="SearchCaseBox" Content="대소문자" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed" Margin="0,0,12,0" />
             <CheckBox x:Name="SearchWordBox" Content="단어" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed" Margin="0,0,12,0" />
             <CheckBox x:Name="SearchRegexBox" Content="정규식" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed" Margin="0,0,12,0" />
@@ -286,9 +293,13 @@
             </ComboBox>
             <Button Content="선택 범위 지정" Click="CaptureSearchSelection_Click" FontSize="11" ToolTip="F3로 만든 선택과 별개로 현재 선택을 검색 범위로 고정" Margin="8,0" />
           </WrapPanel>
+          <WrapPanel Margin="0,3,0,0">
+            <TextBlock x:Name="SearchStatus" FontSize="11" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" MaxWidth="{Binding ActualWidth, ElementName=SearchBox}" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,12,0" />
+            <TextBlock x:Name="SearchScopeStatus" Text="현재 표시 중인 기록" FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+          </WrapPanel>
           </StackPanel>
         </Border>
-        <StackPanel Grid.Row="3">
+        <StackPanel>
         <Border x:Name="SplitStatusPanel" Visibility="Collapsed" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,5">
           <DockPanel>
             <Button DockPanel.Dock="Right" Content="×" Click="SplitClear_Click" ToolTip="분리 시작 지정 해제" AutomationProperties.Name="분리 시작 지정 해제" Padding="5,0" MinHeight="24" />
@@ -380,6 +391,8 @@
         </StackPanel>
         </ScrollViewer>
         </StackPanel>
+        </StackPanel>
+        </ScrollViewer>
         <avalon:TextEditor x:Name="Editor" Grid.Row="4" PreviewMouseLeftButtonDown="Editor_LeftButtonDown" PreviewMouseRightButtonDown="Editor_RightButtonDown" PreviewMouseRightButtonUp="Editor_RightButtonUp" IsReadOnly="True" AllowDrop="True" ShowLineNumbers="False" FontFamily="Consolas, D2Coding, Malgun Gothic" FontSize="14" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,10,10,8" AutomationProperties.Name="로그 원문">
           <avalon:TextEditor.ContextMenu>
             <ContextMenu x:Name="LineContextMenu" Opened="LineContext_Opened" Closed="LineContext_Closed">

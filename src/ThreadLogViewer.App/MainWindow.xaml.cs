@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.7.0";
+    private const string AppTitle = "ThreadLog Viewer v0.8.0";
 
     public MainWindow() : this(null, true) { }
     public MainWindow(string? settingsDirectory, bool persistSettings)
@@ -50,13 +50,15 @@ public partial class MainWindow : Window
         Editor.TextArea.SelectionCornerRadius = 0;
         InitializeFeatures(settingsDirectory, persistSettings);
         InitializeSessions();
+        InitializeWindowLayout(); InitializeEditing();
+        InitializePerformance();
         viewReady = true;
         InitializeAnalysis();
         ApplyTheme();
         ApplyTypography();
         UpdateMenus();
         SourceInitialized += (_, _) => theme.ApplyTitleBar(this);
-        Closed += (_, _) => { fileBatchVersion++; viewReady = false; DisposeFeatures(); work.Dispose(); searchWork.Dispose(); };
+        Closed += (_, _) => { fileBatchVersion++; viewReady = false; DisposeFeatures(); DisposePerformance(); work.Dispose(); searchWork.Dispose(); DisposeSessions(); };
         Loaded += async (_, _) =>
         {
             string[] paths = Environment.GetCommandLineArgs().Skip(1).ToArray();
@@ -139,16 +141,7 @@ public partial class MainWindow : Window
         UpdateMenus();
     }
     private static TextDocument PrepareDocument(string text, CancellationToken token, IProgress<WorkProgress> progress)
-    {
-        token.ThrowIfCancellationRequested();
-        progress.Report(new("화면 문서 준비", 0));
-        var document = new TextDocument(text);
-        document.UndoStack.SizeLimit = 0;
-        document.SetOwnerThread(null);
-        token.ThrowIfCancellationRequested();
-        progress.Report(new("화면 문서 준비", 100));
-        return document;
-    }
+        => CancellableDocumentFactory.Create(text, token, progress);
     private Task<bool> OpenAsync(string path, EncodingMode mode)
     {
         string fullPath;
@@ -174,9 +167,11 @@ public partial class MainWindow : Window
     private async Task<bool> LoadIntoSessionAsync(Func<CancellationToken, IProgress<WorkProgress>, Task<LogData>> load,
         string startingMessage, string errorTitle, LogSession? replaceSession, EncodingMode encodingMode = EncodingMode.Auto)
     {
+        long openAttempt = fileOpenAttemptVersion;
         if (replaceSession is null && IsBlankSession) replaceSession = activeSession;
         if (busy) RestoreFilters();
         var op = BeginWork(startingMessage, true);
+        if (openAttempt == fileOpenAttemptVersion) lastFileOpenWorkVersion = op.Version;
         var timer = Stopwatch.StartNew();
         try
         {
@@ -187,12 +182,12 @@ public partial class MainWindow : Window
                 return (loaded, view, document: PrepareDocument(view.Text, op.Token, op.Progress));
             }, op.Token);
             op.Token.ThrowIfCancellationRequested();
-            if (!work.IsCurrent(op.Version)) return false;
-            CommitLoadedSession(result.loaded, result.view, result.document, replaceSession, encodingMode: encodingMode);
-            OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용";
+            if (!work.IsCurrent(op.Version)) { if (openAttempt == fileOpenAttemptVersion) lastFileOpenCancelled = true; return false; }
+            int evicted = CommitLoadedSession(result.loaded, result.view, result.document, replaceSession, encodingMode: encodingMode);
+            OperationStatus.Text = $"열기 완료 · {timer.Elapsed.TotalSeconds:F2}초 · 읽기 전용" + ClosedRetentionNotice(evicted);
             return true;
         }
-        catch (OperationCanceledException) { if (work.IsCurrent(op.Version)) { RestoreFilters(); OperationStatus.Text = "열기 취소 · 이전 화면 유지"; } }
+        catch (OperationCanceledException) { if (openAttempt == fileOpenAttemptVersion) lastFileOpenCancelled = true; if (work.IsCurrent(op.Version)) { RestoreFilters(); OperationStatus.Text = "열기 취소 · 이전 화면 유지"; } }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or DecoderFallbackException or ArgumentException or OutOfMemoryException)
         {
             if (work.IsCurrent(op.Version)) { RestoreFilters(); ShowError(errorTitle, ex); }
@@ -293,7 +288,7 @@ public partial class MainWindow : Window
     {
         if ((sender as Button)?.Tag is ThreadItem item) await SetThreadsAsync(t => t.Id == item.Id);
     }
-    private void Cancel_Click(object sender, RoutedEventArgs e) { fileBatchVersion++; work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
+    private void Cancel_Click(object sender, RoutedEventArgs e) { MarkFileBatchCancellation(); fileBatchVersion++; work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
     private async void Export_Click(object sender, RoutedEventArgs e)
     {
         if (projection is null || busy || IsBlankSession) return;

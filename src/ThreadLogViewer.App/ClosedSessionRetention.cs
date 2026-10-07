@@ -24,7 +24,7 @@ public sealed class ClosedSessionRetention<T>(Func<T, IEnumerable<RetainedResour
         return true;
     }
 
-    public void Trim(IEnumerable<T> openSessions) => TrimCore(OpenResources(openSessions));
+    public int Trim(IEnumerable<T> openSessions) => TrimCore(OpenResources(openSessions));
 
     public bool TryPop(out T? session, out int index)
     {

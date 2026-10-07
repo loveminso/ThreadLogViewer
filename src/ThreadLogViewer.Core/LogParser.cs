@@ -22,96 +22,142 @@ public static partial class LogParser
     public static LogData Parse(string text, string? sourcePath = "synthetic.log", string encoding = "테스트 입력",
         CancellationToken cancellationToken = default, IProgress<WorkProgress>? progress = null)
     {
-        var lines = new List<LogLine>();
-        var entries = new List<LogEntry>();
+        // Count physical lines first so a large parse does not retain an oversized List<T>
+        // backing array alongside an equally large final LogLine array during publication.
+        int physicalCount = CountPhysicalLines(text, cancellationToken);
+        var lines = new LogLine[physicalCount];
+        var entries = new LogEntry[physicalCount];
+        int lineCount = 0, entryCount = 0;
         var summaries = new Dictionary<int, SummaryBuilder>();
         int position = 0;
         int activeTimestampEntry = -1;
         while (position < text.Length)
         {
-            if ((lines.Count & 2047) == 0)
+            if ((lineCount & 2047) == 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new("파싱", 100.0 * position / Math.Max(1, text.Length)));
             }
-            int end = position;
-            while (end < text.Length && text[end] is not '\r' and not '\n') end++;
+            int end = FindLineEnd(text, position, cancellationToken);
             int next = end;
             if (next < text.Length && text[next++] == '\r' && next < text.Length && text[next] == '\n') next++;
             var raw = text.AsMemory(position, end - position);
             var ending = text.AsMemory(end, next - end);
-            string value = raw.ToString();
-            var timestamp = TimePattern().Match(value);
+            bool timestamp = TimePattern().IsMatch(raw.Span);
             LogLine line;
-            if (timestamp.Success || activeTimestampEntry < 0)
+            if (timestamp || activeTimestampEntry < 0)
             {
-                int entryIndex = entries.Count;
-                line = ParseHeader(raw, ending, lines.Count + 1, value, timestamp) with { EntryIndex = entryIndex };
-                entries.Add(new(lines.Count, 1, line.ThreadId));
-                if (timestamp.Success) activeTimestampEntry = entryIndex;
+                int entryIndex = entryCount++;
+                line = ParseHeader(raw, ending, lineCount + 1) with { EntryIndex = entryIndex };
+                entries[entryIndex] = new(lineCount, 1, line.ThreadId);
+                if (timestamp) activeTimestampEntry = entryIndex;
             }
             else
             {
                 var entry = entries[activeTimestampEntry];
                 entries[activeTimestampEntry] = entry with { LineCount = entry.LineCount + 1 };
                 // Ownership follows the user's timestamp boundary rule. Do not parse dump contents as new headers.
-                line = new(lines.Count + 1, raw, ending, entry.ThreadId, null, default, raw, default, null,
+                line = new(lineCount + 1, raw, ending, entry.ThreadId, null, default, raw, default, null,
                     ParseQuality.Continuation, activeTimestampEntry);
             }
-            lines.Add(line);
+            lines[lineCount++] = line;
             int key = line.ThreadId ?? -1;
             if (!summaries.TryGetValue(key, out var summary)) summaries[key] = summary = new();
             summary.Count++;
             if (line.Quality != ParseQuality.Continuation) summary.EntryCount++;
             if (line.TimeOfDay.HasValue)
             {
-                summary.First ??= line.TimestampText.ToString();
-                summary.Last = line.TimestampText.ToString();
+                summary.First ??= line.TimestampText;
+                summary.Last = line.TimestampText;
             }
             position = next;
         }
         cancellationToken.ThrowIfCancellationRequested();
         var threads = summaries.OrderBy(p => p.Key == -1 ? long.MaxValue : p.Key)
-            .Select(p => new ThreadSummary(p.Key == -1 ? null : p.Key, p.Value.Count, p.Value.First, p.Value.Last, p.Value.EntryCount)).ToArray();
+            .Select(p => new ThreadSummary(p.Key == -1 ? null : p.Key, p.Value.Count,
+                p.Value.First?.ToString(), p.Value.Last?.ToString(), p.Value.EntryCount)).ToArray();
         progress?.Report(new("파싱", 100));
-        return new(sourcePath, text, encoding, lines.ToArray(), entries.ToArray(), threads);
+        if (entryCount != entries.Length) Array.Resize(ref entries, entryCount);
+        return new(sourcePath, text, encoding, lines, entries, threads);
+    }
+
+    private static int CountPhysicalLines(string text, CancellationToken token)
+    {
+        int count = 0, position = 0;
+        while (position < text.Length)
+        {
+            if ((count & 2047) == 0) token.ThrowIfCancellationRequested();
+            int end = FindLineEnd(text, position, token);
+            position = end;
+            if (position < text.Length && text[position++] == '\r' && position < text.Length && text[position] == '\n') position++;
+            count++;
+        }
+        token.ThrowIfCancellationRequested();
+        return count;
+    }
+
+    private static int FindLineEnd(string text, int start, CancellationToken token)
+    {
+        const int block = 65536;
+        while (start < text.Length)
+        {
+            token.ThrowIfCancellationRequested();
+            int length = Math.Min(block, text.Length - start);
+            int found = text.AsSpan(start, length).IndexOfAny('\r', '\n');
+            if (found >= 0) return start + found;
+            start += length;
+        }
+        return text.Length;
     }
 
     public static LogLine ParseLine(ReadOnlyMemory<char> raw, ReadOnlyMemory<char> ending, int lineNumber)
     {
-        // Regex works on one transient line string. Stored field slices retain only the shared input.
-        string value = raw.ToString();
-        return ParseHeader(raw, ending, lineNumber, value, TimePattern().Match(value));
+        return ParseHeader(raw, ending, lineNumber);
     }
 
-    private static LogLine ParseHeader(ReadOnlyMemory<char> raw, ReadOnlyMemory<char> ending, int lineNumber,
-        string value, Match tm)
+    private static LogLine ParseHeader(ReadOnlyMemory<char> raw, ReadOnlyMemory<char> ending, int lineNumber)
     {
+        ReadOnlySpan<char> value = raw.Span;
         int prefixEnd = 0;
         TimeSpan? time = null;
         ReadOnlyMemory<char> stamp = default, source = default;
         int? thread = null, sourceLine = null;
-        if (tm.Success)
+        var timestamps = TimePattern().EnumerateMatches(value);
+        if (timestamps.MoveNext())
         {
-            var g = tm.Groups["time"];
-            stamp = raw.Slice(g.Index, g.Length);
-            time = ParseTimestamp(g.Value);
+            var tm = timestamps.Current;
+            int first = value[..tm.Length].IndexOf('[') + 1;
+            stamp = raw.Slice(first, tm.Length - first - 1);
+            time = ParseTimestamp(stamp.Span);
             prefixEnd = tm.Length;
         }
-        var th = ThreadPattern().Match(value, prefixEnd);
-        if (th.Success && int.TryParse(th.Groups["id"].ValueSpan, out int id))
+        var threads = ThreadPattern().EnumerateMatches(value, prefixEnd);
+        if (threads.MoveNext())
         {
-            thread = id;
-            prefixEnd = th.Index + th.Length;
+            var th = threads.Current;
+            int first = th.Index;
+            while (char.IsWhiteSpace(value[first])) first++;
+            first += 2; // opening bracket and the literal T
+            while (char.IsWhiteSpace(value[first])) first++;
+            if (int.TryParse(value.Slice(first, th.Index + th.Length - first - 1), out int id))
+            { thread = id; prefixEnd = th.Index + th.Length; }
         }
-        var sm = SourcePattern().Match(value);
         int messageEnd = value.Length;
-        if (sm.Success && int.TryParse(sm.Groups["line"].ValueSpan, out int number) && number > 0)
+        var sources = SourcePattern().EnumerateMatches(value);
+        if (sources.MoveNext())
         {
-            var file = sm.Groups["file"];
-            source = raw.Slice(file.Index, file.Length);
-            sourceLine = number;
-            messageEnd = sm.Index;
+            var sm = sources.Current;
+            int first = sm.Index;
+            while (char.IsWhiteSpace(value[first])) first++;
+            first++; // opening parenthesis
+            int last = sm.Index + sm.Length - 1;
+            while (char.IsWhiteSpace(value[last])) last--;
+            int colon = first + value.Slice(first, last - first).LastIndexOf(':');
+            if (int.TryParse(value.Slice(colon + 1, last - colon - 1), out int number) && number > 0)
+            {
+                source = raw.Slice(first, colon - first);
+                sourceLine = number; messageEnd = sm.Index;
+            }
         }
         int messageStart = Math.Min(prefixEnd, messageEnd);
         while (messageStart < messageEnd && char.IsWhiteSpace(value[messageStart])) messageStart++;
@@ -121,21 +167,21 @@ public static partial class LogParser
             source, sourceLine, quality);
     }
 
-    private static TimeSpan? ParseTimestamp(string value)
+    private static TimeSpan? ParseTimestamp(ReadOnlySpan<char> value)
     {
         if (!TimeValuePattern().IsMatch(value)) return null;
         int colon = value.IndexOf(':');
-        if (!long.TryParse(value.AsSpan(0, colon), NumberStyles.None, CultureInfo.InvariantCulture, out long hours)) return null;
-        int minutes = int.Parse(value.AsSpan(colon + 1, 2), CultureInfo.InvariantCulture);
-        int seconds = int.Parse(value.AsSpan(colon + 4, 2), CultureInfo.InvariantCulture);
+        if (!long.TryParse(value[..colon], NumberStyles.None, CultureInfo.InvariantCulture, out long hours)) return null;
+        int minutes = int.Parse(value.Slice(colon + 1, 2), CultureInfo.InvariantCulture);
+        int seconds = int.Parse(value.Slice(colon + 4, 2), CultureInfo.InvariantCulture);
         if (minutes > 59 || seconds > 59) return null;
         int fractionStart = colon + 7;
         long fractionTicks = fractionStart < value.Length
-            ? int.Parse(value.AsSpan(fractionStart), CultureInfo.InvariantCulture) : 0;
+            ? int.Parse(value[fractionStart..], CultureInfo.InvariantCulture) : 0;
         for (int digits = value.Length - fractionStart; digits > 0 && digits < 7; digits++) fractionTicks *= 10;
         try { return TimeSpan.FromTicks(checked(hours * TimeSpan.TicksPerHour + minutes * TimeSpan.TicksPerMinute + seconds * TimeSpan.TicksPerSecond + fractionTicks)); }
         catch (OverflowException) { return null; }
     }
 
-    private sealed class SummaryBuilder { public int Count; public int EntryCount; public string? First; public string? Last; }
+    private sealed class SummaryBuilder { public int Count; public int EntryCount; public ReadOnlyMemory<char>? First; public ReadOnlyMemory<char>? Last; }
 }

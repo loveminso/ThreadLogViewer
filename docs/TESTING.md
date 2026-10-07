@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-현재 기능의 수동 확인 절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md), 키 조작은 [단축키 표](SHORTCUTS.md), 실제 빌드·회귀·배포 결과는 [v0.7.0 검증 기록](VALIDATION-v0.7.0.md)을 따른다. 기대 결과와 실제 통과 기록을 구분한다.
+현재 기능의 수동 확인 절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md), 키 조작은 [단축키 표](SHORTCUTS.md), 실제 빌드·회귀·배포 결과는 [v0.8.0 검증 기록](VALIDATION-v0.8.0.md)을 따른다. 기대 결과와 실제 통과 기록을 구분한다.
 
 ## 자동 회귀
 
@@ -31,4 +31,4 @@ Release 빌드 뒤 합성 작업 측정은 테스트 실행 파일의 별도 경
 & .\.tools\dotnet\dotnet.exe .\tests\ThreadLogViewer.Tests\bin\Release\net10.0-windows\ThreadLogViewer.Tests.dll --workbench-benchmark TestResults\my-workbench-run 100
 ```
 
-100 MiB 읽기/필터, 세 탭, 1 MiB 한 줄, 10만 검색 결과와 실제 reader 진행 후 취소를 실행한다. JSON에 시간·메모리·25ms dispatcher 대기·취소 확인을 구분하고 작은 창의 비표시 렌더를 생성한다. 높은 bitmap DPI는 실제 모니터 DPI 검증을 대신하지 않는다. 창을 닫은 뒤 GC 값과 약한 참조 회수 여부는 별도 지표이며, 미회수 원인 확인 없이 누수 여부를 결론내리지 않는다.
+100 MiB 읽기/필터, 세 탭, 1 MiB 한 줄, 10만 검색 결과와 실제 reader 진행 후 취소를 실행한다. 긴 줄은 기본 구간 표시와 마지막 구간 검색을 측정한다. 같은 창에서 큰 탭을 닫고 복원 보관을 비운 뒤 원문·투영·문서 약한 참조 회수를 확인하는 경우와 전체 창 종료 후 검사를 구분한다. JSON에 시간·메모리·25ms dispatcher 대기·취소 확인을 구분하고 작은 창의 비표시 렌더를 생성한다. 높은 bitmap DPI는 실제 모니터 DPI 검증을 대신하지 않는다. 창을 닫은 뒤 GC 값과 약한 참조 회수 여부는 별도 지표이며, 미회수 원인 확인 없이 누수 여부를 결론내리지 않는다.

@@ -11,10 +11,10 @@ public partial class MainWindow
     {
         public List<NavigationPoint> Back { get; } = [];
         public List<NavigationPoint> Forward { get; } = [];
+        public int Depth { get; set; }
+        public bool Replaying { get; set; }
     }
     private const int MaximumNavigationHistory = 100;
-    private int navigationDepth;
-    private bool historyReplaying;
 
     private NavigationPoint? CaptureNavigationPoint()
     {
@@ -31,16 +31,19 @@ public partial class MainWindow
         private readonly LogData? source;
         private readonly NavigationPoint? before;
         private readonly bool outermost;
+        private readonly NavigationHistory? history;
         public NavigationTransaction(MainWindow owner)
         {
             this.owner = owner; session = owner.activeSession; source = owner.data;
-            outermost = owner.navigationDepth++ == 0;
-            if (outermost && !owner.historyReplaying) before = owner.CaptureNavigationPoint();
+            history = session?.History;
+            outermost = history is not null && history.Depth++ == 0;
+            if (outermost && !history!.Replaying) before = owner.CaptureNavigationPoint();
         }
         public void Dispose()
         {
-            owner.navigationDepth--;
-            if (!outermost || owner.historyReplaying || session != owner.activeSession || source != owner.data || before is null) return;
+            if (history is not null) history.Depth--;
+            if (!outermost || history is null || session is null || history.Replaying || session != owner.activeSession || source != owner.data ||
+                session.History != history || before is null) return;
             var after = owner.CaptureNavigationPoint();
             if (after is null || SamePlace(before, after)) return;
             Push(session!.History.Back, before);
@@ -61,13 +64,14 @@ public partial class MainWindow
     private async void ForwardNavigation_Click(object sender, RoutedEventArgs e) => await NavigateHistoryAsync(true);
     private async Task NavigateHistoryAsync(bool forward)
     {
-        if (busy || historyReplaying || activeSession is not { } session || data is null) return;
+        if (busy || activeSession is not { } session || session.History.Replaying || data is null) return;
+        var history = session.History;
         var stack = forward ? session.History.Forward : session.History.Back;
         if (stack.Count == 0) return;
         var source = data;
         var target = stack[^1];
         var current = CaptureNavigationPoint();
-        historyReplaying = true;
+        history.Replaying = true;
         try
         {
             if (target.Context)
@@ -79,7 +83,7 @@ public partial class MainWindow
                 await FilterAsync(returnAnchor: target.Position);
                 if (contextActive) return; // cancellation leaves the current view and stacks untouched
             }
-            if (source != data || session != activeSession) return;
+            if (source != data || session != activeSession || session.History != history) return;
             restoringPosition = true;
             try { RestorePosition(target.Position); }
             finally { restoringPosition = false; }
@@ -89,7 +93,7 @@ public partial class MainWindow
             OperationStatus.Text = $"{(forward ? "앞으로" : "뒤로")} 이동 · 원본 {(CurrentSourceLine() ?? target.Position.SourceLine) + 1:N0}줄" +
                 (positionMovedToNearest ? " · 필터로 숨겨진 이전 위치에 가까운 줄을 표시합니다." : "");
         }
-        finally { historyReplaying = false; UpdateMenus(); }
+        finally { history.Replaying = false; UpdateMenus(); }
     }
 
     private void RemapNavigationHistory(LogSession session, SourceLineRemap map)

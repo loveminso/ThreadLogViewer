@@ -56,6 +56,7 @@ public partial class MainWindow
 
     private void UpdateResultsLayout()
     {
+        UpdateResponsiveLayout();
         if (!resultsLayoutReady || updatingResultsLayout) return;
         updatingResultsLayout = true;
         try

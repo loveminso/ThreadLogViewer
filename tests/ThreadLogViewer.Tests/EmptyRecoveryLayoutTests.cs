@@ -2,6 +2,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -56,7 +57,16 @@ public sealed class EmptyRecoveryLayoutTests
             Assert.Equal(100, Control<ListBox>(window, "ResultsList").Items.Count);
             object firstResult = Control<ListBox>(window, "ResultsList").Items[0];
             Assert.StartsWith("[숨김", (string)firstResult.GetType().GetProperty("Label")!.GetValue(firstResult)!);
-            Assert.InRange(results.ActualHeight, 178, 182);
+            // The extra search-status row can consume part of the preferred 180-DIP results pane.
+            // Verify the actual body allocation, retaining the 120-DIP log minimum rather than overflow.
+            double preferredHeight = Field<double>(window, "preferredResultsHeight");
+            Assert.Equal(180, preferredHeight);
+            double viewportHeight = Math.Min(grid.ActualHeight, LayoutInformation.GetLayoutSlot(grid).Height);
+            double bodyHeight = viewportHeight - Bounds(editor, grid).Top;
+            double availableResults = bodyHeight - 120 - splitter.ActualHeight;
+            Assert.True(availableResults >= 80, $"Results allocation: {availableResults:0.##} DIP.");
+            Assert.InRange(results.ActualHeight, Math.Min(preferredHeight, availableResults) - 1,
+                Math.Min(preferredHeight, availableResults) + 1);
             Assert.True(editor.ActualHeight >= 120, $"Editor height: {editor.ActualHeight:0.##} DIP.");
             Assert.Equal(Visibility.Visible, viewport.Visibility);
             Assert.True(viewport.ClipToBounds);
@@ -74,6 +84,15 @@ public sealed class EmptyRecoveryLayoutTests
             Assert.True(empty.ActualHeight + viewport.Padding.Top + viewport.Padding.Bottom <= viewport.ActualHeight + 1,
                 $"Compact empty panel {empty.ActualHeight:0.##} exceeds viewport {viewport.ActualHeight:0.##}.");
             SaveImage(window, $"empty-{(noThreads ? "threads" : "content")}-{(dark ? "dark" : "light")}-1040x600.png");
+
+            // Temporary clamping must not replace the user's preference when more height becomes available.
+            await Layout(window, 680);
+            Assert.InRange(results.ActualHeight, preferredHeight - 1, preferredHeight + 1);
+            Assert.Equal(preferredHeight, Field<double>(window, "preferredResultsHeight"));
+            Assert.True(editor.ActualHeight >= 120);
+            await Layout(window);
+            Assert.InRange(results.ActualHeight, Math.Min(preferredHeight, availableResults) - 1,
+                Math.Min(preferredHeight, availableResults) + 1);
 
             // Long help must scroll only in the body viewport, without enlarging it over the search pane.
             Control<TextBlock>(window, "EmptyDetail").Text = string.Join("\n", Enumerable.Repeat("합성 긴 안내 · 복구 버튼은 위에 있습니다.", 20));
@@ -126,13 +145,13 @@ public sealed class EmptyRecoveryLayoutTests
         for (int pass = 0; pass < 200 && !condition(); pass++) await Task.Delay(10);
         Assert.True(condition());
     }
-    private static async Task Layout(MainWindow window)
+    private static async Task Layout(MainWindow window, double height = 600)
     {
-        window.Width = 1040; window.Height = 600;
+        window.Width = 1040; window.Height = height;
         var content = (FrameworkElement)window.Content;
         for (int pass = 0; pass < 3; pass++)
         {
-            content.Measure(new Size(1040, 600)); content.Arrange(new Rect(0, 0, 1040, 600)); content.UpdateLayout();
+            content.Measure(new Size(1040, height)); content.Arrange(new Rect(0, 0, 1040, height)); content.UpdateLayout();
             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
         }
     }
@@ -140,7 +159,7 @@ public sealed class EmptyRecoveryLayoutTests
     {
         string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         Assert.True(File.Exists(System.IO.Path.Combine(root, "ThreadLogViewer.slnx")));
-        string directory = System.IO.Path.Combine(root, "TestResults", "v0.7.0", "empty-recovery-layout");
+        string directory = System.IO.Path.Combine(root, "TestResults", "v0.8.0", "empty-recovery-layout");
         Directory.CreateDirectory(directory);
         var image = new RenderTargetBitmap(1040, 600, 96, 96, PixelFormats.Pbgra32);
         image.Render((FrameworkElement)window.Content);

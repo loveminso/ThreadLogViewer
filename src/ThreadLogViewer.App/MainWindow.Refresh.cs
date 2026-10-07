@@ -7,6 +7,8 @@ namespace ThreadLogViewer.App;
 
 public partial class MainWindow
 {
+    // Synthetic tests can pause this second background phase without relying on timing or large data.
+    private Func<CancellationToken, Task>? refreshMapCheckpoint = null;
     private async void RefreshSession_Click(object sender, RoutedEventArgs e) => await RefreshCurrentSessionAsync();
 
     private Task RefreshCurrentSessionAsync()
@@ -41,34 +43,66 @@ public partial class MainWindow
                 int radius = int.TryParse(snapshot.ContextRadius, out int value) ? Math.Clamp(value, 0, 10000) : 20;
                 var view = context ? LogContext.Create(updated, center!.Value, radius, op.Token) :
                     LogProjection.CreateFiltered(updated, selectedNext, snapshot.Filter, op.Token, op.Progress);
-                var next = CopySessionState(snapshot, updated, view, PrepareDocument(view.Text, op.Token, op.Progress));
-                int removed = RemapSessionState(snapshot, next, map);
-                bool relocated = snapshot.Position is { } previousPosition && map.Map(previousPosition.SourceLine) is null && next.Position is not null;
-                next.Context = context;
-                next.NormalThreads = context ? selectedNext : null;
+                var document = PrepareDocument(view.Text, op.Token, op.Progress);
+                int preceding = 0, following = 0;
                 if (context)
                 {
-                    next.ContextLine = center;
                     int centerEntry = updated.Lines[center!.Value].EntryIndex;
-                    next.ContextEntry = centerEntry;
-                    int preceding = view.EntryIndexes.Count(index => index < centerEntry);
-                    int following = view.EntryIndexes.Count(index => index > centerEntry);
-                    next.ContextText = $"주변 로그 보기 중 · 기준: 원본 {center.Value + 1:N0}줄 · 앞 {preceding:N0}기록 / 뒤 {following:N0}기록 · 모든 스레드";
-                    next.ContextTip = "새로 고친 원본에서 내용과 소유 헤더가 같은 기준 기록을 복원했습니다.";
-                    next.ContextInput = $"원본 {center.Value + 1:N0}줄을 기준으로 표시했습니다.";
+                    preceding = view.EntryIndexes.Count(index => index < centerEntry);
+                    following = view.EntryIndexes.Count(index => index > centerEntry);
                 }
-                else { next.ContextLine = next.ContextEntry = null; next.NormalPosition = null; }
                 op.Token.ThrowIfCancellationRequested();
-                return (next, map, selectedNext, removed, relocated);
+                return (updated, view, document, map, selectedNext, context, center, preceding, following);
             }, op.Token);
-            op.Token.ThrowIfCancellationRequested();
-            if (!work.IsCurrent(op.Version) || activeSession != previous || !sessions.Contains(previous)) return;
-            var next = prepared.next;
+            LogSession next;
+            int removed;
+            bool relocated;
+            while (true)
+            {
+                op.Token.ThrowIfCancellationRequested();
+                if (!work.IsCurrent(op.Version) || !viewReady || activeSession != previous || data != snapshot.Source || !sessions.Contains(previous)) return;
+                CaptureActiveSession();
+                var latest = CopySessionState(previous, previous.Source, previous.View, previous.Document);
+                var back = previous.History.Back.ToArray();
+                var forward = previous.History.Forward.ToArray();
+                var checkpoint = refreshMapCheckpoint;
+                var restored = await Task.Run(async () =>
+                {
+                    if (checkpoint is not null) await checkpoint(op.Token);
+                    op.Token.ThrowIfCancellationRequested();
+                    op.Progress.Report(new("분석 상태 위치 복원", 0));
+                    var target = CopySessionState(latest, prepared.updated, prepared.view, prepared.document);
+                    int dropped = RemapSessionState(latest, target, prepared.map, op.Token);
+                    target.Context = prepared.context;
+                    target.NormalThreads = prepared.context ? prepared.selectedNext : null;
+                    if (prepared.context)
+                    {
+                        target.ContextLine = prepared.center;
+                        target.ContextEntry = prepared.updated.Lines[prepared.center!.Value].EntryIndex;
+                        target.ContextText = $"주변 로그 보기 중 · 기준: 원본 {prepared.center.Value + 1:N0}줄 · 앞 {prepared.preceding:N0}기록 / 뒤 {prepared.following:N0}기록 · 모든 스레드";
+                        target.ContextTip = "새로 고친 원본에서 내용과 소유 헤더가 같은 기준 기록을 복원했습니다.";
+                        target.ContextInput = $"원본 {prepared.center.Value + 1:N0}줄을 기준으로 표시했습니다.";
+                    }
+                    else { target.ContextLine = target.ContextEntry = null; target.NormalPosition = null; }
+                    op.Token.ThrowIfCancellationRequested();
+                    return (target, dropped);
+                }, op.Token);
+                op.Token.ThrowIfCancellationRequested();
+                if (!work.IsCurrent(op.Version) || !viewReady || activeSession != previous || data != snapshot.Source || !sessions.Contains(previous)) return;
+                CaptureActiveSession();
+                // Mapping may be expensive. An input made during that await belongs to this tab too.
+                // Reuse the already prepared immutable source/view and map the newest state again.
+                if (!SameRefreshState(latest, previous, back, forward)) continue;
+                next = restored.target;
+                removed = restored.dropped;
+                relocated = latest.Position is { } position && prepared.map.Map(position.SourceLine) is null && next.Position is not null;
+                break;
+            }
             next.Threads = next.Source.Threads.Select(summary => new ThreadItem(summary, theme)
                 { IsSelected = prepared.selectedNext.Contains(summary.ThreadId) }).ToList();
             int historyCount = next.History.Back.Count + next.History.Forward.Count;
             RemapNavigationHistory(next, prepared.map);
-            int removed = prepared.removed + historyCount - next.History.Back.Count - next.History.Forward.Count;
+            removed += historyCount - next.History.Back.Count - next.History.Forward.Count;
             selectingSession = true;
             try
             {
@@ -76,10 +110,11 @@ public partial class MainWindow
                 ActivateSession(next);
             }
             finally { selectingSession = false; }
-            closedSessions.Trim(sessions);
+            int evicted = TrimClosedSessions();
             OperationStatus.Text = "파일 새로 고침 완료 · 인코딩과 필터·검색·강조 유지" +
-                (prepared.relocated ? " · 이전 커서 위치가 없어 가까운 확인된 원본 줄로 이동했습니다." : "") +
-                (removed > 0 ? $" · 내용 변경·삭제 또는 중복으로 위치 {removed:N0}개를 정확히 복원하지 않았습니다. 필요한 위치를 다시 지정하세요." : " · 확인된 원본 위치 복원");
+                (relocated ? " · 이전 커서 위치가 없어 가까운 확인된 원본 줄로 이동했습니다." : "") +
+                (removed > 0 ? $" · 내용 변경·삭제 또는 중복으로 위치 {removed:N0}개를 정확히 복원하지 않았습니다. 필요한 위치를 다시 지정하세요." : " · 확인된 원본 위치 복원") +
+                ClosedRetentionNotice(evicted);
             UpdateMenus();
         }
         catch (OperationCanceledException)
@@ -89,6 +124,27 @@ public partial class MainWindow
         { if (work.IsCurrent(op.Version)) { RestoreFilters(); ShowError("파일 새로 고침 실패", ex); } }
         finally { FinishWork(op.Version); }
     }
+
+    private static bool SameRefreshState(LogSession before, LogSession current, NavigationPoint[] back, NavigationPoint[] forward) =>
+        before.View == current.View && before.Document == current.Document && before.Position == current.Position &&
+        before.EmptyPosition == current.EmptyPosition && before.NormalPosition == current.NormalPosition &&
+        before.SelectionStart == current.SelectionStart && before.SelectionLength == current.SelectionLength &&
+        SameItems(before.WholeLineSelection, current.WholeLineSelection) &&
+        (before.NormalThreads is null ? current.NormalThreads is null : current.NormalThreads is not null && before.NormalThreads.SetEquals(current.NormalThreads)) &&
+        SameItems(before.Bookmarks, current.Bookmarks) && before.TimeA == current.TimeA && before.TimeB == current.TimeB &&
+        before.SeparationStart == current.SeparationStart && before.Filter == current.Filter &&
+        before.Includes == current.Includes && before.Excludes == current.Excludes && before.IncludeAll == current.IncludeAll && before.FilterCase == current.FilterCase &&
+        before.Keywords.Select(rule => (rule.Keyword, rule.ColorIndex, rule.Enabled)).SequenceEqual(current.Keywords.Select(rule => (rule.Keyword, rule.ColorIndex, rule.Enabled))) &&
+        before.KeywordInput == current.KeywordInput && before.KeywordColor == current.KeywordColor && before.ThreadSearchQuery == current.ThreadSearchQuery &&
+        before.Context == current.Context && before.ContextLine == current.ContextLine && before.ContextEntry == current.ContextEntry &&
+        before.ContextText == current.ContextText && Equals(before.ContextTip, current.ContextTip) && before.ContextInput == current.ContextInput && before.ContextRadius == current.ContextRadius &&
+        before.Query == current.Query && before.SearchCase == current.SearchCase && before.SearchWord == current.SearchWord && before.SearchRegex == current.SearchRegex &&
+        before.SearchScope == current.SearchScope && SameItems(before.SearchRanges, current.SearchRanges) && before.LastHit == current.LastHit && before.SearchVisible == current.SearchVisible &&
+        before.AnalysisExpanded == current.AnalysisExpanded && before.AnalysisTool == current.AnalysisTool && before.BookmarksExpanded == current.BookmarksExpanded && before.FilterExpanded == current.FilterExpanded &&
+        back.SequenceEqual(current.History.Back) && forward.SequenceEqual(current.History.Forward);
+
+    private static bool SameItems<T>(IEnumerable<T>? first, IEnumerable<T>? second) =>
+        first is null ? second is null : second is not null && first.SequenceEqual(second);
 
     private static LogSession CopySessionState(LogSession old, LogData source, LogProjection view,
         ICSharpCode.AvalonEdit.Document.TextDocument document) => new(source, view, document, old.DisplayTitle, old.Scope, old.SourceTitle, old.IsBlank)
@@ -108,11 +164,12 @@ public partial class MainWindow
         BookmarksExpanded = old.BookmarksExpanded, FilterExpanded = old.FilterExpanded
     };
 
-    private static int RemapSessionState(LogSession old, LogSession next, SourceLineRemap map)
+    private static int RemapSessionState(LogSession old, LogSession next, SourceLineRemap map, CancellationToken token = default)
     {
         int removed = 0;
         int? Line(int? index)
         {
+            token.ThrowIfCancellationRequested();
             if (index is null) return null;
             var result = map.Map(index.Value); if (result is null) removed++;
             return result;
@@ -121,7 +178,7 @@ public partial class MainWindow
         {
             if (anchor is null) return null;
             int? mapped = Line(anchor.SourceLine);
-            if ((mapped ?? map.FindNearestMappedLine(anchor.SourceLine)) is not { } line) return null;
+            if ((mapped ?? map.FindNearestMappedLine(anchor.SourceLine, token)) is not { } line) return null;
             return anchor with { SourceLine = line, Column = mapped.HasValue ? anchor.Column : 1,
                 TopSourceLine = Line(anchor.TopSourceLine) ?? line };
         }
@@ -135,12 +192,12 @@ public partial class MainWindow
         next.WholeLineSelection = old.WholeLineSelection?.Select(index => Line(index)).Where(index => index.HasValue).Select(index => index!.Value).ToArray();
         if (old.Context && old.ContextLine is { } context && map.Map(context) is null) removed++;
         next.SearchRanges = old.SearchRanges?.Select(range =>
-        { var mapped = map.MapRange(range); if (mapped is null) removed++; return mapped; })
+        { var mapped = map.MapRange(range, token); if (mapped is null) removed++; return mapped; })
             .Where(range => range.HasValue).Select(range => range!.Value).ToArray();
         next.LastHit = null;
         if (old.LastHit is { } hit)
         {
-            if (map.MapRange(new(hit.SourceOffset, hit.Length)) is { } range)
+            if (map.MapRange(new(hit.SourceOffset, hit.Length), token) is { } range)
             {
                 int line = next.Source.GetLineIndexAtOffset(range.Offset);
                 next.LastHit = new(range.Offset, range.Length, line, range.Offset - next.Source.GetLineOffset(line) + 1, next.Source.Lines[line].EntryIndex);
@@ -156,18 +213,32 @@ public partial class MainWindow
             int first = -1, end = -1; bool valid = true;
             foreach (var oldRange in ranges)
             {
-                if (map.MapRange(oldRange) is not { } range || next.View.GetDisplayOffset(range.Offset) is not { } start) { valid = false; break; }
+                token.ThrowIfCancellationRequested();
+                if (map.MapRange(oldRange, token) is not { } range || next.View.GetDisplayOffset(range.Offset) is not { } start) { valid = false; break; }
                 int line = next.Source.GetLineIndexAtOffset(range.Offset + range.Length - 1);
                 if (next.View.FindDisplayLine(line + 1) is not { } lastDisplay) { valid = false; break; }
                 int last = next.View.DisplayOffsets[lastDisplay - 1] + range.Offset + range.Length - next.Source.GetLineOffset(line);
                 if (first < 0) first = start; else if (start != end) { valid = false; break; }
                 end = last;
             }
-            if (valid && first >= 0 && end >= first && old.View.Text.AsSpan(old.SelectionStart, old.SelectionLength)
-                .SequenceEqual(next.View.Text.AsSpan(first, end - first)))
+            if (valid && first >= 0 && end >= first && EqualSelection(old.View.Text, old.SelectionStart, old.SelectionLength,
+                next.View.Text, first, end - first, token))
             { next.SelectionStart = first; next.SelectionLength = end - first; }
             else removed++;
         }
+        token.ThrowIfCancellationRequested();
         return removed;
+    }
+
+    private static bool EqualSelection(string oldText, int oldStart, int oldLength, string newText, int newStart, int newLength, CancellationToken token)
+    {
+        if (oldLength != newLength) return false;
+        for (int offset = 0; offset < oldLength; offset += 65536)
+        {
+            token.ThrowIfCancellationRequested();
+            int length = Math.Min(65536, oldLength - offset);
+            if (!oldText.AsSpan(oldStart + offset, length).SequenceEqual(newText.AsSpan(newStart + offset, length))) return false;
+        }
+        return true;
     }
 }

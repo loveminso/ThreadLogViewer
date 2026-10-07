@@ -19,7 +19,7 @@ public sealed class AppFeatureTests
         Assert.True(defaults.Success);
         Assert.True(defaults.CanSave);
         Assert.Equal(UiSettings.Default, defaults.Settings);
-        var values = new UiSettings { Dark = false, Compact = true, WordWrap = true, FontSize = 18, PanelWidth = 420, ResultsHeight = 360, ResultsCollapsed = true, ThreadBackgrounds = false };
+        var values = new UiSettings { Dark = false, Compact = true, WordWrap = true, FontSize = 18, PanelWidth = 420, ResultsHeight = 360, ResultsCollapsed = true, ThreadBackgrounds = false, LargeLinePreview = false };
         Assert.True(store.Save(values).Success);
         Assert.Equal(values, store.Load().Settings);
         Assert.True(store.Save(values with { FontSize = 20 }).Success);
@@ -27,7 +27,7 @@ public sealed class AppFeatureTests
         using var json = JsonDocument.Parse(File.ReadAllBytes(store.FilePath));
         Assert.Equal(SettingsStore.OwnerMarker, json.RootElement.GetProperty("Owner").GetString());
         Assert.Equal(SettingsStore.SchemaVersion, json.RootElement.GetProperty("Schema").GetInt32());
-        Assert.Equal(8, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
+        Assert.Equal(9, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
         Assert.Empty(Directory.EnumerateFiles(System.IO.Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
     }
 
