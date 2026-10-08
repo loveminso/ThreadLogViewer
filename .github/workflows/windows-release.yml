@@ -1,0 +1,193 @@
+name: Windows release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: '1'
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select unpublished version
+        id: version
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$properties = Get-Content Directory.Build.props -Raw
+          $version = [string]$properties.Project.PropertyGroup.Version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unsupported version: $version" }
+          $tag = "v$version"
+          "tag=$tag" | Add-Content $env:GITHUB_OUTPUT
+          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read releases.' }
+          $releases = @(foreach ($page in $pages) { foreach ($item in $page) { $item } })
+          $existing = @($releases | Where-Object { $_.tag_name -eq $tag })
+          if ($existing.Count -gt 1) { throw 'Multiple releases share the version tag.' }
+          if ($existing.Count -eq 1 -and -not $existing[0].draft) {
+            "publish=false" | Add-Content $env:GITHUB_OUTPUT
+            Write-Host "$tag is already published. Existing release files remain unchanged; increment Version for the next release."
+          } else {
+            $tagCommit = git rev-parse -q --verify "refs/tags/$tag^{commit}"
+            $tagExists = $LASTEXITCODE -eq 0
+            $global:LASTEXITCODE = 0
+            if ($tagExists -and $tagCommit -ne $env:GITHUB_SHA) {
+              throw "Existing $tag points to a different source commit. Use a new version."
+            }
+            "publish=true" | Add-Content $env:GITHUB_OUTPUT
+          }
+
+      - name: Set up .NET SDK
+        if: steps.version.outputs.publish == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Release
+        if: steps.version.outputs.publish == 'true'
+        run: |
+          dotnet build ThreadLogViewer.slnx -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+      - name: Run all automated tests
+        if: steps.version.outputs.publish == 'true'
+        run: |
+          dotnet test ThreadLogViewer.slnx -c Release --no-build --no-restore --logger "trx;LogFileName=tests.trx" --results-directory TestResults/release
+          if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed.' }
+
+      - name: Publish portable Windows x64 package
+        if: steps.version.outputs.publish == 'true'
+        run: ./scripts/publish.ps1
+
+      - name: Verify tests, runtime, versions and every ZIP file
+        if: steps.version.outputs.publish == 'true'
+        id: verify
+        run: ./scripts/verify-release.ps1
+
+      - name: Preserve validation results
+        if: always() && steps.version.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-verification
+          path: |
+            TestResults/release/**/*.trx
+            artifacts/release-verification.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload draft, verify assets, then publish release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_HASH: ${{ steps.verify.outputs.hash }}
+          TESTS_PASSED: ${{ steps.verify.outputs.passed }}
+          TESTS_TOTAL: ${{ steps.verify.outputs.total }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          $notes = @(
+            "# ThreadLog Viewer $tag"
+            ''
+            'Windows x64용 읽기 전용 오프라인 로그 뷰어입니다. 최신 기능과 사용법은 함께 제공되는 README와 docs에 있습니다.'
+            ''
+            '## 회사 PC에서 실행'
+            ''
+            '- 아래 Assets의 **ThreadLogViewer-win-x64.zip**을 받아 전체 압축을 해제합니다.'
+            '- 압축을 푼 **ThreadLogViewer-win-x64** 폴더에서 **ThreadLogViewer.exe**를 실행합니다.'
+            '- DLL, licenses, docs, samples를 함께 유지합니다. 별도 .NET 설치 없이 실행됩니다.'
+            '- Source code ZIP은 개발용 소스입니다. 실행본은 위 이름의 ZIP을 받으세요.'
+            ''
+            '## 포함된 기능'
+            ''
+            '- 여러 파일/붙여넣기 탭, 스레드·내용 필터, 고급 검색과 결과 목록, 문구 강조.'
+            '- 원본 줄·주변 문맥·탐색 이력, 시간 비교, 선택 범위 탭, 원본을 보호하는 내보내기.'
+            '- 닫은 탭 복원, F5 새로 고침 상태 유지, 분석 상태와 필터/강조 프리셋 저장·불러오기.'
+            '- 작은 창 레이아웃, 긴 줄 구간 표시. v0.8.1부터 북마크는 제공하지 않습니다.'
+            ''
+            '## 이번 Windows 자동 검증'
+            ''
+            "- Release 빌드 성공, 자동 테스트 **$env:TESTS_PASSED/$env:TESTS_TOTAL 통과**."
+            '- Windows x64 EXE/DLL 버전, 포함된 .NET/WPF 런타임·라이선스·문서·샘플 검사.'
+            '- ZIP의 모든 파일을 배포 폴더와 SHA-256으로 비교하고 다운로드용 체크섬 파일 생성.'
+            '- 실제 GUI 입력, 모니터 DPI, 새로운 성능 측정은 이 자동 검증에 포함하지 않습니다.'
+            ''
+            "소스 커밋: $env:GITHUB_SHA"
+            "ZIP SHA-256: $env:RELEASE_HASH"
+            ''
+            "전체 설명: https://github.com/$env:GITHUB_REPOSITORY/blob/$env:GITHUB_SHA/README.md"
+          )
+          $notes | Set-Content artifacts/release-notes.md -Encoding utf8NoBOM
+          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read releases.' }
+          $releases = @(foreach ($page in $pages) { foreach ($item in $page) { $item } })
+          $existing = @($releases | Where-Object { $_.tag_name -eq $tag })
+          if ($existing.Count -gt 0) {
+            if (-not $existing[0].draft) { throw 'Refusing to overwrite a published release.' }
+            gh release edit $tag --target $env:GITHUB_SHA --title "ThreadLog Viewer $tag" --notes-file artifacts/release-notes.md
+            if ($LASTEXITCODE -ne 0) { throw 'Could not update the draft release.' }
+            gh release upload $tag artifacts/ThreadLogViewer-win-x64.zip artifacts/ThreadLogViewer-win-x64.zip.sha256 --clobber
+          } else {
+            gh release create $tag artifacts/ThreadLogViewer-win-x64.zip artifacts/ThreadLogViewer-win-x64.zip.sha256 --target $env:GITHUB_SHA --title "ThreadLog Viewer $tag" --notes-file artifacts/release-notes.md --draft
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload release files.' }
+          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the draft release.' }
+          $drafts = @(foreach ($page in $pages) { foreach ($item in $page) { if ($item.tag_name -eq $tag) { $item } } })
+          if ($drafts.Count -ne 1 -or -not $drafts[0].draft) { throw 'Expected one draft release.' }
+          $release = $drafts[0]
+          foreach ($path in @('artifacts/ThreadLogViewer-win-x64.zip', 'artifacts/ThreadLogViewer-win-x64.zip.sha256')) {
+            $file = Get-Item -LiteralPath $path
+            $asset = @($release.assets | Where-Object { $_.name -eq $file.Name })
+            if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or $asset[0].size -ne $file.Length) {
+              throw "Invalid uploaded asset: $($file.Name)"
+            }
+            if ($asset[0].digest) {
+              $expectedDigest = 'sha256:' + (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($asset[0].digest -ne $expectedDigest) { throw "Uploaded checksum mismatch: $($file.Name)" }
+            }
+          }
+          gh release edit $tag --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the verified release.' }
+
+      - name: Check the public README download links
+        if: steps.version.outputs.publish == 'true'
+        env:
+          RELEASE_HASH: ${{ steps.verify.outputs.hash }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = Join-Path $env:RUNNER_TEMP 'public-download-verification'
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          $root = "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download"
+          foreach ($name in @('ThreadLogViewer-win-x64.zip', 'ThreadLogViewer-win-x64.zip.sha256')) {
+            Invoke-WebRequest -Uri "$root/$name" -OutFile (Join-Path $folder $name)
+          }
+          $zip = Join-Path $folder 'ThreadLogViewer-win-x64.zip'
+          $checksum = Get-Content (Join-Path $folder 'ThreadLogViewer-win-x64.zip.sha256') -Raw
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:RELEASE_HASH -or $checksum.Trim() -ne "$actual  ThreadLogViewer-win-x64.zip") {
+            throw 'The public download does not match the verified build.'
+          }
+          "Download verified: $root/ThreadLogViewer-win-x64.zip" | Add-Content $env:GITHUB_STEP_SUMMARY

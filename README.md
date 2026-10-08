@@ -1,16 +1,48 @@
 # ThreadLog Viewer v0.8.1
 
 Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10 + WPF + AvalonEdit.
-실행 중 인터넷, 로그인, API, 서버, DB, 텔레메트리를 사용하지 않습니다.
-개발 시 .NET SDK와 NuGet 패키지 다운로드에는 인터넷이 필요합니다. 회사 PC에는 ZIP 전체를 풀어서 복사합니다.
+실행 중 인터넷, 로그인, API, 서버, DB, 텔레메트리를 사용하지 않습니다. 개발 시 SDK·NuGet 다운로드와 GitHub에서 실행 ZIP을 받을 때 인터넷이 필요합니다.
 
+## 최신 실행본
+
+[**Windows x64 실행 ZIP 다운로드**](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip) · [SHA-256](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip.sha256) · [최신 릴리스](https://github.com/loveminso/ThreadLogViewer/releases/latest)
+
+회사 PC에서는 `ThreadLogViewer-win-x64.zip`을 **전부 압축 해제한 뒤 `ThreadLogViewer.exe`**를 실행합니다. .NET 런타임과 필요한 DLL을 포함하므로 별도 .NET SDK·런타임 설치가 필요하지 않습니다. 자세한 절차는 [회사 PC 배포](#회사-pc-배포)를 따릅니다.
+
+`Source code (zip)`과 저장소의 **Code → Download ZIP**은 소스 코드입니다. 실행용 ZIP은 Releases의 `ThreadLogViewer-win-x64.zip`을 선택하세요. 버전별 실행본과 변경 사항은 [릴리스 목록](https://github.com/loveminso/ThreadLogViewer/releases)에서 확인합니다.
+
+## 현재 기능
+
+| 작업 | 제공 기능 |
+|---|---|
+| 로그 열기 | 여러 `.log`·`.txt` 파일, 드래그 앤 드롭, 클립보드 텍스트·파일, 새 빈 탭 |
+| 스레드 분석 | 시간 헤더 기준 여러 줄 기록, 스레드 색상·배경색·ID 찾기, 기록 건수·원본 줄 수 |
+| 필터 | 스레드 선택, 포함 OR/AND·제외 문구, 미적용 변경 안내, 결과 0건 복구 |
+| 찾기와 탐색 | 대소문자·단어·정규식, 표시 기록·전체 원본·고정 선택 범위, 결과 목록, 원본 줄 이동, 탐색 뒤로·앞으로 |
+| 줄 작업 | 실제 개행을 보존하는 여러 줄·불연속 줄 선택과 복사, 우클릭 대상 표시, 주변 로그 보기, 원본 범위 분리 탭 |
+| 강조와 시간 | 탭마다 최대 8개 문구 강조, 선택 문구·커서 단어 즉시 강조/해제, 소유 헤더 기준 A/B 시간 차이 |
+| 상태 보관 | 탭별 분석·위치 보존, 같은 실행 중 닫은 탭 복원, 상태를 유지하는 파일 새로 고침, 분석 상태 JSON·필터/강조 프리셋 저장/불러오기 |
+| 화면 | 다크/라이트, 행 간격·글자 크기·자동 줄바꿈, 긴 줄 구간 표시, 검색 결과 높이 조절·접기, 화면 설정 저장 |
+| 내보내기 | 표시 결과를 원본 줄바꿈 그대로 UTF-8 새 파일로 저장. 원본 로그와 기존 사용자 파일 보호 |
+
+북마크는 v0.8.1에서 제거했습니다. F2·Shift+F2·Ctrl+F2는 북마크 동작을 제공하지 않습니다. 기존 schema 1 분석 파일의 북마크 필드는 무시하며 다른 상태는 복원합니다.
+
+[사용법](#사용법) · [전체 기능 확인 절차](docs/FEATURE-TEST-GUIDE.md) · [전체 단축키 표](docs/SHORTCUTS.md) · [현재 후속 계획](docs/PLAN.md)
+
+## 검증 상태
+
+2026-10-07 개발 검증: Release 빌드 **경고 0/오류 0**, 자동 테스트 **337/337 통과**, 다크·라이트 합성 작은 창 렌더링 확인. 실제 프로그램의 마우스·키보드·팝업·클립보드 조작과 실제 모니터 DPI 전환은 미실행입니다. v0.8.1 새 성능 측정도 실행하지 않았습니다. 빌드·자동 테스트·합성 화면·실제 GUI·측정 성능은 [v0.8.1 검증 기록](docs/VALIDATION-v0.8.1.md)에서 구분합니다.
+
+GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)에서 Release 빌드·전체 자동 테스트·런타임과 라이선스 포함 여부·EXE/DLL 버전·ZIP의 모든 파일을 검증한 뒤 게시합니다. 릴리스 설명에 해당 빌드의 소스 커밋·테스트 결과·ZIP SHA-256을 기록하며, README 다운로드 링크로 받은 ZIP의 해시도 대조합니다. 이 자동 검증은 실제 GUI·모니터 DPI·성능 실측을 대신하지 않습니다.
+
+아래 버전별 항목은 당시의 구현·검증 기록입니다. 과거 항목에 남아 있는 북마크와 로컬 배포 경로는 현재 기능·최신 다운로드를 뜻하지 않습니다.
 ## v0.8.1 — 북마크 제거
 
 - 북마크 메뉴·패널·이름·줄 표식과 F2 / Shift+F2 / Ctrl+F2 동작을 제거했습니다.
 - 닫은 탭 복원·새로 고침·분석 저장에서도 북마크 데이터를 제거했습니다. 기존 schema 1 분석 파일은 북마크 필드를 무시하고 다른 상태를 복원하며 기존 파일을 수정하지 않습니다.
 - 검색·원본 줄 이동·탐색 뒤로/앞으로·필터·강조·시간 비교는 유지합니다.
 
-실행본은 `artifacts/ThreadLogViewer-v0.8.1-win-x64/ThreadLogViewer.exe`, ZIP은 `artifacts/ThreadLogViewer-v0.8.1-win-x64.zip`입니다. Release 빌드 경고 0/오류 0, 전체 자동 테스트 **337/337 통과**입니다. 다크·라이트의 합성 작은 창 렌더링을 확인했으며 실제 GUI 입력·모니터 DPI와 새 성능 측정은 미실행입니다. 검증 결과는 [v0.8.1 기록](docs/VALIDATION-v0.8.1.md)을 따릅니다. 아래는 이전 버전별 구현·검증 기록이며 북마크는 v0.8.1부터 제공하지 않습니다.
+v0.8.1 개발 검증의 로컬 실행본과 ZIP은 `artifacts/ThreadLogViewer-v0.8.1-win-x64/ThreadLogViewer.exe`, `artifacts/ThreadLogViewer-v0.8.1-win-x64.zip`으로 보관했습니다. 공개 실행본은 위의 최신 실행 ZIP에서 받습니다. Release 빌드 경고 0/오류 0, 전체 자동 테스트 **337/337 통과**입니다. 다크·라이트의 합성 작은 창 렌더링을 확인했으며 실제 GUI 입력·모니터 DPI와 새 성능 측정은 미실행입니다. 검증 결과는 [v0.8.1 기록](docs/VALIDATION-v0.8.1.md)을 따릅니다. 아래는 이전 버전별 구현·검증 기록이며 북마크는 v0.8.1부터 제공하지 않습니다.
 
 ## v0.8.0 — 동시 작업 안정화와 분석 저장
 
@@ -92,7 +124,7 @@ v0.6.0 로컬 배포를 보존합니다: `artifacts/ThreadLogViewer-v0.6.0-win-x
 - 파일을 열 때 BOM을 확인하고, BOM 없는 입력은 엄격한 UTF-8을 먼저 시도한 뒤 실패하면 엄격한 CP949로 읽습니다. 직접 선택은 **파일 → 인코딩으로 다시 읽기 → 자동 판별 / 한국어 (CP949)**에 있습니다.
 - 클립보드 제공자의 읽기 예외를 처리하고, 실패하면 현재 로그를 유지합니다. 이 PC의 v0.4.0 오류 이벤트에서 붙여넣기의 `InvalidDataException`이 처리되지 않아 종료된 사실을 확인하고 예외 경계를 보완했습니다. 빈·지원하지 않는 입력과 긴 로그 다음 짧은 로그 붙여넣기를 회귀 검증했습니다.
 
-v0.5.0 로컬 배포를 보존합니다: `artifacts/ThreadLogViewer-v0.5.0-win-x64/ThreadLogViewer.exe`, `artifacts/ThreadLogViewer-v0.5.0-win-x64.zip`. 당시 결과는 [v0.5.0 검증 기록](docs/VALIDATION-v0.5.0.md)을 확인합니다. 이번 변경도 GitHub에 업로드하지 않습니다.
+v0.5.0 로컬 배포를 보존합니다: `artifacts/ThreadLogViewer-v0.5.0-win-x64/ThreadLogViewer.exe`, `artifacts/ThreadLogViewer-v0.5.0-win-x64.zip`. 당시 결과는 [v0.5.0 검증 기록](docs/VALIDATION-v0.5.0.md)을 확인합니다. 이는 v0.5.0 당시 로컬 배포 기록입니다. 최신 공개 실행본은 위의 다운로드 링크를 따릅니다.
 [메뉴·탭 테스트 방법](docs/FEATURE-TEST-GUIDE.md) · [단축키 표](docs/SHORTCUTS.md).
 
 ## v0.4.1 — 분석 화면 사용 흐름 개선
@@ -117,7 +149,7 @@ v0.4.1 로컬 배포도 보존합니다: `artifacts/ThreadLogViewer-v0.4.1-win-x
 - 실행 폴더의 `user-data/ui-settings.json`에 화면 설정만 저장합니다. 로그·경로·북마크·검색어는 저장하지 않습니다.
 - [단축키 표](docs/SHORTCUTS.md), [기능 테스트 방법](docs/FEATURE-TEST-GUIDE.md), [v0.4 검증 기록](docs/VALIDATION-v0.4.md).
 
-v0.4.0 배포 폴더도 보존합니다. GitHub 릴리스는 이번 작업에서 갱신하지 않습니다.
+v0.4.0 당시 로컬 배포 폴더와 검증 기록을 보존합니다. 최신 공개 실행본은 위의 다운로드 링크를 따릅니다.
 
 ## v0.3.0 — 시간 헤더 단위의 여러 줄 기록
 
@@ -136,7 +168,7 @@ v0.4.0 배포 폴더도 보존합니다. GitHub 릴리스는 이번 작업에서
 - 원본 파일 경로는 파일명 위에 마우스를 올려 확인합니다. 하단 줄 수 위에는 최근 작업 결과가 표시됩니다.
 - 진행률과 취소는 작업 중에 표시됩니다. 기존 읽기·붙여넣기·필터·검색·내보내기 기능을 유지합니다.
 
-[공개 GitHub 실행 ZIP](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip) · [릴리스 목록](https://github.com/loveminso/ThreadLogViewer/releases). 이번 v0.6.3 변경은 공개 릴리스에 게시하지 않았습니다.
+[공개 GitHub 실행 ZIP](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip) · [릴리스 목록](https://github.com/loveminso/ThreadLogViewer/releases). 최신 실행본의 버전과 변경 사항은 해당 릴리스에서 확인합니다.
 
 ## 개발도구
 
@@ -171,21 +203,28 @@ dotnet test ThreadLogViewer.slnx -c Release
 프로젝트 내부 SDK는 `.tools\dotnet\dotnet.exe`로 `dotnet`을 대체합니다.
 CMD 창에서 스크립트를 실행하면 오류와 종료 코드를 확인할 수 있습니다. 실패한 빌드·테스트·배포는 0이 아닌 코드로 종료합니다.
 
+### GitHub 릴리스 게시
+
+[Windows release](.github/workflows/windows-release.yml)는 `main`에 변경을 올리거나 Actions에서 수동 실행하면 `Directory.Build.props`의 버전을 확인합니다. 아직 공개하지 않은 버전이면 Windows에서 Release 빌드와 전체 xUnit 테스트를 실행하고 `scripts/publish.ps1`로 실행 ZIP을 생성합니다. `scripts/verify-release.ps1`는 테스트가 모두 통과했는지, x64 EXE/DLL 버전·런타임·라이선스·문서·샘플이 포함됐는지, ZIP의 모든 파일이 배포 폴더와 일치하는지 검사합니다.
+
+검증한 ZIP과 SHA-256 파일을 초안 릴리스에 올리고 업로드 크기·해시를 대조한 뒤 최신 릴리스로 공개합니다. 마지막으로 README의 공개 다운로드 URL에서 다시 받아 해시를 확인합니다. 검증 결과 JSON과 TRX는 해당 Actions 실행에 보관합니다. 이미 공개한 버전은 덮어쓰지 않으므로 다음 실행본을 배포할 때는 `Directory.Build.props`의 `Version`을 올리고 README·검증 문서도 갱신하세요. 수동 실행은 `main`에서만 게시합니다.
+
 ## 회사 PC 배포
 
-이번 로컬 v0.6.3은 생성·검증한 `artifacts/ThreadLogViewer-v0.6.3-win-x64.zip`을 모두 압축 해제해 복사합니다. 실행 창 제목의 v0.6.3으로 기존 배포와 구분합니다. 배포 검증은 [검증 기록](docs/VALIDATION-v0.6.3.md)을 따릅니다.
+1. [최신 릴리스](https://github.com/loveminso/ThreadLogViewer/releases/latest)의 **Assets**에서 [`ThreadLogViewer-win-x64.zip`](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip)을 받습니다. 공개 실행 ZIP은 GitHub 로그인 없이 다운로드할 수 있습니다.
+2. ZIP을 새 폴더에 **모두 압축 해제**합니다. ZIP 안에서 직접 실행하거나 `ThreadLogViewer.exe`만 따로 복사하지 말고 DLL·`licenses/`·문서·샘플 등 전체 배포 파일을 유지합니다.
+3. 압축을 푼 `ThreadLogViewer-win-x64` 폴더의 `ThreadLogViewer.exe`를 실행합니다. Windows x64 / Release / self-contained 배포이며 별도 .NET SDK·런타임 설치 없이 오프라인으로 실행합니다. 창 제목에서 버전을 확인합니다.
+4. 새 버전은 별도 폴더에 풀어 사용합니다. 이전 배포와 원본 로그·저장한 분석 파일을 보존합니다.
 
-GitHub 저장소의 **Releases**에서 `ThreadLogViewer-win-x64.zip`을 받습니다. GitHub가 자동 생성하는 `Source code (zip)`은 소스 코드이며 실행용 배포물이 아닙니다.
-공개 릴리스의 ZIP은 GitHub 로그인 없이 다운로드할 수 있고, 내려받은 앱의 실행에는 인터넷이 필요하지 않습니다.
+다운로드 결과를 확인하려면 [`ThreadLogViewer-win-x64.zip.sha256`](https://github.com/loveminso/ThreadLogViewer/releases/latest/download/ThreadLogViewer-win-x64.zip.sha256)을 함께 받고 PowerShell에서 다음 해시를 비교합니다.
 
-`publish.cmd` 결과:
+```powershell
+Get-FileHash .\ThreadLogViewer-win-x64.zip -Algorithm SHA256
+```
 
-- 폴더: `artifacts/ThreadLogViewer-win-x64/`
-- ZIP: `artifacts/ThreadLogViewer-win-x64.zip`
+회사 PC의 다운로드·반입·실행 정책을 따르세요. 이 배포물은 코드 서명하지 않습니다. SmartScreen이나 조직 정책으로 실행이 제한되면 회사 승인 절차를 이용하세요.
 
-ZIP을 **모두 압축 해제한 뒤 `ThreadLogViewer.exe` 실행**. DLL과 `licenses/` 등 나머지 파일도 함께 유지합니다.
-Release / Windows x64 / self-contained / 폴더형 배포이며 회사 PC의 별도 .NET SDK 설치가 필요하지 않습니다.
-코드 서명은 하지 않습니다. 배포물에는 의존성 라이선스와 합성 샘플을 포함합니다.
+`Source code (zip)`은 실행용 배포물이 아닙니다. 직접 빌드하는 경우에만 .NET SDK가 필요합니다. `publish.cmd`의 로컬 출력은 `artifacts/ThreadLogViewer-win-x64/` 폴더와 `artifacts/ThreadLogViewer-win-x64.zip`이며, 릴리스 자산은 소스 ZIP과 별도로 제공합니다.
 
 ## 사용법
 
@@ -219,6 +258,44 @@ Release / Windows x64 / self-contained / 폴더형 배포이며 회사 PC의 별
 - 검색창의 Ctrl+V는 검색어만 붙여넣습니다. 검색창에 포커스가 있어도 **Ctrl+Shift+V**를 누르면 클립보드를 새 로그로 엽니다.
 - 빈 클립보드·텍스트가 아닌 내용·클립보드 제공자 읽기 실패는 상태줄에 안내하고 현재 로그 또는 빈 탭을 유지합니다. 탐색기에서 복사한 여러 `.log`·`.txt` 파일도 첫 성공 입력의 빈 탭 채우기 규칙을 따릅니다. 붙여넣은 로그의 내보내기도 원본과 기존 파일을 덮어쓰지 않습니다.
 
+### 새로 고침·복원·저장
+
+- **F5 / 파일 → 현재 파일 새로 고침**은 전체 파일 탭의 인코딩·필터·검색·강조를 유지하며 원문을 다시 읽습니다. 읽는 중 바꾼 최신 검색·선택·위치를 보존하고, 원문에서 사라지거나 중복된 위치는 재검증 결과를 안내합니다. 붙여넣기·분리 탭에는 적용하지 않습니다. 실패·취소하면 기존 상태를 유지합니다.
+- **Ctrl+Shift+T / 파일 → 닫은 탭 복원**은 같은 실행 중 최근 8개, 열린 탭과 공유하지 않는 추가 보관 추정 128 MiB 안에서 원문·범위·분석 상태를 복원합니다. 프로그램 재시작 뒤에는 이 보관을 복원하지 않습니다.
+- **파일 → 분석 상태 저장 / 불러오기**는 현재 탭의 필터·강조·검색·선택·위치·시간·탐색 이력을 별도 로컬 JSON에 보관합니다. 파일 로그는 원문 경로와 내용 지문을 확인하고, 붙여넣기 로그는 원문을 포함합니다. 같은 원문을 확인한 경우에만 복원하며 실패하면 현재 분석을 유지합니다.
+- **분석 → 필터·강조 프리셋 저장 / 불러오기**는 적용된 필터·스레드 선택·강조 규칙을 다른 로그에 재사용합니다. 전체 선택 프리셋은 현재 전체 스레드에, 특정 ID 선택은 같은 ID에 적용합니다.
+- 분석 상태·프리셋은 최대 **8 MiB**이며 **새 파일만 생성**합니다. 큰 붙여넣기는 먼저 로그로 내보낸 뒤 파일 탭에서 분석을 저장하세요. 시작 시 전체 작업 공간을 자동 복원하는 기능은 제공하지 않습니다.
+
+### 표시와 결과 안내
+
+- 스레드 목록 위 찾기는 ID 일부·`T123`·`미분류`로 목록만 좁히며 스레드 선택과 본문 필터를 유지합니다.
+- 필터 결과가 0건이면 **내용 필터 해제**로 스레드 선택을 유지하거나 **모든 필터 해제**로 전체 기록을 복원합니다. 접힌 내용 필터에도 적용 조건과 미적용 변경을 표시합니다.
+- **보기 → 긴 줄 나눠보기**는 긴 한 줄을 구간별로 표시합니다. 앞/뒤 표시로 옮기며 검색·커서 이동은 해당 구간을 표시합니다. 복사·내보내기는 전체 원문과 실제 개행을 보존합니다. 메뉴를 끄면 전체 줄을 표시합니다.
+- 본문과 검색 결과 사이 경계선을 드래그하거나 경계선에 포커스를 둔 뒤 위·아래 방향키로 높이를 조절합니다. 제목줄의 **접기 / 펼치기**는 목록만 접고 검색 강조와 F3/F4 이동을 유지합니다. 높이·접힘·화면 설정은 재실행 뒤 복원합니다.
+- 진행률·취소는 작업 중 표시하고 완료·취소·거절·실패 결과는 하단에 남깁니다. 실패 안내에서 재시도 방법을 확인합니다. 여러 파일 열기의 성공·실패·미처리와 닫은 탭 보관 정리도 안내합니다.
+
+### 자주 쓰는 단축키
+
+| 단축키 | 동작 |
+|---|---|
+| Ctrl+N / Ctrl+O | 새 빈 탭 / 로그 파일 열기 |
+| Ctrl+V / Shift+Insert | 본문에서 클립보드 로그 열기. 입력창에서는 텍스트 붙여넣기 |
+| Ctrl+Shift+V | 입력창에 포커스가 있어도 클립보드 로그 열기 |
+| Ctrl+Tab / Ctrl+Shift+Tab | 다음 / 이전 탭 |
+| Ctrl+W / Ctrl+Shift+T | 현재 탭 닫기 / 같은 실행 중 닫은 탭 복원 |
+| F5 | 상태를 유지하는 전체 파일 새로 고침 |
+| Ctrl+F | 검색 |
+| Enter / F3 | 다음 검색 결과. Enter는 검색창에서 사용 |
+| Shift+Enter / F4 / Shift+F3 | 이전 검색 결과. Shift+Enter는 검색창에서 사용 |
+| Ctrl+G / Alt+← / Alt+→ | 원본 줄 이동 / 탐색 뒤로 / 앞으로 |
+| Ctrl+C / Ctrl+A | 선택 텍스트·행 복사 / 전체 선택 |
+| Ctrl+클릭 | 줄 번호·본문의 떨어진 물리적 줄 선택·해제 |
+| Shift+F8 | 선택 문구·커서 단어 즉시 강조·해제 |
+| Ctrl++ / Ctrl+- / Ctrl+0 | 글자 확대 / 축소 / 기본 크기 14 |
+| Esc / F1 | 이동창·검색창 닫기 / 기능과 단축키 도움말 |
+
+메뉴 접근·적용 위치와 예외는 [전체 단축키 표](docs/SHORTCUTS.md)를 따릅니다.
+
 ## 데이터 / 파싱
 
 - `[HH:mm:ss[.소수초]] [T3] 메시지 (소스파일:줄번호)` 또는 `[T 3]`. 시간은 두 자리 이상 (`014`, `025`, `100` 등), 분·초는 00~59, 소수초는 1~7자리까지 해석하며 표시는 입력 그대로입니다. `TimeSpan` 범위를 넘거나 잘못된 시간은 유효 시각으로 표시하지 않습니다.
@@ -240,7 +317,7 @@ dotnet run --project tests\ThreadLogViewer.Tests -c Release -- --benchmark TestR
 
 아직 존재하지 않는 출력 폴더 이름을 사용합니다. 벤치마크는 합성 파일을 생성한 뒤 읽기·디코딩·파싱, 필터 투영, AvalonEdit 문서 생성 시간과 해당 콘솔 프로세스 메모리를 JSON으로 저장합니다. UI 배치/렌더 시간은 포함하지 않습니다. 합성 10/100 **MiB**(1 MiB=1,048,576바이트)를 사용합니다.
 
-현재 변경의 검증 결과는 [v0.6.3 검증 기록](docs/VALIDATION-v0.6.3.md)에 있습니다. 이번 새 탭의 성능은 별도 측정 여부를 검증 기록에 표시합니다. 여러 줄 선택·즉시 강조는 [v0.6.2](docs/VALIDATION-v0.6.2.md), 줄 선택·대상 표시는 [v0.6.1](docs/VALIDATION-v0.6.1.md), 줄 작업·범위 탭은 [v0.6.0](docs/VALIDATION-v0.6.0.md)에 보존합니다. [v0.5.0](docs/VALIDATION-v0.5.0.md)은 합성 10 MiB의 **디코딩 단계만** 측정했고 전체 읽기·파싱·탭 전환·GUI 성능을 측정하지 않았습니다. 분석 화면 개선 기록은 [v0.4.1](docs/VALIDATION-v0.4.1.md), 합성 10/100 MiB Core 실측은 [v0.4](docs/VALIDATION-v0.4.md), 과거 전체 투영/AvalonEdit 문서·GUI 확인은 [v0.3](docs/VALIDATION-v0.3.md), [v0.2](docs/VALIDATION-v0.2.md), [v0.1](docs/VALIDATION.md)에 보존합니다. 측정 범위가 달라 과거 수치와 직접 비교하지 않습니다.
+현재 v0.8.1의 검증 범위는 [v0.8.1 검증 기록](docs/VALIDATION-v0.8.1.md)을 따릅니다. v0.8.1 새 성능·메모리 벤치마크는 미실행입니다. [v0.8.0 측정](docs/VALIDATION-v0.8.0.md)에서 합성 100 MiB 열기·배치는 4,059ms, dispatcher 최대 대기는 679ms, 열기 직후 working set은 약 1.18 GiB였습니다. 이 값은 해당 환경의 합성 단회 측정이며 실제 입력 반응이나 v0.8.1 실측을 뜻하지 않습니다. 긴 줄 기본 구간 표시는 합성 1 MiB 한 줄에서 42ms/18ms로 측정했습니다. 새 빈 탭 검증은 [v0.6.3](docs/VALIDATION-v0.6.3.md)에 보존합니다. 여러 줄 선택·즉시 강조는 [v0.6.2](docs/VALIDATION-v0.6.2.md), 줄 선택·대상 표시는 [v0.6.1](docs/VALIDATION-v0.6.1.md), 줄 작업·범위 탭은 [v0.6.0](docs/VALIDATION-v0.6.0.md)에 보존합니다. [v0.5.0](docs/VALIDATION-v0.5.0.md)은 합성 10 MiB의 **디코딩 단계만** 측정했고 전체 읽기·파싱·탭 전환·GUI 성능을 측정하지 않았습니다. 분석 화면 개선 기록은 [v0.4.1](docs/VALIDATION-v0.4.1.md), 합성 10/100 MiB Core 실측은 [v0.4](docs/VALIDATION-v0.4.md), 과거 전체 투영/AvalonEdit 문서·GUI 확인은 [v0.3](docs/VALIDATION-v0.3.md), [v0.2](docs/VALIDATION-v0.2.md), [v0.1](docs/VALIDATION.md)에 보존합니다. 측정 범위가 달라 과거 수치와 직접 비교하지 않습니다.
 
 ## 구조와 현재 한계
 
@@ -248,11 +325,11 @@ dotnet run --project tests\ThreadLogViewer.Tests -c Release -- --benchmark TestR
 - `src/ThreadLogViewer.App`: WPF 화면과 AvalonEdit 렌더링. 화면에 보이는 줄만 그립니다.
 - `tests/ThreadLogViewer.Tests`: xUnit 자동 테스트와 재현 가능한 벤치마크.
 - 열린 탭마다 메모리에 디코딩 원문·행 정보·표시 문서를 유지합니다. 탭을 많이 열면 메모리 사용량이 늘어납니다. 2GB 이상 파일은 차단하며 그 미만도 RAM과 줄 길이에 따라 한계가 있습니다. 극단적으로 긴 한 줄은 표시가 느려질 수 있습니다.
-- 전체 디코딩 및 AvalonEdit 문서 생성의 내부 단계는 즉시 취소되지 않을 수 있습니다. 백그라운드에서 끝난 뒤 취소를 확인하며 UI는 계속 조작할 수 있습니다.
+- 읽기·디코딩·문서 생성은 구간마다 취소를 확인합니다. 초기 문서 게시·배치와 내부 처리에는 지연이 남을 수 있으며 모든 단계의 즉시 취소를 보장하지 않습니다.
 - 검색은 첫 100,000개까지 강조·이동하며 초과 여부를 표시합니다. 닫기로 검색을 취소할 수 있습니다. 필터 변경은 검색을 다시 수행합니다.
 - 글꼴 폴백의 한글 폭은 설치 글꼴에 영향을 받습니다.
-- 실시간 파일 추적·편집·타임라인·단축키 사용자 지정은 후속 기능입니다. [계획](docs/PLAN.md) 참고.
-- 기능 추가 검토: [37개 후보 전체 표](docs/FEATURE-CANDIDATES.md), [높은 우선순위 11개 상세 설계 및 구현 상태](docs/HIGH-PRIORITY-FEATURES.md). 1~11번은 v0.4, 28번 다중 파일 탭은 v0.5에 구현했습니다. 22번 인코딩 선택은 자동/CP949 메뉴 범위를 반영했으며 UTF-8/UTF-16 수동 선택은 후속 후보입니다.
+- 후속 후보: 전체 작업 공간 자동 시작 복원, 실시간 파일 따라가기(교체·부분 행·회전), 타임라인, 별도 편집 문서, 단축키 사용자 지정, 메모리 매핑·구간 로딩·투영 증분 처리. 확정 일정은 없으며 [계획](docs/PLAN.md)의 현재 후속 범위를 따릅니다.
+- 기능 추가 검토: [37개 후보 전체 표](docs/FEATURE-CANDIDATES.md), [높은 우선순위 11개 상세 설계 및 구현 상태](docs/HIGH-PRIORITY-FEATURES.md). 높은 우선순위 1~11번은 v0.4에 구현했고 3번 북마크는 v0.8.1에 제거했습니다. 28번 다중 파일 탭은 v0.5에 구현했습니다. 스레드 ID 찾기·탐색 이력·파일 새로 고침·필터 프리셋·명시적 분석 저장도 현재 제공합니다. 후보 표에는 최초 제안 이력이 남아 있으므로 현재 기능은 위 사용법과 최신 검증 기록을 따릅니다. 22번 인코딩 선택은 자동/CP949 메뉴 범위를 반영했으며 UTF-8/UTF-16 수동 선택은 후속 후보입니다.
 - 공개 저장소에는 소스·문서·합성 샘플만 포함합니다. 실제 로그는 버전 관리에서 제외한 `local-data/`에 보관하고 공개 저장소나 릴리스에 올리지 마세요.
 
 의존성 고지: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
