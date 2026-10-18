@@ -1,4 +1,4 @@
-# ThreadLog Viewer v0.8.1
+# ThreadLog Viewer v0.8.2
 
 Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10 + WPF + AvalonEdit.
 실행 중 인터넷, 로그인, API, 서버, DB, 텔레메트리를 사용하지 않습니다. 개발 시 SDK·NuGet 다운로드와 GitHub에서 실행 ZIP을 받을 때 인터넷이 필요합니다.
@@ -31,11 +31,26 @@ Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10
 
 ## 검증 상태
 
-2026-10-07 개발 검증: Release 빌드 **경고 0/오류 0**, 자동 테스트 **337/337 통과**, 다크·라이트 합성 작은 창 렌더링 확인. 실제 프로그램의 마우스·키보드·팝업·클립보드 조작과 실제 모니터 DPI 전환은 미실행입니다. v0.8.1 새 성능 측정도 실행하지 않았습니다. 빌드·자동 테스트·합성 화면·실제 GUI·측정 성능은 [v0.8.1 검증 기록](docs/VALIDATION-v0.8.1.md)에서 구분합니다.
+2026-10-18 기준: `main`에 병합된 최신 코드는 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)(PR #5, [run 39129854369](https://github.com/loveminso/ThreadLogViewer/actions/runs/39129854369))에서 Release 빌드 **경고 0/오류 0**, 단위 테스트 **355/355 통과**, FlaUI UI 테스트 **3회 연속** 각 **6 통과 / 1 건너뜀 / 7 합계**를 확인했습니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`가 여전히 게시된 v0.8.1이면 테스트·ZIP 생성을 건너뜁니다. v0.8.2 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)에서 구분합니다.
 
 GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)에서 Release 빌드·전체 자동 테스트·런타임과 라이선스 포함 여부·EXE/DLL 버전·ZIP의 모든 파일을 검증한 뒤 게시합니다. 릴리스 설명에 해당 빌드의 소스 커밋·테스트 결과·ZIP SHA-256을 기록하며, README 다운로드 링크로 받은 ZIP의 해시도 대조합니다. 이 자동 검증은 실제 GUI·모니터 DPI·성능 실측을 대신하지 않습니다.
 
 아래 버전별 항목은 당시의 구현·검증 기록입니다. 과거 항목에 남아 있는 북마크와 로컬 배포 경로는 현재 기능·최신 다운로드를 뜻하지 않습니다.
+
+## v0.8.2 — 공유 읽기·예외 안정화·UI 자동화
+
+- 다른 프로그램이 읽기 공유를 허용한 채 열거나 쓰고 있는 로그도 열 수 있습니다(FileShare.ReadWrite·Delete). 다른 프로그램이 파일을 독점으로 열었으면 열 수 없습니다. ([PR #2](https://github.com/loveminso/ThreadLogViewer/pull/2))
+- **전역 예외 처리**([PR #3](https://github.com/loveminso/ThreadLogViewer/pull/3)): 화면 작업과 비동기 이벤트 처리 중 난 예외는 한국어 경고 창을 띄운 뒤 앱을 계속 실행합니다. 화면 작업 중 메모리 부족·접근 위반 같은 치명적 오류는 경고 후 종료됩니다. Task가 아닌 별도 스레드에서 처리되지 않은 예외는 앱을 종료하며, 이때 경고 창이 보이지 않을 수 있지만 예외 기록은 남습니다. 예외 시각·종류·발생 경로만 `%LOCALAPPDATA%\ThreadLogViewer\unhandled-exceptions.log`에 남기고, 로그 내용과 파일 경로는 기록하지 않습니다. 잘못된 강조 규칙은 상태줄에 `강조 준비 실패`를 표시합니다.
+- **FlaUI UI 자동화**([PR #4](https://github.com/loveminso/ThreadLogViewer/pull/4), [PR #5](https://github.com/loveminso/ThreadLogViewer/pull/5)): Windows CI에서 게시한 실행 파일로 `Scenario01`~`Scenario06`을 **한 잡당 3회** 연속 실행합니다. 회차마다 TRX 건수를 검사합니다.
+- **알려진 한계**
+  - 다른 프로세스가 **쓰는 UTF-8 BOM** 로그에서 F5 새로 고침이 `파일 새로 고침 실패`로 끝날 수 있습니다. CI는 해당 시나리오(`Scenario05_Utf8Bom_RefreshWhileAppending`)를 건너뜁니다. 수정은 후속 작업입니다.
+  - CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.
+  - 강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다.
+  - 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
+  - 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 `Scenario07_JumpToOriginalLine`, `Scenario08_PositionAndSelectionInfo`, `Scenario10_SurroundingLogKeepsFilterOnReturn`, `Scenario11_FilterKeepsOrMovesPosition`, `Scenario12_SettingsPersistAfterRestart`, `Scenario13_TimeDifferenceBetweenRecords`가 판정한다. 대응은 [기능 테스트 방법](docs/FEATURE-TEST-GUIDE.md) 매핑 표를 따른다.
+
+v0.8.2 릴리스 검증·CI 수치·한계는 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)을 따릅니다. 공개 실행본은 위의 최신 실행 ZIP에서 받습니다.
+
 ## v0.8.1 — 북마크 제거
 
 - 북마크 메뉴·패널·이름·줄 표식과 F2 / Shift+F2 / Ctrl+F2 동작을 제거했습니다.
@@ -317,7 +332,7 @@ dotnet run --project tests\ThreadLogViewer.Tests -c Release -- --benchmark TestR
 
 아직 존재하지 않는 출력 폴더 이름을 사용합니다. 벤치마크는 합성 파일을 생성한 뒤 읽기·디코딩·파싱, 필터 투영, AvalonEdit 문서 생성 시간과 해당 콘솔 프로세스 메모리를 JSON으로 저장합니다. UI 배치/렌더 시간은 포함하지 않습니다. 합성 10/100 **MiB**(1 MiB=1,048,576바이트)를 사용합니다.
 
-현재 v0.8.1의 검증 범위는 [v0.8.1 검증 기록](docs/VALIDATION-v0.8.1.md)을 따릅니다. v0.8.1 새 성능·메모리 벤치마크는 미실행입니다. [v0.8.0 측정](docs/VALIDATION-v0.8.0.md)에서 합성 100 MiB 열기·배치는 4,059ms, dispatcher 최대 대기는 679ms, 열기 직후 working set은 약 1.18 GiB였습니다. 이 값은 해당 환경의 합성 단회 측정이며 실제 입력 반응이나 v0.8.1 실측을 뜻하지 않습니다. 긴 줄 기본 구간 표시는 합성 1 MiB 한 줄에서 42ms/18ms로 측정했습니다. 새 빈 탭 검증은 [v0.6.3](docs/VALIDATION-v0.6.3.md)에 보존합니다. 여러 줄 선택·즉시 강조는 [v0.6.2](docs/VALIDATION-v0.6.2.md), 줄 선택·대상 표시는 [v0.6.1](docs/VALIDATION-v0.6.1.md), 줄 작업·범위 탭은 [v0.6.0](docs/VALIDATION-v0.6.0.md)에 보존합니다. [v0.5.0](docs/VALIDATION-v0.5.0.md)은 합성 10 MiB의 **디코딩 단계만** 측정했고 전체 읽기·파싱·탭 전환·GUI 성능을 측정하지 않았습니다. 분석 화면 개선 기록은 [v0.4.1](docs/VALIDATION-v0.4.1.md), 합성 10/100 MiB Core 실측은 [v0.4](docs/VALIDATION-v0.4.md), 과거 전체 투영/AvalonEdit 문서·GUI 확인은 [v0.3](docs/VALIDATION-v0.3.md), [v0.2](docs/VALIDATION-v0.2.md), [v0.1](docs/VALIDATION.md)에 보존합니다. 측정 범위가 달라 과거 수치와 직접 비교하지 않습니다.
+현재 v0.8.2의 검증 범위는 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)을 따릅니다. v0.8.2 새 성능·메모리 벤치마크는 미실행입니다. [v0.8.0 측정](docs/VALIDATION-v0.8.0.md)에서 합성 100 MiB 열기·배치는 4,059ms, dispatcher 최대 대기는 679ms, 열기 직후 working set은 약 1.18 GiB였습니다. 이 값은 해당 환경의 합성 단회 측정이며 실제 입력 반응이나 v0.8.1 실측을 뜻하지 않습니다. 긴 줄 기본 구간 표시는 합성 1 MiB 한 줄에서 42ms/18ms로 측정했습니다. 새 빈 탭 검증은 [v0.6.3](docs/VALIDATION-v0.6.3.md)에 보존합니다. 여러 줄 선택·즉시 강조는 [v0.6.2](docs/VALIDATION-v0.6.2.md), 줄 선택·대상 표시는 [v0.6.1](docs/VALIDATION-v0.6.1.md), 줄 작업·범위 탭은 [v0.6.0](docs/VALIDATION-v0.6.0.md)에 보존합니다. [v0.5.0](docs/VALIDATION-v0.5.0.md)은 합성 10 MiB의 **디코딩 단계만** 측정했고 전체 읽기·파싱·탭 전환·GUI 성능을 측정하지 않았습니다. 분석 화면 개선 기록은 [v0.4.1](docs/VALIDATION-v0.4.1.md), 합성 10/100 MiB Core 실측은 [v0.4](docs/VALIDATION-v0.4.md), 과거 전체 투영/AvalonEdit 문서·GUI 확인은 [v0.3](docs/VALIDATION-v0.3.md), [v0.2](docs/VALIDATION-v0.2.md), [v0.1](docs/VALIDATION.md)에 보존합니다. 측정 범위가 달라 과거 수치와 직접 비교하지 않습니다.
 
 ## 구조와 현재 한계
 

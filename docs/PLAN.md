@@ -1,5 +1,16 @@
 # 구현 범위와 후속 계획
 
+## v0.8.2 공유 읽기·예외·UI 자동화
+
+- 다른 프로그램이 읽기 공유를 허용한 채 열거나 쓰고 있는 로그도 열 수 있습니다(FileShare.ReadWrite·Delete). 다른 프로그램이 파일을 독점으로 열었으면 열 수 없습니다.
+- 화면 작업과 비동기 이벤트 처리 중 난 예외는 한국어 경고 창을 띄운 뒤 앱을 계속 실행합니다. 화면 작업 중 메모리 부족·접근 위반 같은 치명적 오류는 경고 후 종료됩니다. Task가 아닌 별도 스레드에서 처리되지 않은 예외는 앱을 종료하며, 이때 경고 창이 보이지 않을 수 있지만 예외 기록은 남습니다. 예외 시각·종류·발생 경로만 `%LOCALAPPDATA%\ThreadLogViewer\unhandled-exceptions.log`에 남기고, 로그 내용과 파일 경로는 기록하지 않습니다. 잘못된 강조 규칙은 상태줄에 `강조 준비 실패`를 표시합니다.
+- FlaUI UI 시나리오를 Windows CI에서 게시 실행 파일로 한 잡당 3회 연속 실행하고 TRX 건수를 검사한다.
+- 쓰기 중인 UTF-8 BOM 로그의 F5 새로 고침 실패는 알려진 한계로 남기고 후속 수정한다.
+- CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.
+- 강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다.
+- 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
+- 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 `Scenario07_JumpToOriginalLine`, `Scenario08_PositionAndSelectionInfo`, `Scenario10_SurroundingLogKeepsFilterOnReturn`, `Scenario11_FilterKeepsOrMovesPosition`, `Scenario12_SettingsPersistAfterRestart`, `Scenario13_TimeDifferenceBetweenRecords`가 판정한다. 대응은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md) 매핑 표를 따른다.
+
 ## v0.8.1 북마크 제거
 
 - 사용자 요청에 따라 북마크 UI·단축키·표식·탭 상태·저장 모델을 제거한다.
