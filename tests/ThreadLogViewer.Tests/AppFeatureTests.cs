@@ -141,10 +141,16 @@ public sealed class AppFeatureTests
         using var folder = new SyntheticFolder();
         string obstacle = System.IO.Path.Combine(folder.Path, "user-data");
         File.WriteAllText(obstacle, "synthetic user file");
-        var store = new SettingsStore(folder.Path);
-        Assert.False(store.Load().CanSave);
-        Assert.False(store.Save(UiSettings.Default).Success);
+        string fallbackRoot = System.IO.Path.Combine(folder.Path, "synthetic-fallback");
+        Directory.CreateDirectory(fallbackRoot);
+        var store = new SettingsStore(folder.Path, fallbackRoot);
+        Assert.True(store.Load().CanSave);
+        Assert.True(store.Save(UiSettings.Default).Success);
         Assert.Equal("synthetic user file", File.ReadAllText(obstacle));
+        Assert.False(Directory.Exists(obstacle));
+        Assert.False(File.Exists(store.FilePath));
+        Assert.True(File.Exists(store.FallbackFilePath));
+        Assert.Equal(UiSettings.Default, new SettingsStore(folder.Path, fallbackRoot).Load().Settings);
     }
 
     [Fact]
