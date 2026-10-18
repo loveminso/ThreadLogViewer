@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -23,6 +24,23 @@ internal sealed record UiReviewBucket(string State, string Theme, int Scale, int
 internal sealed class UiReviewLint
 {
     internal const int FindingCap = 400;
+
+    private static readonly Regex ReviewFolderPrefix = new(
+        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData[\\/]+Local[\\/]+Temp[\\/]+tlv-ui-review-[0-9a-f]+",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex UserAppDataPrefix = new(
+        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    internal static string RedactReviewPaths(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+        string text = ReviewFolderPrefix.Replace(value, "<temp>");
+        return UserAppDataPrefix.Replace(text, "<temp>");
+    }
+
     internal const string TruncatedText = "truncated-text";
     internal const string OutsideBounds = "outside-bounds";
     internal const string TabOrder = "tab-order";
@@ -334,7 +352,7 @@ internal sealed class UiReviewLint
             return;
         }
         count.Stored++;
-        findings.Add(new UiReviewFinding(category, state, theme, size, scale, Clean(detail)));
+        findings.Add(new UiReviewFinding(category, state, theme, size, scale, RedactReviewPaths(Clean(detail))));
     }
 
     private readonly record struct BucketKey(string State, string Theme, int Scale);
@@ -556,7 +574,7 @@ internal sealed class UiReviewLint
 
     private static string Label(AutomationElement element)
     {
-        string name = Clean(element.Properties.Name.ValueOrDefault);
+        string name = RedactReviewPaths(Clean(element.Properties.Name.ValueOrDefault));
         string id = Clean(element.Properties.AutomationId.ValueOrDefault);
         string type = TypeOf(element).ToString();
         if (name.Length > 0 && id.Length > 0)

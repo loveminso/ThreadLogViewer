@@ -26,6 +26,7 @@ internal static class UiReviewReport
 
     internal static void Write(string directory, string displayNote, IReadOnlyList<UiReviewShot> shots, IReadOnlyList<UiReviewFinding> findings, IReadOnlyList<UiReviewBucket> buckets, UiReviewFilterCounts filtered)
     {
+        displayNote = UiReviewLint.RedactReviewPaths(displayNote);
         Directory.CreateDirectory(directory);
         int truncated = findings.Count(item => item.Category == UiReviewLint.TruncatedText);
         int outside = findings.Count(item => item.Category == UiReviewLint.OutsideBounds);

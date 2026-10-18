@@ -69,6 +69,7 @@ internal static class UiReview
             {
             }
         }
+        RejectRunnerPaths(output);
         if (shots.Count != 72)
             throw new InvalidOperationException($"Expected 72 screenshots but wrote {shots.Count}.");
         foreach (var shot in shots)
@@ -221,6 +222,9 @@ internal static class UiReview
     {
         if (steady)
             Steady(session);
+        ParkPointer(session);
+        if (state == "menus")
+            OpenFileMenu(session);
         Thread.Sleep(250);
         string file = $"{state}__{theme}__{width}x{height}__scale-{scale}.png";
         string path = Path.Combine(output, file);
@@ -248,14 +252,101 @@ internal static class UiReview
 
     private static void ParkPointer(UiSession session)
     {
+        // The caption has no content controls. A leftover hover on FileLabel opens a path tooltip that PrintWindow includes.
+        var bounds = session.Window.BoundingRectangle;
+        var spots = new (int X, int Y)[]
+        {
+            (bounds.Left + bounds.Width / 2, bounds.Top + 8),
+            (bounds.Left + 48, bounds.Top + 8),
+            (bounds.Right - 160, bounds.Top + 8),
+        };
+        for (int attempt = 0; attempt < spots.Length; attempt++)
+        {
+            try { Mouse.MoveTo(spots[attempt].X, spots[attempt].Y); }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+            Thread.Sleep(300);
+            if (!TooltipVisible(session))
+                return;
+        }
+        throw new InvalidOperationException("A tooltip stayed open before the screenshot.");
+    }
+
+    private static bool TooltipVisible(UiSession session)
+    {
+        if (ContainsOpenTooltip(session.Window))
+            return true;
+        AutomationElement[] windows;
+        try { windows = session.Automation.GetDesktop().FindAllChildren(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return false; }
+        int pid = session.App.ProcessId;
+        IntPtr main = session.Window.Properties.NativeWindowHandle.ValueOrDefault;
+        foreach (var window in windows)
+        {
+            try
+            {
+                if (window.Properties.ProcessId.ValueOrDefault != pid)
+                    continue;
+                IntPtr hwnd = window.Properties.NativeWindowHandle.ValueOrDefault;
+                if (hwnd != IntPtr.Zero && hwnd == main)
+                    continue;
+                if (IsOpenTooltip(window) || ContainsOpenTooltip(window))
+                    return true;
+            }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            {
+            }
+        }
+        return false;
+    }
+
+    private static bool ContainsOpenTooltip(AutomationElement root)
+    {
         try
         {
-            var bounds = session.Window.BoundingRectangle;
-            if (bounds.Width > 80 && bounds.Height > 80)
-                Mouse.MoveTo(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+            var tip = root.FindFirstDescendant(condition => condition.ByControlType(ControlType.ToolTip));
+            return tip is not null && IsShown(tip);
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
+            return false;
+        }
+    }
+
+    private static bool IsOpenTooltip(AutomationElement element)
+    {
+        try
+        {
+            return element.Properties.ControlType.ValueOrDefault == ControlType.ToolTip && IsShown(element);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsShown(AutomationElement element)
+    {
+        try
+        {
+            if (element.Properties.IsOffscreen.ValueOrDefault)
+                return false;
+            var bounds = element.BoundingRectangle;
+            return bounds.Width > 1 && bounds.Height > 1;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static void RejectRunnerPaths(string output)
+    {
+        foreach (string name in new[] { "ui-lint.json", "ui-lint.md" })
+        {
+            string text = File.ReadAllText(Path.Combine(output, name));
+            if (text.Contains("runneradmin", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("AppData", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(name + " still contains a runner user path.");
         }
     }
 
