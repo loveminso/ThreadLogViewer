@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-Windows CI의 FlaUI UI 테스트가 다루는 GUI는 아래 **Windows UI 자동화** 절과 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)에 맞춰 판정한다. UI 테스트가 없는 항목은 후속 UI 테스트 대상이며, 절차·기대 결과는 같은 가이드에 남긴다. 수동 확인은 SmartScreen만 해당한다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)을 따른다.
+기능 표의 GUI는 아래 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정하며, 기능과 테스트 이름 대응은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 매핑 표를 따른다. 수동 확인은 SmartScreen만 해당한다. 실제 Explorer 끌어 놓기는 알려진 한계다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)을 따른다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛴다.
 
 ## 자동 회귀
 
@@ -31,7 +31,7 @@ CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행�
 
 ## 실제 화면과 성능
 
-`Scenario01`~`Scenario06`이 다루는 열기·끌어 놓기·내용 포함 필터·검색·보내기·강조 준비 실패·새로 고침 등은 Windows CI의 FlaUI UI 테스트(`tests/ThreadLogViewer.UiTests`, 잡당 세 회차)로 판정한다. UI 테스트가 없는 표·절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)에 기대 결과로 남긴다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
+`Scenario01`~`Scenario13`이 기능 표의 GUI를 판정한다. 세 회차 모두 통과 13, 건너뜀 1, 전체 14, 실패 0이다. 건너뛰는 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending`이며 이유는 수정 4다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
 
