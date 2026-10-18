@@ -130,18 +130,18 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock x:Name="CountStatus" Text="0/0건 · 표시 0/0줄" FontSize="11" ToolTip="{Binding Text, ElementName=OperationStatus}" VerticalAlignment="Center" />
-        <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="인코딩: 파일 없음" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="20,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" VerticalAlignment="Center" />
+        <TextBlock x:Name="CountStatus" AutomationProperties.AutomationId="CountStatus" Text="0/0건 · 표시 0/0줄" FontSize="11" ToolTip="{Binding Text, ElementName=OperationStatus}" VerticalAlignment="Center" />
+        <TextBlock x:Name="EncodingStatus" AutomationProperties.AutomationId="EncodingStatus" Grid.Column="1" Text="인코딩: 파일 없음" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="20,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" VerticalAlignment="Center" />
         <TextBlock x:Name="ParseStatus" Grid.Column="2" Text="파싱: 대기" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
-        <TextBlock x:Name="PositionStatus" Grid.Column="3" Text="읽기 전용" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="20,0,0,0" VerticalAlignment="Center" ToolTip="열은 문서 열입니다. 선택 글자 수는 Unicode 문자 수이며 CRLF는 2개로 셉니다." />
-        <TextBlock x:Name="OperationStatus" Grid.Row="1" Grid.ColumnSpan="4" Text="로그 파일을 끌어 놓거나 Ctrl+V로 붙여넣으세요." FontSize="12" TextWrapping="Wrap" MaxHeight="42" Margin="0,5,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.Name="최근 작업 안내" />
+        <TextBlock x:Name="PositionStatus" AutomationProperties.AutomationId="PositionStatus" Grid.Column="3" Text="읽기 전용" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="20,0,0,0" VerticalAlignment="Center" ToolTip="열은 문서 열입니다. 선택 글자 수는 Unicode 문자 수이며 CRLF는 2개로 셉니다." />
+        <TextBlock x:Name="OperationStatus" AutomationProperties.AutomationId="OperationStatus" Grid.Row="1" Grid.ColumnSpan="4" Text="로그 파일을 끌어 놓거나 Ctrl+V로 붙여넣으세요." FontSize="12" TextWrapping="Wrap" MaxHeight="42" Margin="0,5,0,0" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.Name="최근 작업 안내" />
       </Grid>
     </Border>
     <Border x:Name="WorkPanel" DockPanel.Dock="Bottom" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,7" Visibility="Collapsed">
       <DockPanel>
         <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="작업 취소" Click="Cancel_Click" Visibility="Collapsed" />
         <ProgressBar x:Name="ProgressBar" DockPanel.Dock="Right" Width="150" Height="5" Minimum="0" Maximum="100" Margin="10,0,15,0" Visibility="Collapsed" />
-        <TextBlock x:Name="WorkStatus" Text="작업 준비 중…" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+        <TextBlock x:Name="WorkStatus" AutomationProperties.AutomationId="WorkStatus" Text="작업 준비 중…" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
       </DockPanel>
     </Border>
     <Grid x:Name="WorkspaceGrid">
@@ -177,17 +177,17 @@
           </StackPanel>
           <ScrollViewer x:Name="SidebarSettingsScroll" DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" ClipToBounds="True">
           <StackPanel>
-            <Expander x:Name="ContentFilterExpander" Margin="4,0,4,12" Foreground="{DynamicResource TextBrush}">
+            <Expander x:Name="ContentFilterExpander" AutomationProperties.AutomationId="ContentFilterExpander" Margin="4,0,4,12" Foreground="{DynamicResource TextBrush}">
               <Expander.Header><TextBlock x:Name="ContentFilterHeader" Text="내용 필터" TextWrapping="Wrap" /></Expander.Header>
               <StackPanel x:Name="TextFilterControls" Margin="0,8,0,0" IsEnabled="{Binding CanChangeFilters, RelativeSource={RelativeSource AncestorType=Window}}">
                 <TextBlock Text="보여줄 기록 · 한 줄에 한 문구" FontSize="12" />
-                <TextBox x:Name="IncludeBox" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음" TextChanged="Criteria_Changed" />
+                <TextBox x:Name="IncludeBox" AutomationProperties.AutomationId="IncludeBox" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음" TextChanged="Criteria_Changed" />
                 <ComboBox x:Name="IncludeModeBox" SelectedIndex="0" Margin="0,6,0,0" SelectionChanged="FilterOption_Changed" AutomationProperties.Name="포함 문구 일치 방식"><ComboBoxItem Content="하나라도 포함된 기록" /><ComboBoxItem Content="모두 포함된 기록" /></ComboBox>
                 <TextBlock Text="숨길 기록 · 한 줄에 한 문구" FontSize="12" Margin="0,10,0,0" />
                 <TextBox x:Name="ExcludeBox" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: heartbeat · 하나라도 포함되면 기록 전체를 숨김" TextChanged="Criteria_Changed" />
                 <CheckBox x:Name="FilterCaseBox" Content="대소문자 구분" Margin="0,8,0,6" Checked="FilterOption_Changed" Unchecked="FilterOption_Changed" />
                 <StackPanel Orientation="Horizontal">
-                  <Button Content="필터 적용" Click="ApplyTextFilter_Click" />
+                  <Button AutomationProperties.AutomationId="ApplyFilterButton" Content="필터 적용" Click="ApplyTextFilter_Click" />
                   <Button Content="내용 필터 해제" Click="ResetTextFilter_Click" />
                 </StackPanel>
                 <TextBlock x:Name="FilterDirtyStatus" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,4,0,0" />
@@ -233,7 +233,7 @@
         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="15,9">
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-              <Button x:Name="ExportButton" Click="Export_Click" IsEnabled="False" ToolTip="표시 중인 로그를 새 UTF-8 파일로 내보내기" AutomationProperties.Name="필터 결과 내보내기">
+              <Button x:Name="ExportButton" AutomationProperties.AutomationId="ExportButton" Click="Export_Click" IsEnabled="False" ToolTip="표시 중인 로그를 새 UTF-8 파일로 내보내기" AutomationProperties.Name="필터 결과 내보내기">
                 <StackPanel Orientation="Horizontal">
                   <TextBlock Style="{StaticResource ToolbarIcon}" Text="" />
                   <TextBlock x:Name="ExportLabel" Text="필터 결과 내보내기" />
@@ -241,7 +241,7 @@
               </Button>
             </StackPanel>
             <TextBlock Text="" Style="{StaticResource ToolbarIcon}" Foreground="{DynamicResource MutedBrush}" />
-            <TextBlock x:Name="FileLabel" Text="로그 원문" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock x:Name="FileLabel" AutomationProperties.AutomationId="FileLabel" Text="로그 원문" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" VerticalAlignment="Center" />
           </DockPanel>
         </Border>
         <Border x:Name="ContextPanel" Visibility="Collapsed" Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3,0,0,0" Padding="12,8">
@@ -263,7 +263,7 @@
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="SearchBox" TextChanged="Search_Changed" KeyDown="Search_KeyDown" AutomationProperties.Name="현재 표시 중인 로그 검색" ToolTip="현재 표시 중인 로그에서 검색" MinWidth="80" />
+            <TextBox x:Name="SearchBox" AutomationProperties.AutomationId="SearchBox" TextChanged="Search_Changed" KeyDown="Search_KeyDown" AutomationProperties.Name="현재 표시 중인 로그 검색" ToolTip="현재 표시 중인 로그에서 검색" MinWidth="80" />
             <Button Grid.Column="1" Content="↑" Click="Previous_Click" ToolTip="이전 결과 · F4 / Shift+F3" AutomationProperties.Name="이전 검색 결과" Margin="8,0,3,0" />
             <Button Grid.Column="2" Content="↓" Click="Next_Click" ToolTip="다음 결과 · F3" AutomationProperties.Name="다음 검색 결과" />
             <Button Grid.Column="3" Content="×" Click="CloseSearch_Click" ToolTip="검색 닫기 · Esc" AutomationProperties.Name="검색 닫기" Margin="0" />
@@ -280,7 +280,7 @@
             <Button Content="선택 범위 지정" Click="CaptureSearchSelection_Click" FontSize="11" ToolTip="F3로 만든 선택과 별개로 현재 선택을 검색 범위로 고정" Margin="8,0" />
           </WrapPanel>
           <WrapPanel Margin="0,3,0,0">
-            <TextBlock x:Name="SearchStatus" FontSize="11" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" MaxWidth="{Binding ActualWidth, ElementName=SearchBox}" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,12,0" />
+            <TextBlock x:Name="SearchStatus" AutomationProperties.AutomationId="SearchStatus" FontSize="11" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" MaxWidth="{Binding ActualWidth, ElementName=SearchBox}" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,12,0" />
             <TextBlock x:Name="SearchScopeStatus" Text="현재 표시 중인 기록" FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
           </WrapPanel>
           </StackPanel>
@@ -438,7 +438,7 @@
               <Button x:Name="ResultsToggleButton" DockPanel.Dock="Right" Content="접기" Click="ResultsToggle_Click" FontSize="11" Padding="7,2" MinHeight="24" Margin="8,0,0,0" ToolTip="검색과 강조를 유지하고 결과 목록만 접기" AutomationProperties.Name="검색 결과 목록 접기" />
               <TextBlock Text="검색 결과 · 원본 줄 / 소유 헤더 시간 / 스레드" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </DockPanel>
-            <ListBox x:Name="ResultsList" Grid.Row="1" SelectionChanged="Result_Selected" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" DisplayMemberPath="Label" />
+            <ListBox x:Name="ResultsList" AutomationProperties.AutomationId="ResultsList" Grid.Row="1" SelectionChanged="Result_Selected" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" DisplayMemberPath="Label" />
           </Grid>
         </Border>
       </Grid>
