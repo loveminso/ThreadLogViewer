@@ -65,7 +65,7 @@ v0.7.0의 결과 안내·복구·새로 고침·탐색·배경색 확인 절차�
 .\run.cmd
 ```
 
-공개 실행본은 Releases의 `ThreadLogViewer-win-x64.zip`을 압축 해제한 `ThreadLogViewer.exe`다. 제목에 v0.8.2가 표시되는지 확인한다. 이전 `artifacts/ThreadLogViewer-v0.8.x-win-x64` 로컬 폴더는 보존한다. 배포 생성 여부는 검증 기록을 따른다. 아래는 사용자가 직접 확인할 절차이며 이번 작업에서 앱을 자동 실행하거나 제어하지 않았다.
+공개 실행본은 Releases의 `ThreadLogViewer-win-x64.zip`을 압축 해제한 `ThreadLogViewer.exe`다. 제목에 v0.8.2가 표시되는지 확인한다. 이전 `artifacts/ThreadLogViewer-v0.8.x-win-x64` 로컬 폴더는 보존한다. 배포 생성 여부는 검증 기록을 따른다. 아래 절차의 판정 범위는 이 문서 앞부분의 FlaUI UI 테스트 설명을 따르며, 수동 확인은 SmartScreen만 남긴다.
 
 ## + / Ctrl+N 새 빈 탭 확인
 
