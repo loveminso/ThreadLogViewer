@@ -88,34 +88,34 @@ internal sealed class UiReviewLint
         }
         AutomationElement[] children;
         try { children = element.FindAllChildren(); }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return; }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return; }
         foreach (var child in children)
             Walk(child, root, window, state, theme, size, scale, depth + 1, seen);
     }
 
     private void InspectName(AutomationElement element, string state, string theme, string size, int scale)
     {
-        if (!Is(element.ControlType, NamedControls))
+        if (!Is(TypeOf(element), NamedControls))
             return;
         if (!element.Properties.IsEnabled.ValueOrDefault)
             return;
-        if (!string.IsNullOrWhiteSpace(element.Name))
+        if (!string.IsNullOrWhiteSpace(element.Properties.Name.ValueOrDefault))
             return;
         Add(MissingName, state, theme, size, scale, Describe(element) + " has no accessible name");
     }
 
     private void InspectTruncation(AutomationElement element, string state, string theme, string size, int scale)
     {
-        if (element.ControlType != ControlType.Text && element.ControlType != ControlType.Header)
+        if (TypeOf(element) != ControlType.Text && TypeOf(element) != ControlType.Header)
             return;
-        string name = Clean(element.Name);
+        string name = Clean(element.Properties.Name.ValueOrDefault);
         if (name.Length == 0)
             return;
         Rectangle bounds = SafeBounds(element);
         if (bounds.Width <= 1 || bounds.Height <= 1)
             return;
         bool ellipsis = name.Contains('…') || name.EndsWith("...", StringComparison.Ordinal);
-        string help = Clean(element.HelpText);
+        string help = Clean(element.Properties.HelpText.ValueOrDefault);
         if (ellipsis && help.Length > name.Length)
         {
             Add(TruncatedText, state, theme, size, scale, "Ellipsis trimming on " + Describe(element));
@@ -242,15 +242,15 @@ internal sealed class UiReviewLint
             if (element.Properties.IsKeyboardFocusable.ValueOrDefault &&
                 element.Properties.IsEnabled.ValueOrDefault &&
                 !element.Properties.IsOffscreen.ValueOrDefault &&
-                Is(element.ControlType, TabStops))
+                Is(TypeOf(element), TabStops))
                 stops.Add((Identity(element), Label(element)));
         }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
         }
         AutomationElement[] children;
         try { children = element.FindAllChildren(); }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return; }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return; }
         foreach (var child in children)
             CollectStops(child, stops, depth + 1, seen);
     }
@@ -331,14 +331,21 @@ internal sealed class UiReviewLint
         }
     }
 
+    private static ControlType TypeOf(AutomationElement element)
+    {
+        try { return element.Properties.ControlType.ValueOrDefault; }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { return ControlType.Unknown; }
+    }
+
     private static string Identity(AutomationElement element)
     {
         try
         {
             int[] runtime = element.Properties.RuntimeId.ValueOrDefault ?? [];
-            return element.ControlType + "|" + (element.AutomationId ?? "") + "|" + string.Join('.', runtime);
+            string id = element.Properties.AutomationId.ValueOrDefault ?? "";
+            return TypeOf(element) + "|" + id + "|" + string.Join('.', runtime);
         }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             return Guid.NewGuid().ToString("N");
         }
@@ -348,7 +355,7 @@ internal sealed class UiReviewLint
     {
         string name = Clean(element.Properties.Name.ValueOrDefault);
         string id = Clean(element.Properties.AutomationId.ValueOrDefault);
-        string type = element.ControlType.ToString();
+        string type = TypeOf(element).ToString();
         if (name.Length > 0 && id.Length > 0)
             return type + " " + id + " \"" + Trim(name) + "\"";
         if (name.Length > 0)
