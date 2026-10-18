@@ -69,7 +69,7 @@ F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`�
 
 규칙은 탭마다 최대 8개다 (`HighlightPrompt`). 새 규칙은 Shift+F8과 같이 0부터 5까지 아직 쓰지 않은 색을 고른다. 여섯 색이 모두 쓰이면 규칙 개수의 나머지를 쓴다. ‘강조 문구 관리’의 새 문구 색도 그 값에서 시작하고, 추가나 삭제 뒤에 다음 빈 색으로 옮긴다. `RefreshKeywordsAsync`가 켠 규칙을 하나씩 준비한다 (`src/ThreadLogViewer.App/MainWindow.Analysis.cs`). 준비는 `Task.Run` 안에서 `KeywordRefreshFailure.CanPrepare`로 검사한 뒤 `LogSearch.Find`로 찾는다. 짝 없는 UTF-16 서로게이트는 그 규칙만 `SkippedRule`로 건너뛴다. 나머지 규칙은 계속 강조한다. 건너뛴 규칙이 있으면 상태줄 `OperationStatus`에 `KeywordRefreshFailure.SkippedNotice`가 만든 문장이 남는다. 그 문장은 `강조 준비 실패`로 시작하고, 목록 번호·색 이름·읽을 수 있는 문구를 잇는다. `SkippedNotice`는 `FailedKeyword` 상수를 쓰지 않는다. 상수 `KeywordRefreshFailure.FailedKeyword`는 `강조 준비 실패`만이고, 강조 칸 `KeywordStatus`에 붙이거나, 켠 규칙이 모두 건너뛰면 그 칸을 그 상수로 바꾼다. 준비 중 `OperationCanceledException`이 아니면 `KeywordRefreshFailure.Apply`가 상태 문자열로 바꾼다. 취소는 실패로 보지 않아, 강조 칸이 `강조 준비 중…`인 채로 남을 수 있다. 메모리 부족은 `강조 메모리 부족 · 규칙을 줄여 주세요.`다. 그 외 예외는 강조 칸 `강조 준비 실패`, 상태줄 `강조 준비 실패 · 규칙을 확인한 뒤 다시 시도하세요.`다.
 
-`README.md`와 `docs/PLAN.md`의 v0.8.2 목록에 남은 `강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다`는 그 이전 동작이다. 현재 동작은 두 문서 맨 위의 `main(미출시)` 문장과 `src/ThreadLogViewer.App/MainWindow.Analysis.cs`다.
+`README.md`와 `docs/PLAN.md`의 v0.8.2 목록에 남은 `강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다`는 그 이전 동작이다. 현재 동작은 README의 v0.8.3 항목과 `src/ThreadLogViewer.App/MainWindow.Analysis.cs`다.
 
 ### 주변 로그
 
