@@ -155,12 +155,18 @@ internal static class UiReview
                        !status.Contains("강조 준비 실패", StringComparison.Ordinal);
             }, TimeSpan.FromSeconds(15), "highlight rule");
             CloseSearch(session);
-            foreach (var size in Sizes)
+            Window highlight = OpenHighlight(session);
+            try
             {
-                Resize(session, size.Width, size.Height);
-                Window dialog = OpenHighlight(session);
-                Shoot(session, lint, output, shots, "highlight-manager", "강조 문구 관리", theme, scale, size.Width, size.Height, dialog, steady: false);
-                CloseHighlight(dialog);
+                foreach (var size in Sizes)
+                {
+                    Resize(session, size.Width, size.Height);
+                    Shoot(session, lint, output, shots, "highlight-manager", "강조 문구 관리", theme, scale, size.Width, size.Height, highlight, steady: false);
+                }
+            }
+            finally
+            {
+                CloseHighlight(highlight);
             }
             AddBadRule(session);
             session.WaitUntil(() =>
@@ -375,9 +381,11 @@ internal static class UiReview
 
     private static Window OpenHighlight(UiSession session)
     {
-        Window? dialog = null;
-        for (int attempt = 1; dialog is null && attempt <= 2; attempt++)
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
+            var existing = FindHighlight(session);
+            if (existing is not null)
+                return existing;
             if (attempt > 1)
             {
                 session.FocusWindow();
@@ -386,32 +394,30 @@ internal static class UiReview
             }
             InvokeMenu(session, "분석", "강조 문구 관리");
             var watch = Stopwatch.StartNew();
-            while (dialog is null && watch.Elapsed < TimeSpan.FromSeconds(8))
+            while (watch.Elapsed < TimeSpan.FromSeconds(8))
             {
-                dialog = FindHighlight(session);
-                if (dialog is null)
-                    Thread.Sleep(50);
+                var dialog = FindHighlight(session);
+                if (dialog is not null)
+                    return dialog;
+                Thread.Sleep(50);
             }
         }
-        return dialog ?? throw new InvalidOperationException("Highlight manager did not open. " + session.Describe());
+        throw new InvalidOperationException("Highlight manager did not open. " + session.Describe());
     }
 
     private static void CloseHighlight(Window dialog)
     {
-        var cancel = dialog.FindFirstDescendant(condition => condition.ByControlType(ControlType.Button).And(condition.ByName("취소")));
-        try { cancel?.AsButton().Invoke(); }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
-        var watch = Stopwatch.StartNew();
-        while (watch.Elapsed < TimeSpan.FromSeconds(5))
+        for (int attempt = 0; attempt < 4; attempt++)
         {
+            if (!IsAlive(dialog))
+                return;
             try
             {
-                if (!dialog.Properties.NativeWindowHandle.IsSupported)
-                    return;
+                var cancel = dialog.FindFirstDescendant(condition => condition.ByControlType(ControlType.Button).And(condition.ByName("취소")));
+                cancel?.AsButton().Invoke();
             }
             catch (Exception ex) when (ex is COMException or InvalidOperationException)
             {
-                return;
             }
             try
             {
@@ -422,7 +428,7 @@ internal static class UiReview
             {
                 return;
             }
-            Thread.Sleep(80);
+            Thread.Sleep(200);
         }
     }
 
@@ -444,6 +450,21 @@ internal static class UiReview
         var apply = dialog.FindFirstDescendant(condition => condition.ByAutomationId("HighlightApplyButton"))?.AsButton()
             ?? throw new InvalidOperationException("Highlight apply button was not found.");
         apply.Invoke();
+    }
+
+    private static bool IsAlive(Window dialog)
+    {
+        try
+        {
+            _ = dialog.Title;
+            if (!dialog.Properties.NativeWindowHandle.IsSupported)
+                return false;
+            return dialog.Properties.NativeWindowHandle.Value != IntPtr.Zero;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return false;
+        }
     }
 
     private static Window? FindHighlight(UiSession session) =>
