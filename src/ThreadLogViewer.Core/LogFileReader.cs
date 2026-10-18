@@ -68,11 +68,27 @@ public static class LogFileReader
             return (DecodeInBlocks(bytes, 2, new UnicodeEncoding(false, true, true), cancellationToken, progress), "UTF-16 LE (BOM 확인)");
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF }))
             return (DecodeInBlocks(bytes, 2, new UnicodeEncoding(true, true, true), cancellationToken, progress), "UTF-16 BE (BOM 확인)");
-        try { return (DecodeInBlocks(bytes, 0, new UTF8Encoding(false, true), cancellationToken, progress), "UTF-8로 해석 (BOM 없음; 추정)"); }
+        const string utf8Estimated = "UTF-8로 해석 (BOM 없음; 추정)";
+        try { return (DecodeInBlocks(bytes, 0, new UTF8Encoding(false, true), cancellationToken, progress), utf8Estimated); }
         catch (DecoderFallbackException)
         {
-            // This is a decoding preference, not reliable encoding identification.
+            // A file still being written can end in the middle of one UTF-8 scalar (1–3 bytes).
+            // Drop only that unfinished tail when it is the sole strict UTF-8 failure. Do not
+            // rewind to a newline, and leave every other failure on the CP949 fallback below.
             // A recognized BOM is authoritative and its malformed payload never reaches this fallback.
+            int tail = IncompleteUtf8TailLength(bytes);
+            if (tail > 0)
+            {
+                try
+                {
+                    return (DecodeInBlocks(bytes, 0, new UTF8Encoding(false, true), cancellationToken, progress, bytes.Length - tail),
+                        utf8Estimated + " (끝의 미완성 문자 제외)");
+                }
+                catch (DecoderFallbackException)
+                {
+                    // The tail was not the only problem.
+                }
+            }
             try
             {
                 return (DecodeInBlocks(bytes, 0, Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), cancellationToken, progress),
@@ -85,11 +101,69 @@ public static class LogFileReader
         }
     }
 
+    // 0 when the bytes are well-formed or the first problem is not a 1–3 byte incomplete scalar at EOF.
+    private static int IncompleteUtf8TailLength(ReadOnlySpan<byte> bytes)
+    {
+        int index = 0;
+        while (index < bytes.Length)
+        {
+            byte lead = bytes[index];
+            if (lead <= 0x7F) { index++; continue; }
+            int expected = Utf8SequenceLength(lead);
+            if (expected == 0) return 0;
+            int available = bytes.Length - index;
+            if (available < expected)
+                return IsAcceptableIncompletePrefix(bytes.Slice(index, available)) ? available : 0;
+            if (!IsWellFormedUtf8Sequence(bytes.Slice(index, expected))) return 0;
+            index += expected;
+        }
+        return 0;
+    }
+
+    private static int Utf8SequenceLength(byte lead) => lead switch
+    {
+        >= 0xC2 and <= 0xDF => 2,
+        >= 0xE0 and <= 0xEF => 3,
+        >= 0xF0 and <= 0xF4 => 4,
+        _ => 0
+    };
+
+    private static bool IsContinuation(byte value) => (value & 0xC0) == 0x80;
+
+    private static bool SecondByteInRange(byte lead, byte second) => IsContinuation(second) && lead switch
+    {
+        0xE0 => second >= 0xA0,
+        0xED => second <= 0x9F,
+        0xF0 => second >= 0x90,
+        0xF4 => second <= 0x8F,
+        _ => true
+    };
+
+    private static bool IsWellFormedUtf8Sequence(ReadOnlySpan<byte> sequence)
+    {
+        if (sequence.Length != Utf8SequenceLength(sequence[0])) return false;
+        if (sequence.Length > 1 && !SecondByteInRange(sequence[0], sequence[1])) return false;
+        for (int i = 2; i < sequence.Length; i++)
+            if (!IsContinuation(sequence[i])) return false;
+        return true;
+    }
+
+    private static bool IsAcceptableIncompletePrefix(ReadOnlySpan<byte> tail)
+    {
+        if (tail.Length is < 1 or > 3) return false;
+        int expected = Utf8SequenceLength(tail[0]);
+        if (expected <= tail.Length) return false;
+        for (int i = 1; i < tail.Length; i++)
+            if (!IsContinuation(tail[i])) return false;
+        return tail.Length == 1 || SecondByteInRange(tail[0], tail[1]);
+    }
+
     private static string DecodeInBlocks(byte[] bytes, int start, Encoding encoding,
-        CancellationToken token, IProgress<WorkProgress>? progress)
+        CancellationToken token, IProgress<WorkProgress>? progress, int length = -1)
     {
         const int block = 65536;
-        int length = bytes.Length - start, position = 0, characters = 0;
+        if (length < 0) length = bytes.Length - start;
+        int position = 0, characters = 0;
         char[] scratch = ArrayPool<char>.Shared.Rent(block);
         try
         {

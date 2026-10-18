@@ -65,6 +65,98 @@ public sealed class EncodingTests
     public void Utf32BomRemainsUnsupportedBeforeUtf16Handling(byte[] bytes) =>
         Assert.Contains("UTF-32", Assert.Throws<InvalidDataException>(() => LogFileReader.Decode(bytes)).Message);
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task TruncatedUtf8FileDropsOnlyTheUnfinishedKoreanCharacter(int missingBytes)
+    {
+        using var folder = new SyntheticEncodingFolder();
+        string path = Path.Combine(folder.Path, "synthetic-truncated-utf8.log");
+        const string complete = "[000:00:01] [T1] 완성\n[000:00:02] [T2] 잘";
+        byte[] full = new UTF8Encoding(false).GetBytes(complete);
+        Assert.Equal(new byte[] { 0xEC, 0x9E, 0x98 }, full[^3..]);
+        byte[] truncated = full[..^missingBytes];
+        await File.WriteAllBytesAsync(path, truncated);
+
+        var data = await LogFileReader.ReadAsync(path);
+
+        Assert.Equal(complete[..^1], data.Text);
+        Assert.Contains("[000:00:02] [T2] ", data.Text);
+        Assert.Contains("완성\n", data.Text);
+        Assert.DoesNotContain("잘", data.Text);
+        Assert.DoesNotContain("\uFFFD", data.Text);
+        Assert.Equal("UTF-8로 해석 (BOM 없음; 추정) (끝의 미완성 문자 제외)", data.EncodingDescription);
+        Assert.Equal(truncated, await File.ReadAllBytesAsync(path));
+    }
+
+    [Fact]
+    public async Task CompleteUtf8FileKeepsTheEstimatedDescription()
+    {
+        using var folder = new SyntheticEncodingFolder();
+        string path = Path.Combine(folder.Path, "synthetic-utf8.log");
+        const string text = "[000:00:01] [T1] 완성\n[000:00:02] [T2] 잘\n";
+        byte[] bytes = new UTF8Encoding(false).GetBytes(text);
+        await File.WriteAllBytesAsync(path, bytes);
+
+        var data = await LogFileReader.ReadAsync(path);
+
+        Assert.Equal(text, data.Text);
+        Assert.Equal("UTF-8로 해석 (BOM 없음; 추정)", data.EncodingDescription);
+        Assert.DoesNotContain("미완성", data.EncodingDescription);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+    }
+
+    [Fact]
+    public async Task Cp949FileStillFallsBackWhenUtf8IsInvalid()
+    {
+        using var folder = new SyntheticEncodingFolder();
+        string path = Path.Combine(folder.Path, "synthetic-cp949-fallback.log");
+        const string text = "[000:00:01] [T1] 한글 확장: 똠 쀍\n";
+        byte[] bytes = StrictCp949().GetBytes(text);
+        Assert.Throws<DecoderFallbackException>(() => new UTF8Encoding(false, true).GetString(bytes));
+        await File.WriteAllBytesAsync(path, bytes);
+
+        var data = await LogFileReader.ReadAsync(path);
+
+        Assert.Equal(text, data.Text);
+        Assert.Equal("CP949로 해석 (UTF-8 실패 후 대체; 추정)", data.EncodingDescription);
+        Assert.DoesNotContain("미완성", data.EncodingDescription);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+    }
+
+    [Fact]
+    public void ThreeByteIncompleteScalarAtEofIsExcludedWithoutCuttingTheLine()
+    {
+        byte[] bytes = new UTF8Encoding(false).GetBytes("line\nmore ").Concat(new byte[] { 0xF0, 0x9F, 0x99 }).ToArray();
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal("line\nmore ", decoded.Text);
+        Assert.Equal("UTF-8로 해석 (BOM 없음; 추정) (끝의 미완성 문자 제외)", decoded.Description);
+    }
+
+    [Fact]
+    public void IncompleteTailAfterABlockBoundaryIsStillExcluded()
+    {
+        byte[] bytes = new byte[65536 + 2];
+        Array.Fill(bytes, (byte)'x');
+        bytes[^2] = 0xEC;
+        bytes[^1] = 0x9E;
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal(new string('x', 65536), decoded.Text);
+        Assert.Equal("UTF-8로 해석 (BOM 없음; 추정) (끝의 미완성 문자 제외)", decoded.Description);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x41, 0xFF })]
+    [InlineData(new byte[] { 0x41, 0x80 })]
+    [InlineData(new byte[] { 0x41, 0xE0, 0x80 })]
+    [InlineData(new byte[] { 0x41, 0xED, 0xA0 })]
+    [InlineData(new byte[] { 0x41, 0xC0, 0x80, 0xEA })]
+    public void OtherUtf8FailuresDoNotDropATail(byte[] bytes)
+    {
+        var failure = Assert.Throws<InvalidDataException>(() => LogFileReader.Decode(bytes));
+        Assert.Contains("UTF-8과 CP949", failure.Message);
+    }
+
     [Fact]
     public async Task AutomaticCp949ReadMapsOriginalLinesAndNeverChangesSourceBytes()
     {
