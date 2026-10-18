@@ -26,6 +26,15 @@ public sealed class GlobalExceptionTests
         Assert.Equal("강조 메모리 부족 · 규칙을 줄여 주세요.", memory.KeywordStatus);
         Assert.Equal(memory.KeywordStatus, memory.OperationStatus);
         Assert.DoesNotContain("준비 중", memory.KeywordStatus);
+
+        KeywordRefreshFailure.EnsureCanPrepare("timeout");
+        KeywordRefreshFailure.EnsureCanPrepare("\U00010400value");
+        var broken = Assert.Throws<ArgumentException>(() => KeywordRefreshFailure.EnsureCanPrepare("broken\uD800"));
+        Assert.DoesNotContain("broken", broken.Message, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => KeywordRefreshFailure.EnsureCanPrepare("\uDFFF"));
+        var prepared = KeywordRefreshFailure.Apply(preparing, broken);
+        Assert.Equal("강조 준비 실패", prepared.KeywordStatus);
+        Assert.Contains("강조 준비 실패", prepared.OperationStatus, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -276,8 +276,8 @@ public partial class MainWindow
             var item = new KeywordRuleItem(draft.Phrase, draft.ColorIndex) { Enabled = draft.Enabled };
             item.PropertyChanged += Keyword_Changed; keywordRules.Add(item);
         }
-        AsyncEvent.Run(RefreshKeywordsAsync);
         OperationStatus.Text = $"강조 문구 {rules.Count}/8개를 적용했습니다. 같은 문구에서 Shift+F8을 누르면 강조를 해제합니다.";
+        AsyncEvent.Run(RefreshKeywordsAsync);
         return true;
     }
 }

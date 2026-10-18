@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using FlaUI.Core.WindowsAPI;
 using Xunit;
 
@@ -9,9 +10,6 @@ namespace ThreadLogViewer.UiTests;
 [Collection(UiCollection.Name)]
 public sealed class UiScenarioTests(PublishedApp app)
 {
-    private const string PrepareFailureSkip =
-        "Skipped until PR #3 (feature/global-exceptions) merges. This branch does not show '강조 준비 실패' when keyword-highlight preparation fails: RefreshKeywordsAsync only handles cancellation and out-of-memory, and other failures are not written to the status bar. PR #3 sets the status bar to '강조 준비 실패 · 규칙을 확인한 뒤 다시 시도하세요.' Asserting that message here would fake a result this build does not produce.";
-
     private const string BomTruncationSkip =
         "Skipped: fix 4. UTF-8 with BOM still fails when a read snapshot ends in the middle of a character. LogFileReader.Decode treats EF BB BF as authoritative and decodes the payload with strict UTF-8, so an unfinished trailing scalar throws DecoderFallbackException and F5 shows '파일 새로 고침 실패'. BOM-less UTF-8 already drops that unfinished tail. This case stays skipped until fix 4; app behavior is unchanged.";
 
@@ -111,11 +109,26 @@ public sealed class UiScenarioTests(PublishedApp app)
         });
     }
 
-    [Fact(Skip = PrepareFailureSkip)]
-    public void Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning() =>
-        throw new InvalidOperationException(
-            "Unskip only after PR #3. Open a synthetic log, add a highlight rule that fails preparation, " +
-            "assert OperationStatus contains '강조 준비 실패', and assert the main window is still open.");
+    [Fact]
+    public void Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning()
+    {
+        string folder = NewFolder("highlight");
+        string log = Path.Combine(folder, "highlight.log");
+        SyntheticLog.Write(log, LogEncodingKind.Utf8, SyntheticLog.Line(1, 1, "synthetic highlight"));
+        Run(log, TimeSpan.FromMinutes(2), session =>
+        {
+            session.WaitForOpen("highlight.log");
+            AddUnpreparedHighlightRule(session);
+            session.WaitUntil(
+                () => session.Status().Contains("강조 준비 실패", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(15),
+                "highlight preparation failure");
+            Assert.False(session.App.HasExited);
+            Assert.Contains("ThreadLog Viewer", session.Window.Title, StringComparison.Ordinal);
+            Assert.Contains("highlight.log", session.Text("FileLabel"), StringComparison.Ordinal);
+            Assert.DoesNotContain("강조 준비 중", session.Status(), StringComparison.Ordinal);
+        });
+    }
 
     [Fact]
     public void Scenario05_RefreshWhileAppendingKorean()
@@ -250,6 +263,66 @@ public sealed class UiScenarioTests(PublishedApp app)
                 throw;
             }
         }, timeout);
+    }
+
+    private static void AddUnpreparedHighlightRule(UiSession session)
+    {
+        session.FocusWindow();
+        var menus = session.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem));
+        var analysis = menus.FirstOrDefault(item =>
+        {
+            string name = item.Name ?? "";
+            return name.Equals("분석", StringComparison.Ordinal) || name.StartsWith("분석(", StringComparison.Ordinal);
+        }) ?? throw new Xunit.Sdk.XunitException("Analysis menu was not found. " + session.Describe());
+        var menu = analysis.AsMenuItem();
+        menu.Expand();
+        FlaUI.Core.Input.Wait.UntilInputIsProcessed();
+        AutomationElement? manage = null;
+        var opened = System.Diagnostics.Stopwatch.StartNew();
+        while (manage is null && opened.Elapsed < TimeSpan.FromSeconds(5))
+        {
+            manage = menu.Items.FirstOrDefault(item => (item.Name ?? "").Contains("강조 문구 관리", StringComparison.Ordinal));
+            manage ??= session.Window.FindFirstDescendant(cf => cf.ByName("강조 문구 관리…"));
+            if (manage is null)
+                Thread.Sleep(50);
+        }
+        if (manage is null)
+            throw new Xunit.Sdk.XunitException("Highlight manager item was not found. " + string.Join(" | ", menu.Items.Select(item => item.Name)));
+        manage.Click();
+        FlaUI.Core.Input.Wait.UntilInputIsProcessed();
+        Window? foundDialog = null;
+        session.WaitUntil(() => (foundDialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(10), "highlight manager did not open");
+        Window dialog = foundDialog ?? throw new Xunit.Sdk.XunitException("Highlight manager did not open.");
+        var box = dialog.FindFirstDescendant(cf => cf.ByName("새 강조 문구"))?.AsTextBox()
+            ?? throw new Xunit.Sdk.XunitException("Highlight phrase box was not found.");
+        const string badPhrase = "broken\uD800";
+        box.Text = badPhrase;
+        session.WaitUntil(() => (box.Text ?? "").Contains('\uD800'), TimeSpan.FromSeconds(5), "bad highlight phrase was not entered");
+        var add = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("추가")))?.AsButton()
+            ?? throw new Xunit.Sdk.XunitException("Highlight add button was not found.");
+        session.WaitUntil(() => add.IsEnabled, TimeSpan.FromSeconds(5), "highlight add button stayed disabled");
+        add.Invoke();
+        session.WaitUntil(
+            () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains("1/8", StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(5),
+            "bad highlight rule was not registered");
+        var apply = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("적용")))?.AsButton()
+            ?? throw new Xunit.Sdk.XunitException("Highlight apply button was not found.");
+        apply.Invoke();
+        session.Step("applied unpaired-surrogate highlight rule");
+    }
+
+    private static Window? HighlightDialog(UiSession session)
+    {
+        try
+        {
+            return session.App.GetAllTopLevelWindows(session.Automation)
+                .FirstOrDefault(window => (window.Title ?? "").Contains("강조 문구 관리", StringComparison.Ordinal));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            return null;
+        }
     }
 
     private static void PressSearch(UiSession session, bool shift)

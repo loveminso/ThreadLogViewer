@@ -116,6 +116,8 @@ public partial class MainWindow
                 for (int ruleIndex = 0; ruleIndex < rules.Length; ruleIndex++)
                 {
                     var rule = rules[ruleIndex];
+                    op.Token.ThrowIfCancellationRequested();
+                    KeywordRefreshFailure.EnsureCanPrepare(rule.Keyword);
                     var found = LogSearch.Find(captured.Source, captured.EntryIndexes, rule.Keyword, new SearchOptions(), ranges, cancellationToken: op.Token);
                     limited |= found.Limited;
                     foreach (var hit in found.Hits)

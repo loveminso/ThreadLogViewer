@@ -19,4 +19,28 @@ public static class KeywordRefreshFailure
         if (exception is OutOfMemoryException) return new(Memory, Memory);
         return new(FailedKeyword, FailedOperation);
     }
+
+    /// <summary>
+    /// A highlight phrase is prepared as a plain string. An unpaired surrogate is not a
+    /// searchable character, so preparation fails instead of matching inside the log.
+    /// </summary>
+    public static void EnsureCanPrepare(string phrase)
+    {
+        if (phrase is null || HasUnpairedSurrogate(phrase))
+            throw new ArgumentException("강조 규칙에 준비할 수 없는 문자가 있습니다.");
+    }
+
+    private static bool HasUnpairedSurrogate(string phrase)
+    {
+        for (int i = 0; i < phrase.Length; i++)
+        {
+            if (char.IsHighSurrogate(phrase[i]))
+            {
+                if (i + 1 >= phrase.Length || !char.IsLowSurrogate(phrase[i + 1])) return true;
+                i++;
+            }
+            else if (char.IsLowSurrogate(phrase[i])) return true;
+        }
+        return false;
+    }
 }
