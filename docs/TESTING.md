@@ -25,7 +25,7 @@ $env:NUGET_PACKAGES = Join-Path $PWD '.nuget\packages'
 
 CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행하므로 테스트가 만드는 `user-data`가 업로드하는 게시 폴더에 들어가지 않는다. 샘플과 입력은 모두 합성 로그다. 실패하면 화면을 `TestResults/ui-screenshots`에 저장하고, 워크플로는 그 폴더를 `ui-screenshots` 아티팩트로 올린다.
 
-끌어 놓기는 Explorer 드래그를 쓰지 않는다. 테스트 프로세스가 WinForms `DataObject`(`FileDrop`)로 OLE 드래그 소스가 되고, `DoDragDrop` 동안 `SendInput`으로 왼쪽 버튼을 누른 채 포인터를 뷰어 창 중앙으로 옮긴 뒤 버튼을 놓는다. 뷰어의 기존 `PreviewDrop`이 그 경로를 연다. `WM_DROPFILES`를 붙이거나 뷰어에 드롭 이벤트를 주입하지 않고, 뷰어 프로세스에 코드를 넣지 않는다. 저장 대화상자는 UIA 값 설정과 버튼 `Invoke`가 원래 이름(문서 폴더의 `<원본>-filtered.log`)을 그대로 확정하므로, 파일 이름 칸에 대상 경로를 입력한 뒤 Enter와 저장 버튼 클릭으로 확정한다.
+끌어 놓기는 Explorer 드래그를 쓰지 않는다. 테스트 프로세스가 WinForms `DataObject`(`FileDrop`)로 OLE 드래그 소스가 되고, `DoDragDrop` 동안 `SendInput`으로 왼쪽 버튼을 누른 채 포인터를 뷰어 창 중앙으로 옮긴 뒤 버튼을 놓는다. 뷰어의 기존 `PreviewDrop`이 그 경로를 연다. `WM_DROPFILES`를 붙이거나 뷰어에 드롭 이벤트를 주입하지 않고, 뷰어 프로세스에 코드를 넣지 않는다. 저장 대화상자는 UIA 값 설정과 Enter가 원래 이름(문서 폴더의 `<원본>-filtered.log`)을 그대로 확정한다. 파일 이름 칸이 포커스를 가진 뒤 대상 경로를 붙여 넣고 저장 버튼을 클릭한다.
 
 `강조 준비 실패`는 PR #3 이전인 이 분기에 없다. `Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning`은 그 문구를 단정하지 않고 PR #3을 이유로 건너뛴다. UTF-8 BOM의 잘린 마지막 문자는 아직 실패한다(fix 4). `LogFileReader.Decode`는 BOM을 확정 인코딩으로 보고 엄격한 UTF-8로 디코딩하며, BOM 없는 UTF-8만 끝의 미완성 문자를 버린다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 그래서 건너뛰고 앱 동작은 바꾸지 않는다. BOM 없는 UTF-8과 CP949는 F5 20회를 실행한다. CP949는 2바이트 문자가 읽기 길이에 걸리면 실패할 수 있어, 도우미가 파일을 연 채 F5 사이에만 완전한 줄을 추가하고 F5 순간에는 쓰지 않는다.
 

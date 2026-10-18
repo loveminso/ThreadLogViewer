@@ -505,9 +505,9 @@ internal sealed class UiSession : IDisposable
 
     private void SetDialogFileName(Window dialog, string destination)
     {
-        // UIA Value.SetValue plus Button.Invoke leaves the common-item dialog's original
-        // name (Documents\<source>-filtered.log). The edit has to receive real keystrokes,
-        // and Save has to be a click or Enter so the dialog reads that edit.
+        // Value.SetValue and WM_SETTEXT update the edit the test can read, but the common-item
+        // dialog still returns its original name. Enter is worse: the file-name combo treats it
+        // as choosing that original suggestion. Paste with real keys, then click Save.
         var box = dialog.FindFirstDescendant(cf => cf.ByAutomationId("FileNameControl"))
             ?? dialog.FindFirstDescendant(cf => cf.ByAutomationId("1001"))
             ?? dialog.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit)).LastOrDefault()
@@ -516,23 +516,85 @@ internal sealed class UiSession : IDisposable
         if (dialog.Properties.NativeWindowHandle.IsSupported)
             SetForegroundWindow(dialog.Properties.NativeWindowHandle.Value);
         edit.Focus();
-        edit.Click();
+        try { edit.Click(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
         Wait.UntilInputIsProcessed();
-        if (edit.Properties.NativeWindowHandle.IsSupported)
-            SendMessage(edit.Properties.NativeWindowHandle.Value, WmSetText, IntPtr.Zero, destination);
-        if (!FileNameMatches(edit, destination))
+        Thread.Sleep(100);
+        if (!FileNameFieldFocused(edit, box))
         {
-            edit.Focus();
-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            edit.Click();
             Wait.UntilInputIsProcessed();
-            Keyboard.Type(destination);
-            Wait.UntilInputIsProcessed();
-            Thread.Sleep(150);
+            Thread.Sleep(100);
         }
+        if (!FileNameFieldFocused(edit, box))
+            throw new Xunit.Sdk.XunitException("Export file-name field did not take focus. " + Describe());
+        PlaceExportPathOnClipboard(destination);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+        Wait.UntilInputIsProcessed();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_V);
+        Wait.UntilInputIsProcessed();
+        Thread.Sleep(200);
         string shown = ReadDialogFileName(edit);
         Step("export name '" + shown + "'");
         if (!FileNameMatches(edit, destination))
+        {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            Keyboard.Type(destination);
+            Wait.UntilInputIsProcessed();
+            Thread.Sleep(200);
+            shown = ReadDialogFileName(edit);
+            Step("export typed '" + shown + "'");
+        }
+        try { System.Windows.Forms.Clipboard.Clear(); }
+        catch (ExternalException) { }
+        if (!FileNameMatches(edit, destination))
             throw new Xunit.Sdk.XunitException($"Export dialog kept '{shown}' instead of '{destination}'.");
+    }
+
+    private bool FileNameFieldFocused(AutomationElement edit, AutomationElement box)
+    {
+        try
+        {
+            var focused = Automation.FocusedElement();
+            if (focused is null)
+                return false;
+            if (SameHwnd(focused, edit) || SameHwnd(focused, box))
+                return true;
+            string id = focused.AutomationId ?? "";
+            return id is "FileNameControl" or "1001";
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool SameHwnd(AutomationElement left, AutomationElement right)
+    {
+        if (!left.Properties.NativeWindowHandle.IsSupported || !right.Properties.NativeWindowHandle.IsSupported)
+            return false;
+        return left.Properties.NativeWindowHandle.Value == right.Properties.NativeWindowHandle.Value;
+    }
+
+    private static void PlaceExportPathOnClipboard(string destination)
+    {
+        ExternalException? last = null;
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            try
+            {
+                System.Windows.Forms.Clipboard.SetText(destination);
+                if (System.Windows.Forms.Clipboard.ContainsText() &&
+                    System.Windows.Forms.Clipboard.GetText() == destination)
+                    return;
+            }
+            catch (ExternalException ex)
+            {
+                last = ex;
+            }
+            Thread.Sleep(40);
+        }
+        throw new Xunit.Sdk.XunitException("Could not place the export path on the clipboard. " + last?.Message);
     }
 
     private static bool FileNameMatches(AutomationElement edit, string destination)
@@ -566,23 +628,21 @@ internal sealed class UiSession : IDisposable
 
     private static void CommitExportDialog(Window dialog)
     {
-        Keyboard.Type(VirtualKeyShort.RETURN);
-        Wait.UntilInputIsProcessed();
-        Thread.Sleep(200);
+        // Enter confirms the combo's original suggestion. Click Save so the dialog reads the paste.
         if (!DialogIsOpen(dialog))
-            return;
+            throw new Xunit.Sdk.XunitException("Export dialog closed before Save was clicked. title=" + SafeTitle(dialog));
         var save = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))
             ?? dialog.FindFirstDescendant(cf => cf.ByName("Save"))
-            ?? dialog.FindFirstDescendant(cf => cf.ByName("저장"));
-        if (save is null)
-            return;
-        try
-        {
-            save.AsButton().Click();
-        }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-        }
+            ?? dialog.FindFirstDescendant(cf => cf.ByName("저장"))
+            ?? throw new InvalidOperationException("Export dialog has no Save button. title=" + SafeTitle(dialog));
+        save.Focus();
+        save.AsButton().Click();
+    }
+
+    private static string SafeTitle(Window dialog)
+    {
+        try { return dialog.Title ?? ""; }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return "<closed>"; }
     }
 
     private static bool DialogIsOpen(Window dialog)
@@ -675,9 +735,4 @@ internal sealed class UiSession : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
-
-    private const int WmSetText = 0x000C;
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
-    private static extern IntPtr SendMessage(IntPtr hwnd, int message, IntPtr wParam, string lParam);
 }
