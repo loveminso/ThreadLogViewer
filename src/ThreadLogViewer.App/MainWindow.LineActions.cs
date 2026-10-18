@@ -215,7 +215,7 @@ public partial class MainWindow
         UpdateSplitStatus();
         OperationStatus.Text = $"구간 시작: 원본 {line + 1:N0}줄 · 마지막 줄을 우클릭하여 ‘여기까지 새 탭으로 분리’를 선택하세요.";
     }
-    private async void SplitEnd_Click(object sender, RoutedEventArgs e)
+    private void SplitEnd_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (separationStartLine is not { } start || LineActionSourceLine() is not { } end)
         { OperationStatus.Text = "먼저 시작 줄을 지정하고 마지막 줄을 우클릭하세요."; return; }
@@ -224,7 +224,7 @@ public partial class MainWindow
         { OperationStatus.Text = "현재 탭 범위 안의 시작과 끝 줄을 지정하세요."; return; }
         if (await OpenLineSessionAsync(first, last))
             OperationStatus.Text = $"원본 {first + 1:N0}~{last + 1:N0}줄을 새 탭에 표시했습니다." + (start > end ? " · 시작·끝 순서를 바꿔 범위를 구성했습니다." : "");
-    }
+    });
     private void SplitClear_Click(object sender, RoutedEventArgs e)
     { separationStartLine = null; UpdateSplitStatus(); OperationStatus.Text = "구간 시작 지정을 해제했습니다."; }
     private void UpdateSplitStatus()
@@ -276,8 +276,8 @@ public partial class MainWindow
             var item = new KeywordRuleItem(draft.Phrase, draft.ColorIndex) { Enabled = draft.Enabled };
             item.PropertyChanged += Keyword_Changed; keywordRules.Add(item);
         }
-        _ = RefreshKeywordsAsync();
         OperationStatus.Text = $"강조 문구 {rules.Count}/8개를 적용했습니다. 같은 문구에서 Shift+F8을 누르면 강조를 해제합니다.";
+        AsyncEvent.Run(RefreshKeywordsAsync);
         return true;
     }
 }
