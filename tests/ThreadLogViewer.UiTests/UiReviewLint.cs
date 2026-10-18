@@ -359,14 +359,30 @@ internal sealed class UiReviewLint
         var type = TypeOf(element);
         if (type != ControlType.Menu && type != ControlType.MenuItem)
             return false;
-        // A menu bar lives on the main window. A popup is a different top-level window.
-        IntPtr elementRoot = TopLevelHwnd(element);
+        // WPF popup items stay under the main window in the UIA tree and often report its HWND.
+        // The window actually under the item is the popup. The menu bar stays on the main window.
         IntPtr mainRoot = TopLevelHwnd(mainWindow);
+        IntPtr atPoint = WindowRootAt(SafeBounds(element));
+        if (atPoint != IntPtr.Zero && mainRoot != IntPtr.Zero)
+            return atPoint != mainRoot;
+        IntPtr elementRoot = TopLevelHwnd(element);
         if (elementRoot != IntPtr.Zero && mainRoot != IntPtr.Zero)
             return elementRoot != mainRoot;
         AutomationElement? elementWindow = NearestWindow(element);
         AutomationElement main = NearestWindow(mainWindow) ?? mainWindow;
         return elementWindow is not null && !SameRuntimeId(elementWindow, main);
+    }
+
+    private static IntPtr WindowRootAt(Rectangle bounds)
+    {
+        if (bounds.Width <= 1 || bounds.Height <= 1)
+            return IntPtr.Zero;
+        var point = new WinPoint { X = bounds.Left + bounds.Width / 2, Y = bounds.Top + bounds.Height / 2 };
+        IntPtr hwnd = WindowFromPoint(point);
+        if (hwnd == IntPtr.Zero)
+            return IntPtr.Zero;
+        IntPtr root = GetAncestor(hwnd, 2);
+        return root == IntPtr.Zero ? hwnd : root;
     }
 
     private static IntPtr TopLevelHwnd(AutomationElement element)
@@ -436,8 +452,18 @@ internal sealed class UiReviewLint
         return builder.ToString();
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WinPoint
+    {
+        public int X;
+        public int Y;
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(WinPoint point);
 
     private static bool ParentIsMenuItem(AutomationElement element)
     {
