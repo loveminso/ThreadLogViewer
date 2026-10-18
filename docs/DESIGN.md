@@ -31,7 +31,7 @@ Windows x64용 읽기 전용 로그 뷰어다. UI는 `src/ThreadLogViewer.App`, 
 
 ### 파일 열기
 
-명령줄, 파일 대화상자, 끌어 놓기, 클립보드 파일은 `MainWindow.LoadIntoSessionAsync`로 모인다 (`src/ThreadLogViewer.App/MainWindow.xaml.cs`). 경로로 여는 경우 `OpenAsync`가 먼저 같은 경로의 전체 파일 탭을 찾고, 자동 인코딩이면 그 탭으로 옮긴다. 인코딩을 지정해 다시 열면 그 탭을 다시 읽는다. 빈 탭이면 그 탭을 채운다. 읽기·파싱·투영·AvalonEdit 문서 생성은 `Task.Run` 안에서 한다. `LogFileReader.ReadAsync`가 스냅샷을 읽고 `LogParser.Parse`로 `LogData`를 만든다. 이어서 `LogProjection.Create`와 `CancellableDocumentFactory.Create`가 표시 문자열과 문서를 만든다. 최신 세대만 `PublishView`로 에디터에 올린다.
+명령줄, 파일 대화상자, 끌어 놓기, 클립보드 파일은 `MainWindow.LoadIntoSessionAsync`로 모인다 (`src/ThreadLogViewer.App/MainWindow.xaml.cs`). 경로로 여는 경우 `OpenAsync`가 먼저 같은 경로의 전체 파일 탭을 찾고, 자동 인코딩이면 그 탭으로 옮긴다. 인코딩을 지정해 다시 읽기(`자동 판별`·`한국어 (CP949)` 메뉴)는 `ReloadCurrentAsync`가 현재 탭을 그 인코딩으로 다시 읽는다. 빈 탭이면 그 탭을 채운다. 읽기·파싱·투영·AvalonEdit 문서 생성은 `Task.Run` 안에서 한다. `LogFileReader.ReadAsync`가 스냅샷을 읽고 `LogParser.Parse`로 `LogData`를 만든다. 이어서 `LogProjection.Create`와 `CancellableDocumentFactory.Create`가 표시 문자열과 문서를 만든다. 최신 세대만 `PublishView`로 에디터에 올린다.
 
 붙여넣은 텍스트는 파일 경로가 없다. `LogParser.ParsePastedText`가 `클립보드 Unicode · 원본 인코딩 알 수 없음`으로 파싱한다.
 

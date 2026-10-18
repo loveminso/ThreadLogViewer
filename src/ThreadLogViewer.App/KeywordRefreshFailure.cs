@@ -74,7 +74,7 @@ public static class KeywordRefreshFailure
             else if (!char.IsLowSurrogate(phrase[i]))
                 builder.Append(phrase[i]);
         }
-        string text = builder.ToString().Trim();
+        string text = builder.ToString().Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ').Trim();
         if (text.Length <= 24) return text;
         int end = 24;
         if (char.IsHighSurrogate(text[end - 1])) end--;

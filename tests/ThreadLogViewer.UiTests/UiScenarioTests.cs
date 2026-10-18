@@ -135,6 +135,7 @@ public sealed class UiScenarioTests(PublishedApp app)
                 return status.Contains("강조 준비 실패", StringComparison.Ordinal) &&
                        status.Contains("broken", StringComparison.Ordinal) &&
                        status.Contains("2번", StringComparison.Ordinal) &&
+                       status.Contains("2번 주황", StringComparison.Ordinal) &&
                        status.Contains("1곳", StringComparison.Ordinal) &&
                        !status.Contains("강조 준비 중", StringComparison.Ordinal);
             }, TimeSpan.FromSeconds(15), "bad rule skipped while the valid phrase stayed highlighted");

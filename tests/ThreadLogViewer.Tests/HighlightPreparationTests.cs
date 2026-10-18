@@ -72,6 +72,19 @@ public sealed class HighlightPreparationTests
     });
 
     [Fact]
+    public void SkippedNoticeFlattensMultilinePhraseAndRemovesUnpairedSurrogate()
+    {
+        const string phrase = "alpha\nbeta\ttail\uD800";
+        string notice = KeywordRefreshFailure.SkippedNotice(
+            [new KeywordRefreshFailure.SkippedRule(2, 1, phrase)],
+            highlightedPlaces: 1);
+        Assert.Contains("2번 보라 ‘alpha beta tail’", notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("\t", notice, StringComparison.Ordinal);
+        Assert.DoesNotContain("\uD800", notice, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public Task AllValidRulesHighlightWithoutAPrepareFailure() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
