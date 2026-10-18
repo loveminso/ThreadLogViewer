@@ -2,7 +2,9 @@ name: PR CI
 
 on:
   pull_request:
-    branches: [main]
+    # feature/pr-ci is included so a PR stacked on this branch runs the same job
+    # before the workflow exists on main. The job below is unchanged.
+    branches: [main, feature/pr-ci]
   workflow_dispatch:
 
 permissions:

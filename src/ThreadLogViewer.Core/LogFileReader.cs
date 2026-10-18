@@ -7,14 +7,35 @@ public static class LogFileReader
 {
     static LogFileReader() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-    public static async Task<LogData> ReadAsync(string path, EncodingMode mode = EncodingMode.Auto,
+    public static Task<LogData> ReadAsync(string path, EncodingMode mode = EncodingMode.Auto,
         CancellationToken cancellationToken = default, IProgress<WorkProgress>? progress = null)
+        => ReadSnapshotAsync(path, mode, cancellationToken, progress, null);
+
+    // Open, F5 refresh, encoding reload, and analysis restore all read the original log through here.
+    // The source fingerprint hashes decoded text already in memory and does not reopen the file.
+    // The settings store's identity check already opens the original read-only with the same share mode.
+    //
+    // FileAccess.Read keeps this handle from writing the source. FileShare.ReadWrite | FileShare.Delete
+    // lets a logger that still has the file open for append, or that renames or deletes it while rotating,
+    // avoid a sharing violation. Length is captured once, immediately after open and before any byte is read.
+    // Growth after that capture is not included. A shrink that prevents filling the captured length still
+    // fails with "읽는 도중 파일 길이가 변경되었습니다. 다시 열어 주세요."
+    // afterLengthCaptured is a synthetic-test seam so a shrink or append can run after that capture
+    // without timing. Production passes null, and the seam itself does not write the source.
+    internal static async Task<LogData> ReadSnapshotAsync(string path, EncodingMode mode,
+        CancellationToken cancellationToken, IProgress<WorkProgress>? progress,
+        Func<string, long, CancellationToken, Task>? afterLengthCaptured)
     {
         // Caller may use Task.Run to keep decoding/parsing off a UI synchronization context.
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete,
             1024 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        if (stream.Length > int.MaxValue) throw new IOException("2GB 이상의 파일을 지원하지 않습니다.");
-        byte[] bytes = new byte[(int)stream.Length];
+        long capturedLength = stream.Length;
+        if (capturedLength > int.MaxValue) throw new IOException("2GB 이상의 파일을 지원하지 않습니다.");
+        cancellationToken.ThrowIfCancellationRequested();
+        if (afterLengthCaptured is not null)
+            await afterLengthCaptured(path, capturedLength, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        byte[] bytes = new byte[(int)capturedLength];
         int read = 0;
         while (read < bytes.Length)
         {
