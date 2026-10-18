@@ -84,6 +84,15 @@ internal sealed class LogAppender : IDisposable
 
     public long Length => new FileInfo(path).Length;
 
+    private bool EndsWithNewline()
+    {
+        using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        if (stream.Length == 0)
+            return false;
+        stream.Seek(-1, SeekOrigin.End);
+        return stream.ReadByte() == '\n';
+    }
+
     public void Pause()
     {
         File.WriteAllText(pauseFile, "pause");
@@ -103,7 +112,7 @@ internal sealed class LogAppender : IDisposable
         var watch = Stopwatch.StartNew();
         while (watch.Elapsed < timeout)
         {
-            if (Length > previousLength)
+            if (Length > previousLength && EndsWithNewline())
                 return;
             if (process.HasExited)
                 throw new InvalidOperationException("Append helper exited early. " + OutputText());

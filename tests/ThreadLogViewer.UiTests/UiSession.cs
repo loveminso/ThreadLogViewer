@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Capturing;
@@ -160,39 +161,34 @@ internal sealed class UiSession : IDisposable
     public void RefreshAndWait()
     {
         FocusWindow();
-        string? beforeStatus = TryStatus();
         string? beforeCount = TryDisplayed("CountStatus");
         bool sawBusy = false;
-        for (int attempt = 1; attempt <= 2; attempt++)
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
             Keyboard.Type(VirtualKeyShort.F5);
             var watch = Stopwatch.StartNew();
-            var budget = attempt == 1 ? TimeSpan.FromSeconds(12) : TimeSpan.FromSeconds(20);
-            while (watch.Elapsed < budget)
+            while (watch.Elapsed < TimeSpan.FromSeconds(8))
             {
                 ThrowIfErrorDialog();
                 if (IsBusy())
                     sawBusy = true;
                 string? status = TryStatus();
-                if (status is null)
-                {
-                    Thread.Sleep(5);
-                    continue;
-                }
-                if (status.Contains("파일 새로 고침 실패", StringComparison.Ordinal))
+                if (status is not null && status.Contains("파일 새로 고침 실패", StringComparison.Ordinal))
                     throw new Xunit.Sdk.XunitException("Refresh failed. " + Describe());
                 string? count = TryDisplayed("CountStatus");
-                bool finished = status.Contains("파일 새로 고침 완료", StringComparison.Ordinal) && !IsBusy();
-                bool statusChanged = beforeStatus is not null && status != beforeStatus;
+                bool finished = status is not null && status.Contains("파일 새로 고침 완료", StringComparison.Ordinal) && !IsBusy();
                 bool countChanged = count is not null && beforeCount is not null && count != beforeCount;
-                if (finished && (sawBusy || statusChanged || countChanged))
+                // The success sentence is identical on every F5, and a tiny file can leave the
+                // progress strip before the next poll. A changed count or a seen progress strip
+                // is what shows this key was handled.
+                if (finished && (sawBusy || countChanged))
                 {
-                    Step("refresh completed");
+                    Step("refresh completed count='" + count + "'");
                     return;
                 }
-                Thread.Sleep(5);
+                Thread.Sleep(40);
             }
-            Step("refresh attempt " + attempt + " sawBusy=" + sawBusy);
+            Step("refresh attempt " + attempt + " sawBusy=" + sawBusy + " count='" + TryDisplayed("CountStatus") + "'");
         }
         throw new Xunit.Sdk.XunitException("Refresh did not finish. sawBusy=" + sawBusy + " " + Describe());
     }
@@ -248,8 +244,9 @@ internal sealed class UiSession : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         var export = Require("ExportButton").AsButton();
         WaitUntil(() => export.IsEnabled && !IsBusy(), TimeSpan.FromSeconds(15), "export button stayed disabled");
-        export.Invoke();
-        var dialog = WaitForTopLevel(window => (window.Title ?? "").Contains("내보내기", StringComparison.Ordinal), TimeSpan.FromSeconds(15), "export dialog");
+        PlaceOnScreen();
+        export.Click();
+        var dialog = WaitForExportDialog(export);
         Step("export dialog " + dialog.Title);
         dialog.Focus();
         SetDialogFileName(dialog, destination);
@@ -434,29 +431,73 @@ internal sealed class UiSession : IDisposable
         return null;
     }
 
-    private Window WaitForTopLevel(Func<Window, bool> match, TimeSpan timeout, string description)
+    private Window WaitForExportDialog(FlaUI.Core.AutomationElements.Button export)
     {
         var watch = Stopwatch.StartNew();
-        while (watch.Elapsed < timeout)
+        var seen = new List<string>();
+        bool invoked = false;
+        while (watch.Elapsed < TimeSpan.FromSeconds(15))
         {
-            Window[] windows;
-            try { windows = App.GetAllTopLevelWindows(Automation); }
-            catch (Exception ex) when (ex is InvalidOperationException or COMException)
+            if (!invoked && watch.Elapsed > TimeSpan.FromSeconds(2))
             {
-                windows = [];
-            }
-            foreach (var window in windows)
-            {
-                try
+                invoked = true;
+                try { export.Invoke(); }
+                catch (Exception ex) when (ex is InvalidOperationException or COMException)
                 {
-                    if (match(window))
-                        return window;
+                    Step("export invoke failed " + ex.GetType().Name);
                 }
+            }
+            IntPtr hwnd = FindProcessWindow(title => title.Contains("내보내기", StringComparison.Ordinal), seen);
+            if (hwnd != IntPtr.Zero)
+            {
+                var element = Automation.FromHandle(hwnd);
+                return element.AsWindow();
+            }
+            foreach (var window in SafeTopLevelWindows())
+            {
+                string title = "";
+                try { title = window.Title ?? ""; }
                 catch (COMException) { }
+                if (title.Length > 0 && !seen.Contains(title))
+                    seen.Add(title);
+                if (title.Contains("내보내기", StringComparison.Ordinal))
+                    return window;
             }
             Thread.Sleep(80);
         }
-        throw new Xunit.Sdk.XunitException(description + " did not appear. " + Describe());
+        throw new Xunit.Sdk.XunitException("export dialog did not appear. windows=[" + string.Join(" | ", seen) + "] " + Describe());
+    }
+
+    private Window[] SafeTopLevelWindows()
+    {
+        try { return App.GetAllTopLevelWindows(Automation); }
+        catch (Exception ex) when (ex is InvalidOperationException or COMException) { return []; }
+    }
+
+    private IntPtr FindProcessWindow(Func<string, bool> match, List<string> seen)
+    {
+        IntPtr found = IntPtr.Zero;
+        EnumWindows((hwnd, _) =>
+        {
+            if (!IsWindowVisible(hwnd))
+                return true;
+            GetWindowThreadProcessId(hwnd, out uint pid);
+            bool ours = pid == (uint)App.ProcessId;
+            var buffer = new StringBuilder(512);
+            GetWindowText(hwnd, buffer, buffer.Capacity);
+            string title = buffer.ToString();
+            if (!ours && !title.Contains("내보내기", StringComparison.Ordinal))
+                return true;
+            if (title.Length > 0 && !seen.Contains(title))
+                seen.Add(title);
+            if (match(title))
+            {
+                found = hwnd;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
     }
 
     private static void SetDialogFileName(Window dialog, string destination)
@@ -503,23 +544,46 @@ internal sealed class UiSession : IDisposable
 
     private static string ReadDisplayedText(AutomationElement element)
     {
+        // TextBlocks expose their text as the UIA Name. HelpText is the tooltip, and several
+        // status labels use a tooltip that is not the label (the count tooltip is the operation
+        // status, and the position tooltip is a column-count note).
+        string name = (element.Name ?? "").Trim();
+        if (name.Length > 0 && !IsAccessibleAlias(name))
+            return name;
         if (element.Patterns.Text.TryGetPattern(out var text))
         {
             try
             {
                 string value = text.DocumentRange.GetText(16_384) ?? "";
-                if (value.Length > 0)
+                if (value.Length > 0 && !IsAccessibleAlias(value.Trim()))
                     return value.Trim();
             }
             catch (Exception ex) when (ex is COMException or InvalidOperationException or ArgumentException)
             {
             }
         }
-        string help = element.HelpText ?? "";
-        if (help.Length > 0 && help != "최근 작업 안내")
-            return help.Trim();
-        return (element.Name ?? "").Trim();
+        string help = (element.HelpText ?? "").Trim();
+        if (help.Length > 0 && !IsAccessibleAlias(help))
+            return help;
+        return name;
     }
+
+    private static bool IsAccessibleAlias(string value) =>
+        value is "최근 작업 안내" or "현재 표시 중인 로그 검색" or "필터 결과 내보내기";
+
+    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hwnd, StringBuilder buffer, int length);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);

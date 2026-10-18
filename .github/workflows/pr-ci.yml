@@ -117,10 +117,14 @@ jobs:
             [xml]$trx = Get-Content -LiteralPath $file.FullName -Raw
             $counter = $trx.SelectSingleNode("//*[local-name()='ResultSummary']/*[local-name()='Counters']")
             if ($null -eq $counter) { throw "Test result counters are missing in $($file.Name)." }
-            $total += Read-Counter $counter 'total'
+            $fileTotal = Read-Counter $counter 'total'
+            $fileExecuted = Read-Counter $counter 'executed'
+            $fileSkipped = Read-Counter $counter 'notExecuted'
+            if ($fileSkipped -eq 0 -and $fileExecuted -gt 0 -and $fileTotal -gt $fileExecuted) { $fileSkipped = $fileTotal - $fileExecuted }
+            $total += $fileTotal
             $passed += Read-Counter $counter 'passed'
             $failed += Read-Counter $counter 'failed'
-            $skipped += Read-Counter $counter 'notExecuted'
+            $skipped += $fileSkipped
             foreach ($node in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
               $outcome = $node.GetAttribute('outcome')
               if ($outcome -eq 'Failed') { $failedNames.Add($node.GetAttribute('testName')) }

@@ -183,13 +183,12 @@ public sealed class UiScenarioTests(PublishedApp app)
                 }
                 for (int iteration = 1; iteration <= 20; iteration++)
                 {
+                    long length = appender.Length;
                     if (pauseDuringRefresh)
-                    {
-                        long length = appender.Length;
                         appender.Resume();
-                        appender.WaitForGrowth(length, TimeSpan.FromSeconds(10));
+                    appender.WaitForGrowth(length, TimeSpan.FromSeconds(10));
+                    if (pauseDuringRefresh)
                         appender.Pause();
-                    }
                     session.RefreshAndWait();
                     session.Step(kind + " F5 " + iteration);
                 }
@@ -236,9 +235,8 @@ public sealed class UiScenarioTests(PublishedApp app)
         Assert.DoesNotContain("결과 없음", status, StringComparison.Ordinal);
     }
 
-    private void Run(string? argument, TimeSpan timeout, Action<UiSession> body)
+    private void Run(string? argument, TimeSpan timeout, Action<UiSession> body, [System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
-        string name = CallerName();
         UiSta.Run(() =>
         {
             using var session = UiSession.Launch(app.ExePath, argument, app.ScreenshotDirectory, name);
@@ -279,8 +277,6 @@ public sealed class UiScenarioTests(PublishedApp app)
             throw new Xunit.Sdk.XunitException("No selected search result. " + session.Describe());
         return text;
     }
-
-    private static string CallerName([System.Runtime.CompilerServices.CallerMemberName] string name = "") => name;
 
     private static string NewFolder(string name)
     {
