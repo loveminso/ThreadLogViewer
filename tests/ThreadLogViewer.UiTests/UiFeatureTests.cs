@@ -557,7 +557,7 @@ public sealed class UiFeatureTests(PublishedApp app)
         var leaf = OpenMenuPath(session, path);
         bool check = leaf.Patterns.Toggle.TryGetPattern(out var toggle)
             ? toggle.ToggleState == ToggleState.On
-            : leaf.AsMenuItem().IsChecked;
+            : leaf.AsMenuItem().IsChecked == true;
         session.Press(VirtualKeyShort.ESCAPE);
         session.Press(VirtualKeyShort.ESCAPE);
         return check;
