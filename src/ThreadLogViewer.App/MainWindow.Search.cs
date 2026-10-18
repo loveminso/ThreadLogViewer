@@ -30,7 +30,7 @@ public partial class MainWindow
     }
     private void ShowSearch()
     {
-        SearchBar.Visibility = Visibility.Visible; SearchBox.Focus(); SearchBox.SelectAll(); _ = SearchAsync();
+        SearchBar.Visibility = Visibility.Visible; SearchBox.Focus(); SearchBox.SelectAll(); AsyncEvent.Run(SearchAsync);
     }
     private void Search_Click(object sender, RoutedEventArgs e) => ShowSearch();
     private void CloseSearch_Click(object sender, RoutedEventArgs e)

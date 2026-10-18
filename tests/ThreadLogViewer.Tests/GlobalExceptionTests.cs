@@ -67,4 +67,28 @@ public sealed class GlobalExceptionTests
         Assert.False(fatal.MarkDispatcherHandled);
         Assert.Equal(UserExceptionReport.TerminatingMessage(nameof(OutOfMemoryException)), fatal.Message);
     }
+
+    [Fact]
+    public async Task FireAndForgetFaultIsReportedAndCancellationIsIgnored()
+    {
+        var shown = new List<UserExceptionDecision>();
+        var faulted = Task.FromException(new InvalidOperationException("synthetic fire-and-forget"));
+        await AsyncEvent.Run(() => faulted, shown.Add);
+        var decision = Assert.Single(shown);
+        Assert.True(decision.ShowToUser);
+        Assert.Equal(
+            "예상하지 못한 오류가 발생했습니다 (InvalidOperationException). 이 창을 닫으면 앱은 계속 실행됩니다.",
+            decision.Message);
+        Assert.Equal(nameof(InvalidOperationException), decision.ExceptionType);
+        Assert.DoesNotContain("synthetic", decision.Message);
+
+        shown.Clear();
+        var cancelled = Task.FromException(new OperationCanceledException());
+        await AsyncEvent.Run(() => cancelled, shown.Add);
+        Assert.Empty(shown);
+
+        var taskCancelled = Task.FromException(new TaskCanceledException());
+        await AsyncEvent.Run(() => taskCancelled, shown.Add);
+        Assert.Empty(shown);
+    }
 }

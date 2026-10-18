@@ -43,7 +43,7 @@ public partial class MainWindow
         {
             foreach (var rule in matching)
             { rule.PropertyChanged -= Keyword_Changed; keywordRules.Remove(rule); }
-            _ = RefreshKeywordsAsync();
+            AsyncEvent.Run(RefreshKeywordsAsync);
             OperationStatus.Text = $"문구 강조를 해제했습니다. · {keywordRules.Count}/8개";
             return true;
         }
@@ -55,7 +55,7 @@ public partial class MainWindow
         var added = new KeywordRuleItem(phrase, colorIndex);
         added.PropertyChanged += Keyword_Changed;
         keywordRules.Add(added);
-        _ = RefreshKeywordsAsync();
+        AsyncEvent.Run(RefreshKeywordsAsync);
         OperationStatus.Text = $"문구 강조 추가 · {QuickHighlightColorNames[colorIndex]} · {keywordRules.Count}/8개 · 같은 문구에서 Shift+F8로 해제";
         return true;
     }

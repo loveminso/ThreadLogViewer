@@ -91,11 +91,11 @@ public partial class MainWindow
         if (HighlightPrompt.PhraseError(KeywordBox.Text) is { } error) { KeywordStatus.Text = OperationStatus.Text = error; return; }
         if (keywordRules.Count >= HighlightPrompt.MaximumRules) { KeywordStatus.Text = OperationStatus.Text = "강조 규칙은 최대 8개입니다. ‘강조 문구 관리’에서 기존 문구를 수정하거나 삭제하세요. 사용을 끄는 것만으로는 빈자리가 생기지 않습니다."; return; }
         var rule = new KeywordRuleItem(KeywordBox.Text, Math.Clamp(KeywordColorBox.SelectedIndex, 0, 5));
-        rule.PropertyChanged += Keyword_Changed; keywordRules.Add(rule); KeywordBox.Clear(); _ = RefreshKeywordsAsync();
+        rule.PropertyChanged += Keyword_Changed; keywordRules.Add(rule); KeywordBox.Clear(); AsyncEvent.Run(RefreshKeywordsAsync);
     }
     private void RemoveKeyword_Click(object sender, RoutedEventArgs e)
-    { if ((sender as Button)?.Tag is KeywordRuleItem rule) { rule.PropertyChanged -= Keyword_Changed; keywordRules.Remove(rule); _ = RefreshKeywordsAsync(); } }
-    private void Keyword_Changed(object? sender, PropertyChangedEventArgs e) => _ = RefreshKeywordsAsync();
+    { if ((sender as Button)?.Tag is KeywordRuleItem rule) { rule.PropertyChanged -= Keyword_Changed; keywordRules.Remove(rule); AsyncEvent.Run(RefreshKeywordsAsync); } }
+    private void Keyword_Changed(object? sender, PropertyChangedEventArgs e) => AsyncEvent.Run(RefreshKeywordsAsync);
     private async Task RefreshKeywordsAsync()
     {
         if (!viewReady) return;
@@ -104,12 +104,12 @@ public partial class MainWindow
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         UpdateAnalysisInputState();
         if (captured is null || keywordRules.Count == 0) { KeywordStatus.Text = $"{keywordRules.Count}/8 규칙"; return; }
-        var rules = keywordRules.Where(r => r.Enabled).Select(r => (r.Keyword, r.ColorIndex)).ToArray();
-        var scope = ActiveScope;
-        IReadOnlyList<SourceTextRange>? ranges = scope is null ? null : [LogSlice.GetTextRange(captured.Source, scope)];
         KeywordStatus.Text = KeywordRefreshFailure.Preparing;
         try
         {
+            var rules = keywordRules.Where(r => r.Enabled).Select(r => (r.Keyword, r.ColorIndex)).ToArray();
+            var scope = ActiveScope;
+            IReadOnlyList<SourceTextRange>? ranges = scope is null ? null : [LogSlice.GetTextRange(captured.Source, scope)];
             var result = await Task.Run(() =>
             {
                 var spans = new List<HighlightSpan>(); bool limited = false;

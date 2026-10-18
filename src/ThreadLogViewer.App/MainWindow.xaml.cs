@@ -222,8 +222,8 @@ public partial class MainWindow : Window
         EmptyPanel.Visibility = view.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateEmptyResultState();
         UpdateBlankSessionHint();
-        _ = SearchAsync();
-        _ = RefreshKeywordsAsync();
+        AsyncEvent.Run(SearchAsync);
+        AsyncEvent.Run(RefreshKeywordsAsync);
     }
     private void RestoreFilters()
     {
