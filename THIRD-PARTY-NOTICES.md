@@ -16,4 +16,5 @@ The SDK and the xUnit / Microsoft test SDK packages are development-only and are
 | FlaUI.UIA3 5.0.0 | MIT | https://github.com/FlaUI/FlaUI |
 
 FlaUI packages are used only by `tests/ThreadLogViewer.UiTests` and are not shipped with the application.
+
 Windows system fonts are referenced by name, not redistributed.

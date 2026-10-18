@@ -31,7 +31,7 @@ CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행�
 
 ## 실제 화면과 성능
 
-열기·끌어 놓기·검색·강조·새로 고침·보내기 등 주요 GUI 시나리오는 Windows CI의 FlaUI UI 테스트(`tests/ThreadLogViewer.UiTests`, 잡당 세 회차)로 판정한다. 수동으로 남기는 것은 SmartScreen·첫 실행 보안 경고, 실제 Explorer 창에서 끌어 오는 드래그 원본, 그 밖에 자동화가 대체하지 않는 OS·배포 환경 확인이다. 합성 샘플로 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 나머지 화면·단축키를 보완 확인할 수 있다. 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
+열기·끌어 놓기·검색·새로 고침·보내기 등 주요 GUI 시나리오는 Windows CI의 FlaUI UI 테스트(`tests/ThreadLogViewer.UiTests`, 잡당 세 회차)로 판정한다. 강조 준비 실패(`Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning`)는 PR #3 이후 같은 CI로 판정한다(현재 분기에서는 Skipped). 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 합성 샘플로 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 나머지 화면·단축키를 보완 확인할 수 있다. 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
 
