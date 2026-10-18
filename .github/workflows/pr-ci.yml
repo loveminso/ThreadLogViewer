@@ -1,0 +1,128 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: '1'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Release
+        run: |
+          dotnet build ThreadLogViewer.slnx -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+      - name: Run all automated tests
+        run: |
+          dotnet test ThreadLogViewer.slnx -c Release --no-build --no-restore --logger "trx;LogFileName=tests.trx" --results-directory TestResults/pr-ci
+          if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed.' }
+
+      - name: Write test counts to the job summary
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $results = 'TestResults/pr-ci'
+          if (-not (Test-Path -LiteralPath $results)) { throw 'Test results directory was not created.' }
+          $trxFiles = @(Get-ChildItem -LiteralPath $results -Filter '*.trx' -File -Recurse)
+          if ($trxFiles.Count -lt 1) { throw 'No .trx test result was produced.' }
+          $total = 0
+          $passed = 0
+          $failed = 0
+          $failedNames = New-Object System.Collections.Generic.List[string]
+          foreach ($file in $trxFiles) {
+            [xml]$trx = Get-Content -LiteralPath $file.FullName -Raw
+            $counter = $trx.SelectSingleNode("//*[local-name()='ResultSummary']/*[local-name()='Counters']")
+            if ($null -eq $counter) { throw "Test result counters are missing in $($file.Name)." }
+            $total += [int]$counter.GetAttribute('total')
+            $passed += [int]$counter.GetAttribute('passed')
+            $failed += [int]$counter.GetAttribute('failed')
+            foreach ($node in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
+              if ($node.GetAttribute('outcome') -eq 'Failed') {
+                $failedNames.Add($node.GetAttribute('testName'))
+              }
+            }
+          }
+          $lines = @(
+            '## Automated tests'
+            ''
+            "- Passed: $passed"
+            "- Total: $total"
+            "- Failed: $failed"
+            ''
+            'Counts were parsed from the TRX ResultSummary counters.'
+          )
+          if ($failedNames.Count -gt 0) {
+            $lines += ''
+            $lines += '### Failed tests'
+            foreach ($name in $failedNames) { $lines += "- $name" }
+          }
+          $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          Write-Host "TRX passed=$passed total=$total failed=$failed files=$($trxFiles.Count)"
+          if ($total -le 0) { throw "Test total must be greater than zero. passed=$passed total=$total failed=$failed" }
+          if ($failed -ne 0) { throw "Test failures must be zero. passed=$passed total=$total failed=$failed" }
+
+      - name: Publish portable Windows x64 package
+        run: ./scripts/publish.ps1
+
+      - name: Upload test results
+        id: test-results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-test-results
+          path: TestResults/pr-ci/**/*.trx
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows x64 package
+        id: package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThreadLogViewer-win-x64
+          path: artifacts/ThreadLogViewer-win-x64/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows x64 ZIP
+        id: package-zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThreadLogViewer-win-x64-zip
+          path: artifacts/ThreadLogViewer-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Link artifacts in the job summary
+        run: |
+          @(
+            ''
+            '## Artifacts'
+            '- Test results (14 days): ${{ steps.test-results.outputs.artifact-url }}'
+            '- Windows x64 folder (14 days): ${{ steps.package.outputs.artifact-url }}'
+            '- Windows x64 ZIP (14 days): ${{ steps.package-zip.outputs.artifact-url }}'
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
