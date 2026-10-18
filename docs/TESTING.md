@@ -21,7 +21,7 @@ $env:NUGET_PACKAGES = Join-Path $PWD '.nuget\packages'
 
 ## Windows UI 자동화
 
-`tests/ThreadLogViewer.UiTests`는 FlaUI UIA3로 게시한 `ThreadLogViewer.exe`를 조작한다. 이 프로젝트는 `ThreadLogViewer.slnx`에 넣지 않는다. `dotnet test ThreadLogViewer.slnx`는 기존 단위 테스트만 실행하고, UI 테스트는 `scripts/publish.ps1` 다음에 별도 `dotnet test tests/ThreadLogViewer.UiTests/ThreadLogViewer.UiTests.csproj`로 실행한다. 솔루션에 넣으면 게시 전과 데스크톱 세션이 없는 실행이 단위 테스트 단계에 섞인다.
+개발 PC에서 UI 테스트를 실행하기 전에 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`이 없어야 한다. UI 테스트는 게시한 실행 파일을 실제 시작 경로로 띄우므로, 그 파일이 있으면 첫 화면이 그 설정을 따를 수 있다. `tests/ThreadLogViewer.UiTests`는 FlaUI UIA3로 게시한 `ThreadLogViewer.exe`를 조작한다. 이 프로젝트는 `ThreadLogViewer.slnx`에 넣지 않는다. `dotnet test ThreadLogViewer.slnx`는 기존 단위 테스트만 실행하고, UI 테스트는 `scripts/publish.ps1` 다음에 별도 `dotnet test tests/ThreadLogViewer.UiTests/ThreadLogViewer.UiTests.csproj`로 실행한다. 솔루션에 넣으면 게시 전과 데스크톱 세션이 없는 실행이 단위 테스트 단계에 섞인다.
 
 CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행하므로 테스트가 만드는 `user-data`가 업로드하는 게시 폴더에 들어가지 않는다. 샘플과 입력은 모두 합성 로그다. 같은 잡에서 UI 스위트를 세 번 연속 실행하고, 회차마다 `ui-tests-1.trx`·`ui-tests-2.trx`·`ui-tests-3.trx`와 콘솔 로그를 남긴다. 한 회차라도 실패하면 잡이 실패한다. 실패 화면은 `TestResults/ui-screenshots/iteration-N`에 저장하고, 워크플로는 그 폴더를 `ui-screenshots` 아티팩트로 올린다.
 
