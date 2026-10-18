@@ -293,12 +293,12 @@ public sealed class UiScenarioTests(PublishedApp app)
         Window? foundDialog = null;
         session.WaitUntil(() => (foundDialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(10), "highlight manager did not open");
         Window dialog = foundDialog ?? throw new Xunit.Sdk.XunitException("Highlight manager did not open.");
-        var box = dialog.FindFirstDescendant(cf => cf.ByName("새 강조 문구"))?.AsTextBox()
+        var box = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightPendingBox"))?.AsTextBox()
             ?? throw new Xunit.Sdk.XunitException("Highlight phrase box was not found.");
         const string badPhrase = "broken\uD800";
         box.Text = badPhrase;
         session.WaitUntil(() => (box.Text ?? "").Contains('\uD800'), TimeSpan.FromSeconds(5), "bad highlight phrase was not entered");
-        var add = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("추가")))?.AsButton()
+        var add = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightAddButton"))?.AsButton()
             ?? throw new Xunit.Sdk.XunitException("Highlight add button was not found.");
         session.WaitUntil(() => add.IsEnabled, TimeSpan.FromSeconds(5), "highlight add button stayed disabled");
         add.Invoke();
@@ -306,7 +306,7 @@ public sealed class UiScenarioTests(PublishedApp app)
             () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains("1/8", StringComparison.Ordinal)),
             TimeSpan.FromSeconds(5),
             "bad highlight rule was not registered");
-        var apply = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("적용")))?.AsButton()
+        var apply = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightApplyButton"))?.AsButton()
             ?? throw new Xunit.Sdk.XunitException("Highlight apply button was not found.");
         apply.Invoke();
         session.Step("applied unpaired-surrogate highlight rule");
@@ -314,14 +314,44 @@ public sealed class UiScenarioTests(PublishedApp app)
 
     private static Window? HighlightDialog(UiSession session)
     {
+        foreach (var window in OwnedWindows(session).Concat(TopLevelWindows(session)))
+        {
+            if (string.Equals(window.AutomationId, "HighlightManagerWindow", StringComparison.Ordinal) ||
+                (window.Title ?? "").Contains("강조 문구 관리", StringComparison.Ordinal))
+                return window;
+        }
+        return null;
+    }
+
+    private static IEnumerable<Window> OwnedWindows(UiSession session)
+    {
+        var windows = new List<Window>();
         try
         {
-            return session.App.GetAllTopLevelWindows(session.Automation)
-                .FirstOrDefault(window => (window.Title ?? "").Contains("강조 문구 관리", StringComparison.Ordinal));
+            windows.AddRange(session.Window.ModalWindows);
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
-            return null;
+        }
+        try
+        {
+            windows.AddRange(session.Window.FindAllChildren(cf => cf.ByControlType(ControlType.Window)).Select(element => element.AsWindow()));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+        }
+        return windows;
+    }
+
+    private static IEnumerable<Window> TopLevelWindows(UiSession session)
+    {
+        try
+        {
+            return session.App.GetAllTopLevelWindows(session.Automation);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            return [];
         }
     }
 

@@ -84,6 +84,7 @@ public static class HighlightPrompt
             MinWidth = 530, MinHeight = 390, WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ShowInTaskbar = false, ResizeMode = ResizeMode.CanResize, FontFamily = new FontFamily("Segoe UI, Malgun Gothic"), FontSize = 13
         };
+        AutomationProperties.SetAutomationId(dialog, "HighlightManagerWindow");
         dialog.SetResourceReference(Control.BackgroundProperty, "PanelBrush");
         dialog.SetResourceReference(Control.ForegroundProperty, "TextBrush");
         IReadOnlyList<HighlightRuleDraft>? result = null;
@@ -109,9 +110,11 @@ public static class HighlightPrompt
         inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var input = new TextBox { Text = editor.PendingPhrase, MinWidth = 150, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         AutomationProperties.SetName(input, "새 강조 문구");
+        AutomationProperties.SetAutomationId(input, "HighlightPendingBox");
         var color = new ComboBox { ItemsSource = ColorNames, SelectedIndex = editor.PendingColorIndex, Width = 78, Margin = new Thickness(0, 0, 8, 0) };
         AutomationProperties.SetName(color, "새 문구 강조 색상");
         var add = new Button { Content = "추가", MinWidth = 60 };
+        AutomationProperties.SetAutomationId(add, "HighlightAddButton");
         inputRow.Children.Add(input); Grid.SetColumn(color, 1); inputRow.Children.Add(color); Grid.SetColumn(add, 2); inputRow.Children.Add(add);
         Grid.SetRow(inputRow, 2); root.Children.Add(inputRow);
         var status = new TextBlock { Text = "입력칸의 문구는 ‘추가’를 눌러야 등록됩니다. ‘적용’은 등록된 규칙만 반영합니다.", Margin = new Thickness(0, 8, 0, 10), TextWrapping = TextWrapping.Wrap };
@@ -163,6 +166,7 @@ public static class HighlightPrompt
         color.SelectionChanged += (_, _) => editor.PendingColorIndex = color.SelectedIndex;
         var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var accept = new Button { Content = "적용", IsDefault = true, MinWidth = 78 };
+        AutomationProperties.SetAutomationId(accept, "HighlightApplyButton");
         var reject = new Button { Content = "취소", IsCancel = true, MinWidth = 78, Margin = new Thickness(8, 0, 0, 0) };
         accept.Click += (_, _) => { if (editor.TryApply(out var applied, out string message)) apply(applied); else status.Text = message; };
         reject.Click += (_, _) => cancel();
