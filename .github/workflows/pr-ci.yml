@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
@@ -39,7 +41,7 @@ jobs:
 
       - name: Run all automated tests
         run: |
-          dotnet test ThreadLogViewer.slnx -c Release --no-build --no-restore --logger "trx;LogFileName=tests.trx" --results-directory TestResults/pr-ci
+          dotnet test ThreadLogViewer.slnx -c Release --no-build --no-restore --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory TestResults/pr-ci
           if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed.' }
 
       - name: Write test counts to the job summary
@@ -113,7 +115,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ThreadLogViewer-win-x64-zip
-          path: artifacts/ThreadLogViewer-win-x64.zip
+          path: artifacts/ThreadLogViewer-win-x64/
           if-no-files-found: error
           retention-days: 14
 
