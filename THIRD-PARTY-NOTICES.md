@@ -9,4 +9,12 @@ The Windows x64 folder distribution includes these components. Full license text
 | Microsoft WPF / Windows Desktop runtime | MIT and third-party notices | https://github.com/dotnet/wpf |
 
 The SDK and the xUnit / Microsoft test SDK packages are development-only and are not shipped with the application.
+
+| Component | License | Upstream |
+| --- | --- | --- |
+| FlaUI.Core 5.0.0 | MIT | https://github.com/FlaUI/FlaUI |
+| FlaUI.UIA3 5.0.0 | MIT | https://github.com/FlaUI/FlaUI |
+
+FlaUI packages are used only by `tests/ThreadLogViewer.UiTests` and are not shipped with the application.
+
 Windows system fonts are referenced by name, not redistributed.
