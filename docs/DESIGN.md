@@ -31,7 +31,7 @@ Windows x64용 읽기 전용 로그 뷰어다. UI는 `src/ThreadLogViewer.App`, 
 
 ### 파일 열기
 
-명령줄, 파일 대화상자, 끌어 놓기, 클립보드 파일은 `MainWindow.LoadIntoSessionAsync`로 모인다 (`src/ThreadLogViewer.App/MainWindow.xaml.cs`). 같은 경로의 전체 파일 탭이 있으면 그 탭으로 옮긴다. 빈 탭이면 그 탭을 채운다. 읽기·파싱·투영·AvalonEdit 문서 생성은 `Task.Run` 안에서 한다. `LogFileReader.ReadAsync`가 스냅샷을 읽고 `LogParser.Parse`로 `LogData`를 만든다. 이어서 `LogProjection.Create`와 `CancellableDocumentFactory.Create`가 표시 문자열과 문서를 만든다. 최신 세대만 `PublishView`로 에디터에 올린다.
+명령줄, 파일 대화상자, 끌어 놓기, 클립보드 파일은 `MainWindow.LoadIntoSessionAsync`로 모인다 (`src/ThreadLogViewer.App/MainWindow.xaml.cs`). 경로로 여는 경우 `OpenAsync`가 먼저 같은 경로의 전체 파일 탭을 찾고, 자동 인코딩이면 그 탭으로 옮긴다. 인코딩을 지정해 다시 열면 그 탭을 다시 읽는다. 빈 탭이면 그 탭을 채운다. 읽기·파싱·투영·AvalonEdit 문서 생성은 `Task.Run` 안에서 한다. `LogFileReader.ReadAsync`가 스냅샷을 읽고 `LogParser.Parse`로 `LogData`를 만든다. 이어서 `LogProjection.Create`와 `CancellableDocumentFactory.Create`가 표시 문자열과 문서를 만든다. 최신 세대만 `PublishView`로 에디터에 올린다.
 
 붙여넣은 텍스트는 파일 경로가 없다. `LogParser.ParsePastedText`가 `클립보드 Unicode · 원본 인코딩 알 수 없음`으로 파싱한다.
 
@@ -51,7 +51,7 @@ BOM이 있는 UTF-8은 끝의 미완성 문자를 버리지 않는다. 이 차�
 
 ### 줄 색인
 
-`LogParser.Parse`는 물리 줄 수를 먼저 세고 `LogLine` 배열을 채운다. 줄 앞의 시간 대괄호가 기록 경계다. 한 기록은 그 헤더부터 다음 헤더 직전까지다. `LogData`는 줄 시작 오프셋 배열을 만들어 원본 오프셋과 줄 번호를 오간다. 연속 본문 줄은 파싱 실패 건수에 넣지 않는다.
+`LogParser.Parse`는 물리 줄 수를 먼저 세고 `LogLine` 배열을 채운다. 줄 앞의 시간 대괄호가 기록 경계다. 한 기록은 그 헤더부터 다음 헤더 직전까지다. 첫 헤더 앞의 줄은 줄마다 한 기록이다. `LogData`는 줄 시작 오프셋 배열을 만들어 원본 오프셋과 줄 번호를 오간다. 연속 본문 줄은 파싱 실패 건수에 넣지 않는다.
 
 ### 쓰는 중인 파일과 F5
 
@@ -73,7 +73,7 @@ F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`�
 
 ### 주변 로그
 
-우클릭이나 숨긴 줄에서 `ShowContextAsync`가 호출된다 (`src/ThreadLogViewer.App/MainWindow.Navigation.cs`). 반경은 0~10,000 기록이고 기본 입력은 20이다. 백그라운드에서 `LogContext.Create`가 기준 기록의 앞뒤 기록을 모든 스레드에서 원본 순서로 모은다 (`src/ThreadLogViewer.Core/LogContext.cs`). 보는 동안 스레드·내용 필터는 잠그고, `기존 필터로 돌아가기`는 저장해 둔 필터와 위치로 `FilterAsync`를 다시 호출한다.
+분석 메뉴·우클릭 메뉴·주변 로그 패널의 버튼과, 숨긴 줄로 가는 검색·이동·이력에서 `ShowContextAsync`가 호출된다 (`src/ThreadLogViewer.App/MainWindow.Navigation.cs`). 반경은 0~10,000 기록이고 기본 입력은 20이다. 백그라운드에서 `LogContext.Create`가 기준 기록의 앞뒤 기록을 모든 스레드에서 원본 순서로 모은다 (`src/ThreadLogViewer.Core/LogContext.cs`). 보는 동안 스레드·내용 필터는 잠그고, `기존 필터로 돌아가기`는 저장해 둔 필터와 위치로 `FilterAsync`를 다시 호출한다.
 
 ### 시간 차이
 
@@ -170,4 +170,4 @@ UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다
 - [검증 안내](TESTING.md)의 판정 범위와 회차 건수.
 - 이 문서에서 경로, 형식 이름, 데이터 흐름이 바뀐 절.
 
-UI 건수는 `.github/workflows/pr-ci.yml` 환경 변수 네 개다. `Assert-UiTrxCounts`가 회차마다 TRX의 passed, skipped, total, failed를 그 변수와 비교한다. skipped는 `notExecuted`다. 그 값이 비었거나 0이고, `executed > 0`이며 `total > executed`이면 skipped는 total − executed다. 하나라도 다르면 그 단계에서 예외가 나고 잡이 실패한다. `dotnet test` 종료 코드가 0이어도 같다. 시나리오를 추가하면 `$required`에 메서드 이름을 넣고 `UI_TEST_EXPECTED_TOTAL`과 passed 또는 skipped를 같이 올린다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 다시 실행하면 skipped는 0, passed는 14, total은 14, failed는 0이어야 한다. 변수, `$required`, [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 표를 같은 변경에서 맞춘다.
+UI 건수는 `.github/workflows/pr-ci.yml` 환경 변수 네 개다. `Assert-UiTrxCounts`가 회차마다 TRX의 passed, skipped, total, failed를 그 변수와 비교한다. skipped는 `Read-UiTrxStats`가 `notExecuted`로 읽고, 그 값이 비었거나 0이고, `executed > 0`이며 `total > executed`이면 skipped는 total − executed다. 하나라도 다르면 세 회차를 모두 돈 뒤 UI 테스트 단계가 실패하고 잡이 실패한다. `dotnet test` 종료 코드가 0이어도 같다. 시나리오를 추가하면 `$required`에 메서드 이름을 넣고 `UI_TEST_EXPECTED_TOTAL`과 passed 또는 skipped를 같이 올린다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 다시 실행하면 skipped는 0, passed는 14, total은 14, failed는 0이어야 한다. 변수, `$required`, [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 표를 같은 변경에서 맞춘다.
