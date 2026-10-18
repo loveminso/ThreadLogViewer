@@ -70,6 +70,7 @@ public static class HighlightPrompt
 {
     public const int MaximumRules = 8, MaximumPhraseLength = 4096;
     private static readonly string[] ColorNames = ["주황", "보라", "청록", "파랑", "분홍", "초록"];
+    public static string ColorName(int colorIndex) => (uint)colorIndex < (uint)ColorNames.Length ? ColorNames[colorIndex] : "";
     public static string? PhraseError(string? phrase) => string.IsNullOrWhiteSpace(phrase) ? "강조할 문구를 입력하세요. 공백만으로는 등록할 수 없습니다." :
         phrase.Length > MaximumPhraseLength ? "강조할 문구는 4,096자 이내로 입력하세요." : null;
     public static bool IsValid(IReadOnlyList<HighlightRuleDraft> rules) => rules.Count <= MaximumRules &&

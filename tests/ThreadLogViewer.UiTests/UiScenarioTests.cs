@@ -114,20 +114,37 @@ public sealed class UiScenarioTests(PublishedApp app)
     {
         string folder = NewFolder("highlight");
         string log = Path.Combine(folder, "highlight.log");
-        SyntheticLog.Write(log, LogEncodingKind.Utf8, SyntheticLog.Line(1, 1, "synthetic highlight"));
-        Run(log, TimeSpan.FromMinutes(2), session =>
+        SyntheticLog.Write(log, LogEncodingKind.Utf8, SyntheticLog.Line(1, 1, "synthetic highlight keep-phrase"));
+        string hash = Hash(log);
+        Run(log, TimeSpan.FromMinutes(3), session =>
         {
             session.WaitForOpen("highlight.log");
-            AddUnpreparedHighlightRule(session);
-            session.WaitUntil(
-                () => session.Status().Contains("강조 준비 실패", StringComparison.Ordinal),
-                TimeSpan.FromSeconds(15),
-                "highlight preparation failure");
+            UiFeatureTests.SelectSearch(session, "keep-phrase");
+            UiFeatureTests.ToggleHighlight(session);
+            session.WaitUntil(() =>
+            {
+                string status = session.Status();
+                return status.Contains("문구 강조 추가", StringComparison.Ordinal) &&
+                       status.Contains("1/8", StringComparison.Ordinal) &&
+                       !status.Contains("강조 준비 실패", StringComparison.Ordinal);
+            }, TimeSpan.FromSeconds(15), "valid highlight was not applied");
+            AddUnpreparedHighlightRule(session, expectedCount: 2);
+            session.WaitUntil(() =>
+            {
+                string status = session.Status();
+                return status.Contains("강조 준비 실패", StringComparison.Ordinal) &&
+                       status.Contains("broken", StringComparison.Ordinal) &&
+                       status.Contains("2번", StringComparison.Ordinal) &&
+                       status.Contains("1곳", StringComparison.Ordinal) &&
+                       !status.Contains("강조 준비 중", StringComparison.Ordinal);
+            }, TimeSpan.FromSeconds(15), "bad rule skipped while the valid phrase stayed highlighted");
             Assert.False(session.App.HasExited);
             Assert.Contains("ThreadLog Viewer", session.Window.Title, StringComparison.Ordinal);
             Assert.Contains("highlight.log", session.Text("FileLabel"), StringComparison.Ordinal);
-            Assert.DoesNotContain("강조 준비 중", session.Status(), StringComparison.Ordinal);
+            Assert.DoesNotContain("\uD800", session.Status(), StringComparison.Ordinal);
+            UiFeatureTests.AssertRegisteredPhrase(session, "keep-phrase");
         });
+        Assert.Equal(hash, Hash(log));
     }
 
     [Fact]
@@ -265,7 +282,7 @@ public sealed class UiScenarioTests(PublishedApp app)
         }, timeout);
     }
 
-    private static void AddUnpreparedHighlightRule(UiSession session)
+    private static void AddUnpreparedHighlightRule(UiSession session, int expectedCount = 1)
     {
         session.FocusWindow();
         var menus = session.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem));
@@ -302,8 +319,9 @@ public sealed class UiScenarioTests(PublishedApp app)
             ?? throw new Xunit.Sdk.XunitException("Highlight add button was not found.");
         session.WaitUntil(() => add.IsEnabled, TimeSpan.FromSeconds(5), "highlight add button stayed disabled");
         add.Invoke();
+        string registered = expectedCount + "/8";
         session.WaitUntil(
-            () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains("1/8", StringComparison.Ordinal)),
+            () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains(registered, StringComparison.Ordinal)),
             TimeSpan.FromSeconds(5),
             "bad highlight rule was not registered");
         var apply = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightApplyButton"))?.AsButton()

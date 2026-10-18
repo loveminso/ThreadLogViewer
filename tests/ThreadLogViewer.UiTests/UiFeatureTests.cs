@@ -466,7 +466,7 @@ public sealed class UiFeatureTests(PublishedApp app)
         apply.Invoke();
     }
 
-    private static void SelectSearch(UiSession session, string query)
+    internal static void SelectSearch(UiSession session, string query)
     {
         session.ShowSearch();
         session.SetSearchQuery(query);
@@ -475,14 +475,14 @@ public sealed class UiFeatureTests(PublishedApp app)
         session.WaitForSearchStatus(status => status.Contains(" / ", StringComparison.Ordinal), "selected " + query);
     }
 
-    private static void ToggleHighlight(UiSession session)
+    internal static void ToggleHighlight(UiSession session)
     {
         session.FocusWindow();
         Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.F8);
         Wait.UntilInputIsProcessed();
     }
 
-    private static void AssertRegisteredPhrase(UiSession session, string phrase)
+    internal static void AssertRegisteredPhrase(UiSession session, string phrase)
     {
         ClickAnalysisItem(session, "강조 문구 관리");
         Window? dialog = null;

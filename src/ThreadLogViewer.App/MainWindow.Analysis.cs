@@ -107,17 +107,28 @@ public partial class MainWindow
         KeywordStatus.Text = KeywordRefreshFailure.Preparing;
         try
         {
-            var rules = keywordRules.Where(r => r.Enabled).Select(r => (r.Keyword, r.ColorIndex)).ToArray();
+            var rules = new List<(string Keyword, int ColorIndex, int Number)>();
+            for (int i = 0; i < keywordRules.Count; i++)
+            {
+                var rule = keywordRules[i];
+                if (rule.Enabled) rules.Add((rule.Keyword, rule.ColorIndex, i + 1));
+            }
             var scope = ActiveScope;
             IReadOnlyList<SourceTextRange>? ranges = scope is null ? null : [LogSlice.GetTextRange(captured.Source, scope)];
             var result = await Task.Run(() =>
             {
-                var spans = new List<HighlightSpan>(); bool limited = false;
-                for (int ruleIndex = 0; ruleIndex < rules.Length; ruleIndex++)
+                var spans = new List<HighlightSpan>();
+                var skipped = new List<KeywordRefreshFailure.SkippedRule>();
+                bool limited = false;
+                for (int ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
                 {
                     var rule = rules[ruleIndex];
                     op.Token.ThrowIfCancellationRequested();
-                    KeywordRefreshFailure.EnsureCanPrepare(rule.Keyword);
+                    if (!KeywordRefreshFailure.CanPrepare(rule.Keyword))
+                    {
+                        skipped.Add(new(rule.Number, rule.ColorIndex, rule.Keyword));
+                        continue;
+                    }
                     var found = LogSearch.Find(captured.Source, captured.EntryIndexes, rule.Keyword, new SearchOptions(), ranges, cancellationToken: op.Token);
                     limited |= found.Limited;
                     foreach (var hit in found.Hits)
@@ -130,13 +141,25 @@ public partial class MainWindow
                     }
                     if (limited && spans.Count == LogSearch.MaxHighlights) break;
                 }
-                return (Index: new HighlightIndex(spans), Limited: limited);
+                return (Index: new HighlightIndex(spans), Limited: limited, Skipped: (IReadOnlyList<KeywordRefreshFailure.SkippedRule>)skipped);
             }, op.Token);
             if (!highlightWork.IsCurrent(op.Version) || captured != projection) return;
             keywordRenderer.RuleColors = rules.Select(r => r.ColorIndex).ToArray();
             keywordRenderer.Index = result.Index;
-            KeywordStatus.Text = $"{keywordRules.Count}/8 규칙 · {result.Index.Count:N0}곳{(result.Limited ? " (첫 100,000곳)" : "")}";
-            if (result.Limited) OperationStatus.Text = "문구 강조 제한 · 첫 100,000곳만 표시합니다. 강조 문구나 필터 범위를 좁혀 주세요.";
+            bool everyEnabledRuleSkipped = rules.Count > 0 && result.Skipped.Count == rules.Count;
+            if (everyEnabledRuleSkipped)
+                KeywordStatus.Text = KeywordRefreshFailure.FailedKeyword;
+            else
+            {
+                KeywordStatus.Text = $"{keywordRules.Count}/8 규칙 · {result.Index.Count:N0}곳{(result.Limited ? " (첫 100,000곳)" : "")}";
+                if (result.Skipped.Count > 0) KeywordStatus.Text += " · " + KeywordRefreshFailure.FailedKeyword;
+            }
+            if (result.Skipped.Count > 0)
+                OperationStatus.Text = KeywordRefreshFailure.SkippedNotice(result.Skipped, everyEnabledRuleSkipped ? 0 : result.Index.Count);
+            else if (result.Limited)
+                OperationStatus.Text = "문구 강조 제한 · 첫 100,000곳만 표시합니다. 강조 문구나 필터 범위를 좁혀 주세요.";
+            else if ((OperationStatus.Text ?? "").Contains(KeywordRefreshFailure.FailedKeyword, StringComparison.Ordinal))
+                OperationStatus.Text = $"{keywordRules.Count}/8 규칙 · {result.Index.Count:N0}곳을 표시합니다.";
             Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
         catch (Exception ex)
