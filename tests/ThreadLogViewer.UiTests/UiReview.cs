@@ -28,6 +28,7 @@ internal static class UiReview
         Console.WriteLine(displayNote);
         var shots = new List<UiReviewShot>();
         var findings = new List<UiReviewFinding>();
+        var buckets = new List<UiReviewBucket>();
         string folder = Path.Combine(Path.GetTempPath(), "tlv-ui-review-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -46,13 +47,14 @@ internal static class UiReview
                 finally
                 {
                     findings.AddRange(lint.Findings);
+                    buckets.AddRange(lint.Buckets);
                     lint.DisposeFont();
                 }
             }
         }
         finally
         {
-            UiReviewReport.Write(output, displayNote, shots, findings);
+            UiReviewReport.Write(output, displayNote, shots, findings, buckets);
             try
             {
                 if (Directory.Exists(folder))
@@ -70,7 +72,8 @@ internal static class UiReview
             if (!File.Exists(path))
                 throw new InvalidOperationException("Screenshot is missing: " + shot.File);
         }
-        Console.WriteLine($"UI review wrote {shots.Count} screenshots and {findings.Count} lint warnings.");
+        int dropped = buckets.Sum(bucket => bucket.Dropped);
+        Console.WriteLine($"UI review wrote {shots.Count} screenshots, {findings.Count} stored lint warnings, and {dropped} dropped.");
     }
 
     private static void CaptureTheme(PublishedApp app, string log, string output, int scale, string theme, UiReviewLint lint, List<UiReviewShot> shots)

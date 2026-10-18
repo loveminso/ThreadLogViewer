@@ -10,8 +10,14 @@ namespace ThreadLogViewer.UiTests;
 
 internal sealed record UiReviewFinding(string Category, string State, string Theme, string Size, int Scale, string Detail);
 
+internal sealed record UiReviewBucket(string State, string Theme, int Scale, int Stored, int Dropped)
+{
+    public bool Capped => Dropped > 0;
+}
+
 internal sealed class UiReviewLint
 {
+    internal const int FindingCap = 400;
     internal const string TruncatedText = "truncated-text";
     internal const string OutsideBounds = "outside-bounds";
     internal const string TabOrder = "tab-order";
@@ -34,6 +40,7 @@ internal sealed class UiReviewLint
     ];
 
     private readonly List<UiReviewFinding> findings = [];
+    private readonly Dictionary<BucketKey, BucketCount> buckets = [];
     private readonly Font measureFont;
 
     internal UiReviewLint(double contentScale)
@@ -44,6 +51,10 @@ internal sealed class UiReviewLint
     }
 
     internal IReadOnlyList<UiReviewFinding> Findings => findings;
+
+    internal IReadOnlyList<UiReviewBucket> Buckets => buckets.Select(pair =>
+        new UiReviewBucket(pair.Key.State, pair.Key.Theme, pair.Key.Scale, pair.Value.Stored, pair.Value.Dropped)).ToArray();
+
     internal List<string> LastTabOrder { get; } = [];
 
     public void DisposeFont() => measureFont.Dispose();
@@ -270,9 +281,27 @@ internal sealed class UiReviewLint
 
     private void Add(string category, string state, string theme, string size, int scale, string detail)
     {
-        if (findings.Count >= 400)
+        var key = new BucketKey(state, theme, scale);
+        if (!buckets.TryGetValue(key, out var count))
+        {
+            count = new BucketCount();
+            buckets[key] = count;
+        }
+        if (count.Stored >= FindingCap)
+        {
+            count.Dropped++;
             return;
+        }
+        count.Stored++;
         findings.Add(new UiReviewFinding(category, state, theme, size, scale, Clean(detail)));
+    }
+
+    private readonly record struct BucketKey(string State, string Theme, int Scale);
+
+    private sealed class BucketCount
+    {
+        public int Stored;
+        public int Dropped;
     }
 
     private static bool Is(ControlType actual, params ControlType[] types)

@@ -176,22 +176,43 @@ jobs:
           if (Test-Path -LiteralPath $lint) {
             $report = Get-Content -LiteralPath $lint -Raw -Encoding utf8 | ConvertFrom-Json
             $summary = $report.summary
-            @(
+            $lines = @(
               ''
               '## UI review'
               ''
               "Screenshots: $($report.screenshotCount)"
               ''
               'Lint warnings do not fail this job. A crash of the review step does.'
+              "Finding cap: $($report.findingCap) stored warnings per state, theme, and scale. Category counts are stored warnings. A capped bucket means the real count is higher."
               ''
-              '| Category | Warnings |'
+              '| Category | Stored warnings |'
               '| --- | ---: |'
               "| truncated-text | $($summary.truncatedText) |"
               "| outside-bounds | $($summary.outsideBounds) |"
               "| tab-order | $($summary.tabOrder) |"
               "| missing-name | $($summary.missingName) |"
-              "| total | $($summary.total) |"
-            ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+              "| stored | $($summary.stored) |"
+              "| dropped | $($summary.dropped) |"
+              ''
+              '| Scale | Stored | Dropped |'
+              '| --- | ---: | ---: |'
+            )
+            $scaleNotes = @()
+            foreach ($scale in @($report.scales)) {
+              $lines += "| $($scale.scale)% | $($scale.stored) | $($scale.dropped) |"
+              $sentence = "$($scale.scale)%: $($scale.stored)건 저장 / $($scale.dropped)건 생략"
+              if ($scale.capped) { $sentence += ', 실제 개수는 저장분보다 많음' }
+              $scaleNotes += $sentence
+            }
+            $lines += ''
+            foreach ($note in $scaleNotes) { $lines += $note }
+            $lines += ''
+            $lines += '| State | Theme | Scale | Stored | Dropped |'
+            $lines += '| --- | --- | ---: | ---: | ---: |'
+            foreach ($bucket in @($report.buckets)) {
+              $lines += "| $($bucket.state) | $($bucket.theme) | $($bucket.scale)% | $($bucket.stored) | $($bucket.dropped) |"
+            }
+            $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
           }
           elseif (-not $failed) {
             throw 'ui-lint.json was not written.'

@@ -24,30 +24,57 @@ internal static class UiReviewReport
         "The failure notice is the status-bar text that starts with 강조 준비 실패 after one broken highlight rule. " +
         "The modal exception MessageBox is shown only for an unhandled UI exception. The review does not inject one.";
 
-    internal static void Write(string directory, string displayNote, IReadOnlyList<UiReviewShot> shots, IReadOnlyList<UiReviewFinding> findings)
+    internal static void Write(string directory, string displayNote, IReadOnlyList<UiReviewShot> shots, IReadOnlyList<UiReviewFinding> findings, IReadOnlyList<UiReviewBucket> buckets)
     {
         Directory.CreateDirectory(directory);
         int truncated = findings.Count(item => item.Category == UiReviewLint.TruncatedText);
         int outside = findings.Count(item => item.Category == UiReviewLint.OutsideBounds);
         int tab = findings.Count(item => item.Category == UiReviewLint.TabOrder);
         int missing = findings.Count(item => item.Category == UiReviewLint.MissingName);
+        int stored = findings.Count;
+        int dropped = buckets.Sum(bucket => bucket.Dropped);
+        bool capped = dropped > 0;
+        var scales = buckets
+            .GroupBy(bucket => bucket.Scale)
+            .OrderBy(group => group.Key)
+            .Select(group =>
+            {
+                int scaleStored = group.Sum(bucket => bucket.Stored);
+                int scaleDropped = group.Sum(bucket => bucket.Dropped);
+                return new { scale = group.Key, stored = scaleStored, dropped = scaleDropped, capped = scaleDropped > 0 };
+            })
+            .ToArray();
         var summary = new
         {
             truncatedText = truncated,
             outsideBounds = outside,
             tabOrder = tab,
             missingName = missing,
-            total = findings.Count
+            stored,
+            dropped,
+            total = stored
         };
         var payload = new
         {
             warningsFailTheBuild = false,
             screenshotCount = shots.Count,
+            findingCap = UiReviewLint.FindingCap,
+            capped,
             scaleLimitation = ScaleLimitation,
             themes = ThemeNote,
             failureNotice = FailureNote,
             display = displayNote,
             summary,
+            scales,
+            buckets = buckets.Select(bucket => new
+            {
+                state = bucket.State,
+                theme = bucket.Theme,
+                scale = bucket.Scale,
+                stored = bucket.Stored,
+                dropped = bucket.Dropped,
+                capped = bucket.Capped
+            }),
             screenshots = shots.Select(shot => new
             {
                 file = shot.File,
@@ -73,7 +100,7 @@ internal static class UiReviewReport
         File.WriteAllText(Path.Combine(directory, "ui-lint.json"), JsonSerializer.Serialize(payload, jsonOptions), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         File.WriteAllText(Path.Combine(directory, "index.md"), IndexMarkdown(displayNote, shots), new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(directory, "index.html"), IndexHtml(shots), new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(directory, "ui-lint.md"), LintMarkdown(summary.truncatedText, summary.outsideBounds, summary.tabOrder, summary.missingName, summary.total, findings), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(directory, "ui-lint.md"), LintMarkdown(truncated, outside, tab, missing, stored, dropped, capped, scales.Select(item => (item.scale, item.stored, item.dropped, item.capped)).ToArray(), buckets, findings), new UTF8Encoding(false));
     }
 
     private static string IndexMarkdown(string displayNote, IReadOnlyList<UiReviewShot> shots)
@@ -122,7 +149,7 @@ internal static class UiReviewReport
         return builder.ToString();
     }
 
-    private static string LintMarkdown(int truncated, int outside, int tab, int missing, int total, IReadOnlyList<UiReviewFinding> findings)
+    private static string LintMarkdown(int truncated, int outside, int tab, int missing, int stored, int dropped, bool capped, (int Scale, int Stored, int Dropped, bool Capped)[] scales, IReadOnlyList<UiReviewBucket> buckets, IReadOnlyList<UiReviewFinding> findings)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# UI lint");
@@ -131,15 +158,43 @@ internal static class UiReviewReport
         builder.AppendLine();
         builder.AppendLine("Truncation is estimated from the UIA tree. UIA does not expose WPF DesiredSize. A single-line text element is reported when its name, measured with Segoe UI at the window font size times the review scale, is wider than its bounding width and the element is stretched to its parent or the excess is large. An ellipsis in the accessible name is also reported. Menu items are omitted from the unreachable-Tab check because they open with Alt and arrows. List items are omitted because the list is one tab stop.");
         builder.AppendLine();
+        builder.AppendLine($"Each state, theme, and scale stores at most {UiReviewLint.FindingCap} warnings. Both window sizes share that bucket. Category counts below are stored warnings only.");
+        builder.AppendLine();
         builder.AppendLine("## Summary");
         builder.AppendLine();
-        builder.AppendLine("| Category | Count |");
+        builder.AppendLine("| Category | Stored |");
         builder.AppendLine("| --- | ---: |");
         builder.AppendLine($"| truncated-text | {truncated} |");
         builder.AppendLine($"| outside-bounds | {outside} |");
         builder.AppendLine($"| tab-order | {tab} |");
         builder.AppendLine($"| missing-name | {missing} |");
-        builder.AppendLine($"| total | {total} |");
+        builder.AppendLine($"| stored | {stored} |");
+        builder.AppendLine($"| dropped | {dropped} |");
+        builder.AppendLine();
+        builder.AppendLine("| Scale | Stored | Dropped |");
+        builder.AppendLine("| --- | ---: | ---: |");
+        foreach (var scale in scales)
+            builder.AppendLine($"| {scale.Scale}% | {scale.Stored} | {scale.Dropped} |");
+        builder.AppendLine();
+        if (scales.Length == 0)
+            builder.AppendLine("No scale buckets.");
+        foreach (var scale in scales)
+        {
+            string line = $"{scale.Scale}%: {scale.Stored}건 저장 / {scale.Dropped}건 생략";
+            if (scale.Capped)
+                line += ", 실제 개수는 저장분보다 많음";
+            builder.AppendLine(line);
+        }
+        builder.AppendLine();
+        if (capped)
+            builder.AppendLine("At least one bucket reached the cap. The stored total is not the full warning count.");
+        builder.AppendLine();
+        builder.AppendLine("## Buckets");
+        builder.AppendLine();
+        builder.AppendLine("| State | Theme | Scale | Stored | Dropped |");
+        builder.AppendLine("| --- | --- | ---: | ---: | ---: |");
+        foreach (var bucket in buckets)
+            builder.AppendLine($"| {bucket.State} | {bucket.Theme} | {bucket.Scale}% | {bucket.Stored} | {bucket.Dropped} |");
         builder.AppendLine();
         if (findings.Count == 0)
         {
