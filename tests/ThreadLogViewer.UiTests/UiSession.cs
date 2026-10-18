@@ -162,6 +162,7 @@ internal sealed class UiSession : IDisposable
     {
         FocusWindow();
         string? beforeCount = TryDisplayed("CountStatus");
+        string? beforeStatus = TryStatus();
         bool sawBusy = false;
         for (int attempt = 1; attempt <= 3; attempt++)
         {
@@ -178,17 +179,19 @@ internal sealed class UiSession : IDisposable
                 string? count = TryDisplayed("CountStatus");
                 bool finished = status is not null && status.Contains("파일 새로 고침 완료", StringComparison.Ordinal) && !IsBusy();
                 bool countChanged = count is not null && beforeCount is not null && count != beforeCount;
-                // The success sentence is identical on every F5, and a tiny file can leave the
-                // progress strip before the next poll. A changed count or a seen progress strip
-                // is what shows this key was handled.
-                if (finished && (sawBusy || countChanged))
+                bool statusChanged = status is not null && beforeStatus is not null && status != beforeStatus;
+                // Later F5 presses reuse the same success sentence, and a tiny unchanged file
+                // neither flashes the progress strip nor changes the count. The first press is
+                // visible because the status text itself changes. Repeats still need a count
+                // change or a seen progress strip.
+                if (finished && (sawBusy || countChanged || statusChanged))
                 {
                     Step("refresh completed count='" + count + "'");
                     return;
                 }
                 Thread.Sleep(40);
             }
-            Step("refresh attempt " + attempt + " sawBusy=" + sawBusy + " count='" + TryDisplayed("CountStatus") + "'");
+            Step("refresh attempt " + attempt + " sawBusy=" + sawBusy + " count='" + TryDisplayed("CountStatus") + "' status='" + TryStatus() + "'");
         }
         throw new Xunit.Sdk.XunitException("Refresh did not finish. sawBusy=" + sawBusy + " " + Describe());
     }
@@ -250,7 +253,7 @@ internal sealed class UiSession : IDisposable
         Step("export dialog " + dialog.Title);
         dialog.Focus();
         SetDialogFileName(dialog, destination);
-        InvokeSave(dialog);
+        CommitExportDialog(dialog);
         WaitUntil(
             () => Status().Contains("내보내기 완료", StringComparison.Ordinal) && File.Exists(destination),
             TimeSpan.FromSeconds(20),
@@ -500,25 +503,101 @@ internal sealed class UiSession : IDisposable
         return found;
     }
 
-    private static void SetDialogFileName(Window dialog, string destination)
+    private void SetDialogFileName(Window dialog, string destination)
     {
+        // UIA Value.SetValue plus Button.Invoke leaves the common-item dialog's original
+        // name (Documents\<source>-filtered.log). The edit has to receive real keystrokes,
+        // and Save has to be a click or Enter so the dialog reads that edit.
         var box = dialog.FindFirstDescendant(cf => cf.ByAutomationId("FileNameControl"))
             ?? dialog.FindFirstDescendant(cf => cf.ByAutomationId("1001"))
             ?? dialog.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit)).LastOrDefault()
             ?? throw new InvalidOperationException("Export dialog has no file-name field. title=" + dialog.Title);
-        if (!box.Patterns.Value.TryGetPattern(out var value))
-            box.AsTextBox().Text = destination;
-        else
-            value.SetValue(destination);
+        var edit = box.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Edit)) ?? box;
+        if (dialog.Properties.NativeWindowHandle.IsSupported)
+            SetForegroundWindow(dialog.Properties.NativeWindowHandle.Value);
+        edit.Focus();
+        edit.Click();
+        Wait.UntilInputIsProcessed();
+        if (edit.Properties.NativeWindowHandle.IsSupported)
+            SendMessage(edit.Properties.NativeWindowHandle.Value, WmSetText, IntPtr.Zero, destination);
+        if (!FileNameMatches(edit, destination))
+        {
+            edit.Focus();
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
+            Wait.UntilInputIsProcessed();
+            Keyboard.Type(destination);
+            Wait.UntilInputIsProcessed();
+            Thread.Sleep(150);
+        }
+        string shown = ReadDialogFileName(edit);
+        Step("export name '" + shown + "'");
+        if (!FileNameMatches(edit, destination))
+            throw new Xunit.Sdk.XunitException($"Export dialog kept '{shown}' instead of '{destination}'.");
     }
 
-    private static void InvokeSave(Window dialog)
+    private static bool FileNameMatches(AutomationElement edit, string destination)
     {
+        // The dialog's default name is "<source>-filtered.log" in Documents. A bare file-name
+        // check would accept that, so the edit has to show both the destination folder and file.
+        string shown = ReadDialogFileName(edit);
+        string? folder = Path.GetFileName(Path.GetDirectoryName(destination));
+        string file = Path.GetFileName(destination);
+        return folder is { Length: > 0 }
+            && shown.Contains(folder, StringComparison.OrdinalIgnoreCase)
+            && shown.Contains(file, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadDialogFileName(AutomationElement edit)
+    {
+        try
+        {
+            if (edit.Patterns.Value.TryGetPattern(out var value))
+            {
+                string current = value.Value ?? "";
+                if (current.Length > 0)
+                    return current;
+            }
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+        }
+        return edit.Name ?? "";
+    }
+
+    private static void CommitExportDialog(Window dialog)
+    {
+        Keyboard.Type(VirtualKeyShort.RETURN);
+        Wait.UntilInputIsProcessed();
+        Thread.Sleep(200);
+        if (!DialogIsOpen(dialog))
+            return;
         var save = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))
             ?? dialog.FindFirstDescendant(cf => cf.ByName("Save"))
-            ?? dialog.FindFirstDescendant(cf => cf.ByName("저장"))
-            ?? throw new InvalidOperationException("Export dialog has no Save button. title=" + dialog.Title);
-        save.AsButton().Invoke();
+            ?? dialog.FindFirstDescendant(cf => cf.ByName("저장"));
+        if (save is null)
+            return;
+        try
+        {
+            save.AsButton().Click();
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+        }
+    }
+
+    private static bool DialogIsOpen(Window dialog)
+    {
+        try
+        {
+            if (!dialog.Properties.NativeWindowHandle.IsSupported)
+                return false;
+            IntPtr hwnd = dialog.Properties.NativeWindowHandle.Value;
+            return IsWindow(hwnd) && IsWindowVisible(hwnd);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     internal string Describe()
@@ -586,6 +665,9 @@ internal sealed class UiSession : IDisposable
     private static extern bool IsWindowVisible(IntPtr hwnd);
 
     [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
 
     [DllImport("user32.dll")]
@@ -593,4 +675,9 @@ internal sealed class UiSession : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    private const int WmSetText = 0x000C;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr hwnd, int message, IntPtr wParam, string lParam);
 }
