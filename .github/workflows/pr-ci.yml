@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-test-publish:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
@@ -39,57 +39,180 @@ jobs:
           dotnet build ThreadLogViewer.slnx -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
 
-      - name: Run all automated tests
+      - name: Run unit tests
         run: |
           dotnet test ThreadLogViewer.slnx -c Release --no-build --no-restore --logger "trx;LogFileName=tests.trx" --logger "console;verbosity=normal" --results-directory TestResults/pr-ci
-          if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed.' }
+
+      - name: Publish portable Windows x64 package
+        run: ./scripts/publish.ps1
+
+      - name: Run UI tests
+        id: ui-tests
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $exe = Join-Path (Get-Location) 'artifacts\ThreadLogViewer-win-x64\ThreadLogViewer.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Published exe was not found: $exe" }
+          $env:THREADLOGVIEWER_EXE = $exe
+          New-Item -ItemType Directory -Force -Path (Join-Path (Get-Location) 'TestResults\pr-ci') | Out-Null
+          $required = @(
+            'Scenario01_SelfContainedExeShowsMainWindow',
+            'Scenario02_OpenDropFilterAndExport',
+            'Scenario03_SearchEnterAndShiftEnterMoveSelection',
+            'Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning',
+            'Scenario05_RefreshWhileAppendingKorean',
+            'Scenario05_Utf8Bom_RefreshWhileAppending',
+            'Scenario06_OpenedLogDirectoryGainsNoFiles'
+          )
+          $iterationFailures = New-Object System.Collections.Generic.List[string]
+          foreach ($iteration in 1..3) {
+            Write-Host "=== UI test iteration $iteration/3 ==="
+            $screenshotDir = Join-Path (Get-Location) "TestResults\ui-screenshots\iteration-$iteration"
+            New-Item -ItemType Directory -Force -Path $screenshotDir | Out-Null
+            $env:UI_SCREENSHOT_DIR = $screenshotDir
+            $trxName = "ui-tests-$iteration.trx"
+            $logPath = Join-Path (Get-Location) "TestResults\pr-ci\ui-tests-$iteration.log"
+            $output = & dotnet test tests/ThreadLogViewer.UiTests/ThreadLogViewer.UiTests.csproj -c Release --logger "trx;LogFileName=$trxName" --logger "console;verbosity=normal" --results-directory TestResults/pr-ci 2>&1
+            $testExit = $LASTEXITCODE
+            $output | Out-File -LiteralPath $logPath -Encoding utf8
+            $output | ForEach-Object { Write-Host $_ }
+            $trxPath = Join-Path (Get-Location) "TestResults\pr-ci\$trxName"
+            if (-not (Test-Path -LiteralPath $trxPath)) {
+              $iterationFailures.Add("iteration $iteration did not produce $trxName (exit $testExit)")
+              continue
+            }
+            [xml]$trx = Get-Content -LiteralPath $trxPath -Raw
+            $results = @($trx.SelectNodes("//*[local-name()='UnitTestResult']"))
+            Write-Host "UI iteration $iteration results from ${trxName}:"
+            foreach ($node in $results) {
+              Write-Host ("{0} {1}" -f $node.GetAttribute('outcome'), $node.GetAttribute('testName'))
+            }
+            foreach ($name in $required) {
+              $found = $false
+              foreach ($node in $results) {
+                if ($node.GetAttribute('testName') -like "*$name*") { $found = $true; break }
+              }
+              if (-not $found) { $iterationFailures.Add("iteration ${iteration}: UI test was not recorded in ${trxName}: $name") }
+            }
+            if ($testExit -ne 0) { $iterationFailures.Add("iteration $iteration failed with exit $testExit") }
+          }
+          if ($iterationFailures.Count -gt 0) {
+            throw ("UI iterations failed: " + ($iterationFailures -join '; '))
+          }
+
+      - name: Upload UI screenshots
+        id: ui-screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: TestResults/ui-screenshots/**
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Write test counts to the job summary
         if: always()
         run: |
           $ErrorActionPreference = 'Stop'
+          function Read-Counter($counter, [string]$name) {
+            $value = $counter.GetAttribute($name)
+            if ([string]::IsNullOrEmpty($value)) { return 0 }
+            return [int]$value
+          }
+          function Read-TrxStats([string]$path) {
+            [xml]$trx = Get-Content -LiteralPath $path -Raw
+            $counter = $trx.SelectSingleNode("//*[local-name()='ResultSummary']/*[local-name()='Counters']")
+            if ($null -eq $counter) { throw "Test result counters are missing in $path." }
+            $fileTotal = Read-Counter $counter 'total'
+            $fileExecuted = Read-Counter $counter 'executed'
+            $fileSkipped = Read-Counter $counter 'notExecuted'
+            if ($fileSkipped -eq 0 -and $fileExecuted -gt 0 -and $fileTotal -gt $fileExecuted) { $fileSkipped = $fileTotal - $fileExecuted }
+            $failedNames = New-Object System.Collections.Generic.List[string]
+            $skippedNames = New-Object System.Collections.Generic.List[string]
+            foreach ($node in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
+              $outcome = $node.GetAttribute('outcome')
+              if ($outcome -eq 'Failed') { $failedNames.Add($node.GetAttribute('testName')) }
+              elseif ($outcome -eq 'NotExecuted') { $skippedNames.Add($node.GetAttribute('testName')) }
+            }
+            return [pscustomobject]@{
+              Total = $fileTotal
+              Passed = (Read-Counter $counter 'passed')
+              Failed = (Read-Counter $counter 'failed')
+              Skipped = $fileSkipped
+              FailedNames = $failedNames
+              SkippedNames = $skippedNames
+            }
+          }
           $results = 'TestResults/pr-ci'
           if (-not (Test-Path -LiteralPath $results)) { throw 'Test results directory was not created.' }
-          $trxFiles = @(Get-ChildItem -LiteralPath $results -Filter '*.trx' -File -Recurse)
-          if ($trxFiles.Count -lt 1) { throw 'No .trx test result was produced.' }
+          $unitFiles = @(Get-ChildItem -LiteralPath $results -Filter '*.trx' -File -Recurse | Where-Object { $_.Name -notmatch '^ui-tests-[123]\.trx$' })
+          if ($unitFiles.Count -lt 1) { throw 'No unit-test .trx result was produced.' }
           $total = 0
           $passed = 0
           $failed = 0
+          $skipped = 0
           $failedNames = New-Object System.Collections.Generic.List[string]
-          foreach ($file in $trxFiles) {
-            [xml]$trx = Get-Content -LiteralPath $file.FullName -Raw
-            $counter = $trx.SelectSingleNode("//*[local-name()='ResultSummary']/*[local-name()='Counters']")
-            if ($null -eq $counter) { throw "Test result counters are missing in $($file.Name)." }
-            $total += [int]$counter.GetAttribute('total')
-            $passed += [int]$counter.GetAttribute('passed')
-            $failed += [int]$counter.GetAttribute('failed')
-            foreach ($node in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
-              if ($node.GetAttribute('outcome') -eq 'Failed') {
-                $failedNames.Add($node.GetAttribute('testName'))
-              }
-            }
+          $skippedNames = New-Object System.Collections.Generic.List[string]
+          foreach ($file in $unitFiles) {
+            $stats = Read-TrxStats $file.FullName
+            $total += $stats.Total
+            $passed += $stats.Passed
+            $failed += $stats.Failed
+            $skipped += $stats.Skipped
+            foreach ($name in $stats.FailedNames) { $failedNames.Add("$($file.Name): $name") }
+            foreach ($name in $stats.SkippedNames) { $skippedNames.Add("$($file.Name): $name") }
           }
           $lines = @(
             '## Automated tests'
             ''
+            '### Unit tests'
+            ''
             "- Passed: $passed"
+            "- Skipped: $skipped"
             "- Total: $total"
             "- Failed: $failed"
             ''
-            'Counts were parsed from the TRX ResultSummary counters.'
+            "Unit counts were parsed from $($unitFiles.Count) TRX ResultSummary counters."
+            ''
+            '### UI test iterations'
+            ''
+            'Three consecutive passes are required. One failed iteration fails the job.'
+            ''
+            '| Iteration | Passed | Skipped | Failed | Total |'
+            '| --- | ---: | ---: | ---: | ---: |'
           )
+          $uiFailed = 0
+          foreach ($iteration in 1..3) {
+            $uiPath = Join-Path (Get-Location) "TestResults\pr-ci\ui-tests-$iteration.trx"
+            if (-not (Test-Path -LiteralPath $uiPath)) { throw "ui-tests-$iteration.trx was not produced." }
+            $stats = Read-TrxStats $uiPath
+            $lines += "| $iteration | $($stats.Passed) | $($stats.Skipped) | $($stats.Failed) | $($stats.Total) |"
+            Write-Host "UI iteration $iteration passed=$($stats.Passed) skipped=$($stats.Skipped) failed=$($stats.Failed) total=$($stats.Total)"
+            $uiFailed += $stats.Failed
+            if ($stats.Total -le 0) { $failedNames.Add("ui-tests-${iteration}.trx: total was 0") }
+            foreach ($name in $stats.FailedNames) { $failedNames.Add("ui-tests-${iteration}.trx: $name") }
+            foreach ($name in $stats.SkippedNames) { $skippedNames.Add("ui-tests-${iteration}.trx: $name") }
+          }
           if ($failedNames.Count -gt 0) {
             $lines += ''
             $lines += '### Failed tests'
             foreach ($name in $failedNames) { $lines += "- $name" }
           }
+          if ($skippedNames.Count -gt 0) {
+            $lines += ''
+            $lines += '### Skipped tests'
+            foreach ($name in $skippedNames) { $lines += "- $name" }
+          }
           $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
-          Write-Host "TRX passed=$passed total=$total failed=$failed files=$($trxFiles.Count)"
-          if ($total -le 0) { throw "Test total must be greater than zero. passed=$passed total=$total failed=$failed" }
-          if ($failed -ne 0) { throw "Test failures must be zero. passed=$passed total=$total failed=$failed" }
-
-      - name: Publish portable Windows x64 package
-        run: ./scripts/publish.ps1
+          Write-Host "Unit TRX passed=$passed skipped=$skipped total=$total failed=$failed files=$($unitFiles.Count); UI iteration failures=$uiFailed"
+          if ($total -le 0) { throw "Unit test total must be greater than zero. passed=$passed total=$total failed=$failed" }
+          if ($failed -ne 0 -or $uiFailed -ne 0) { throw "Test failures must be zero. unit failed=$failed UI failed=$uiFailed" }
+          foreach ($iteration in 1..3) {
+            $uiPath = Join-Path (Get-Location) "TestResults\pr-ci\ui-tests-$iteration.trx"
+            $stats = Read-TrxStats $uiPath
+            if ($stats.Total -le 0) { throw "UI iteration $iteration total must be greater than zero." }
+          }
 
       - name: Upload test results
         id: test-results
@@ -97,7 +220,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pr-test-results
-          path: TestResults/pr-ci/**/*.trx
+          path: |
+            TestResults/pr-ci/**/*.trx
+            TestResults/pr-ci/**/*.log
           if-no-files-found: error
           retention-days: 14
 
@@ -120,11 +245,13 @@ jobs:
           retention-days: 14
 
       - name: Link artifacts in the job summary
+        if: always()
         run: |
           @(
             ''
             '## Artifacts'
             '- Test results (14 days): ${{ steps.test-results.outputs.artifact-url }}'
+            '- UI screenshots on failure, one folder per iteration (14 days): ${{ steps.ui-screenshots.outputs.artifact-url }}'
             '- Windows x64 folder (14 days): ${{ steps.package.outputs.artifact-url }}'
             '- Windows x64 ZIP (14 days): ${{ steps.package-zip.outputs.artifact-url }}'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
