@@ -41,7 +41,6 @@ public sealed class UiFeatureTests(PublishedApp app)
                       session.Text("PositionStatus").Contains("원본 105줄", StringComparison.Ordinal),
                 TimeSpan.FromSeconds(10),
                 "goto 105");
-            FocusEditor(session);
             Keyboard.Type(VirtualKeyShort.UP);
             session.WaitUntil(() => session.Text("PositionStatus").Contains("원본 100줄", StringComparison.Ordinal), TimeSpan.FromSeconds(10), "line above 105");
             Keyboard.Type(VirtualKeyShort.DOWN);
@@ -93,7 +92,6 @@ public sealed class UiFeatureTests(PublishedApp app)
             Assert.Contains("원본 100줄", session.Text("PositionStatus"), StringComparison.Ordinal);
             GoTo(session, "100");
             session.WaitUntil(() => session.Text("PositionStatus").Contains("읽기 전용", StringComparison.Ordinal), TimeSpan.FromSeconds(10), "goto cleared the selection");
-            FocusEditor(session);
             Keyboard.TypeSimultaneously(VirtualKeyShort.SHIFT, VirtualKeyShort.DOWN);
             session.WaitUntil(() =>
             {
@@ -101,7 +99,6 @@ public sealed class UiFeatureTests(PublishedApp app)
                 return position.Contains("원본 105줄", StringComparison.Ordinal) && position.Contains("선택 1줄", StringComparison.Ordinal);
             }, TimeSpan.FromSeconds(10), "selection ending at the next line");
             Assert.DoesNotContain("선택 2줄", session.Text("PositionStatus"), StringComparison.Ordinal);
-            FocusEditor(session);
             Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
             session.WaitUntil(() => session.Text("PositionStatus").Contains("선택 2줄", StringComparison.Ordinal), TimeSpan.FromSeconds(10), "both displayed lines");
             Assert.DoesNotContain("6줄", session.Text("PositionStatus"), StringComparison.Ordinal);
@@ -278,20 +275,21 @@ public sealed class UiFeatureTests(PublishedApp app)
                     session.ShowSearch();
                     session.SetSearchQuery("height-token");
                     session.WaitForSearchStatus(status => status.Contains('개'), "results for the height token");
-                    session.WaitUntil(() => Height(session, "ResultsPanel") > 40, TimeSpan.FromSeconds(10), "results panel");
-                    int heightBefore = Height(session, "ResultsPanel");
+                    session.WaitUntil(() => TryHeight(session, "ResultsList", out int height) && height > 40, TimeSpan.FromSeconds(10), "results list");
+                    int heightBefore = Height(session, "ResultsList");
                     var splitter = session.Window.FindFirstDescendant(cf => cf.ByName("검색 결과 높이 조절"))
                         ?? throw new Xunit.Sdk.XunitException("Results splitter was not found. " + session.Describe());
-                    splitter.Click();
-                    splitter.Focus();
+                    var splitterRect = splitter.BoundingRectangle;
+                    Mouse.Click(new System.Drawing.Point(splitterRect.X + Math.Max(1, splitterRect.Width / 2), splitterRect.Y + Math.Max(1, splitterRect.Height / 2)));
+                    Wait.UntilInputIsProcessed();
                     for (int i = 0; i < 4; i++)
                     {
                         Keyboard.Type(VirtualKeyShort.UP);
                         Wait.UntilInputIsProcessed();
                         Thread.Sleep(60);
                     }
-                    session.WaitUntil(() => Height(session, "ResultsPanel") >= heightBefore + 20, TimeSpan.FromSeconds(10), "results height did not grow");
-                    grownHeight = Height(session, "ResultsPanel");
+                    session.WaitUntil(() => TryHeight(session, "ResultsList", out int height) && height >= heightBefore + 20, TimeSpan.FromSeconds(10), "results height did not grow");
+                    grownHeight = Height(session, "ResultsList");
                     ClickNamed(session, "검색 결과 목록 접기");
                     session.WaitUntil(() => FindNamed(session, "검색 결과 목록 펼치기") is not null, TimeSpan.FromSeconds(10), "results did not collapse");
                     Thread.Sleep(800);
@@ -327,7 +325,7 @@ public sealed class UiFeatureTests(PublishedApp app)
                     session.WaitForSearchStatus(status => status.Contains('개'), "search after restart");
                     session.WaitUntil(() => FindNamed(session, "검색 결과 목록 펼치기") is not null, TimeSpan.FromSeconds(10), "collapsed results were not restored");
                     ClickNamed(session, "검색 결과 목록 펼치기");
-                    session.WaitUntil(() => Math.Abs(Height(session, "ResultsPanel") - grownHeight) <= 24, TimeSpan.FromSeconds(10), "results height was not restored");
+                    session.WaitUntil(() => TryHeight(session, "ResultsList", out int height) && Math.Abs(height - grownHeight) <= 24, TimeSpan.FromSeconds(10), "results height was not restored");
                     Assert.Contains("settings.log", session.Text("FileLabel"), StringComparison.Ordinal);
                 }
                 catch (Exception ex)
@@ -610,14 +608,6 @@ public sealed class UiFeatureTests(PublishedApp app)
         element.AsButton().Invoke();
     }
 
-    private static void FocusEditor(UiSession session)
-    {
-        session.FocusWindow();
-        var editor = session.Require("LogEditor");
-        editor.Focus();
-        Wait.UntilInputIsProcessed();
-    }
-
     private static void DragSplitter(UiSession session, string automationId, int deltaX)
     {
         var splitter = session.Require(automationId);
@@ -643,8 +633,29 @@ public sealed class UiFeatureTests(PublishedApp app)
 
     private static int Height(UiSession session, string automationId)
     {
-        var rect = session.Require(automationId).BoundingRectangle;
-        return rect.Height;
+        if (!TryHeight(session, automationId, out int height))
+            throw new Xunit.Sdk.XunitException("Height was not available for " + automationId + " " + session.Describe());
+        return height;
+    }
+
+    private static bool TryHeight(UiSession session, string automationId, out int height)
+    {
+        height = 0;
+        var element = Find(session, automationId);
+        if (element is null)
+            return false;
+        try
+        {
+            int value = element.BoundingRectangle.Height;
+            if (value <= 0)
+                return false;
+            height = value;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            return false;
+        }
     }
 
     private static AutomationElement? Find(UiSession session, string automationId)
