@@ -157,11 +157,11 @@ public sealed class UiScenarioTests(PublishedApp app)
         Run(log, TimeSpan.FromMinutes(3), session =>
         {
             session.WaitForOpen("fit.log");
-            PlaceMainWindow(session, 1024, 768);
+            PlaceMainWindow(session);
             Window highlight = OpenHighlightManager(session);
             try
             {
-                PlaceMainWindow(session, 1024, 768);
+                PlaceMainWindow(session);
                 Thread.Sleep(300);
                 AssertInsideWorkArea(highlight, "highlight manager");
                 AssertButtonInside(highlight, "HighlightApplyButton", "적용");
@@ -377,19 +377,23 @@ public sealed class UiScenarioTests(PublishedApp app)
         return foundDialog ?? throw new Xunit.Sdk.XunitException("Highlight manager did not open.");
     }
 
-    private static void PlaceMainWindow(UiSession session, int width, int height)
+    private static void PlaceMainWindow(UiSession session)
     {
         var hwnd = session.Window.Properties.NativeWindowHandle.Value;
+        var work = UiReviewCapture.WorkArea(hwnd);
+        // The CI desktop is 1024x768 with a taskbar, so the work area is shorter than 768.
+        int width = Math.Min(1024, work.Width);
+        int height = Math.Min(768, work.Height);
         for (int attempt = 0; attempt < 8; attempt++)
         {
-            UiReviewCapture.MoveWindow(hwnd, width, height);
-            Thread.Sleep(150);
+            UiReviewCapture.MoveWindow(hwnd, work.Left, work.Top, width, height);
+            Thread.Sleep(200);
             var actual = UiReviewCapture.WindowSize(hwnd);
             if (Math.Abs(actual.Width - width) <= 24 && Math.Abs(actual.Height - height) <= 24)
                 return;
         }
         var last = UiReviewCapture.WindowSize(hwnd);
-        throw new Xunit.Sdk.XunitException($"Main window stayed {last.Width}x{last.Height} instead of {width}x{height}.");
+        throw new Xunit.Sdk.XunitException($"Main window stayed {last.Width}x{last.Height} instead of {width}x{height} inside work area {work.Width}x{work.Height}.");
     }
 
     private static void AssertInsideWorkArea(Window window, string label)

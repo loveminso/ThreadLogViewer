@@ -188,7 +188,10 @@ internal static class UiReviewCapture
     private struct NativeRect { public int Left, Top, Right, Bottom; }
 
     internal static void MoveWindow(IntPtr hwnd, int width, int height) =>
-        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height, 0x0040 | 0x0004);
+        MoveWindow(hwnd, 0, 0, width, height);
+
+    internal static void MoveWindow(IntPtr hwnd, int x, int y, int width, int height) =>
+        SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, 0x0040 | 0x0004);
 
     internal static Rectangle WorkArea(IntPtr hwnd)
     {
