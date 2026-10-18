@@ -18,9 +18,7 @@ public sealed class UiFeatureTests(PublishedApp app)
         "[014:15:50.125] [T 7] Write complete (synthetic.cpp:200)\n" +
         "[014:15:50.200] [T 3] heartbeat (synthetic.cpp:300)\n" +
         "  timeout\n" +
-        "[014:99:00] [T 11] invalid timestamp (synthetic.cpp:400)\n" +
-        "[023:59:59] [T 3] before midnight (synthetic.cpp:500)\n" +
-        "[000:00:00] [T 7] after midnight (synthetic.cpp:600)\n";
+        "[014:99:00] [T 11] invalid timestamp (synthetic.cpp:400)\n";
 
     [Fact]
     public void Scenario07_JumpToOriginalLine()
@@ -384,12 +382,8 @@ public sealed class UiFeatureTests(PublishedApp app)
                 return summary.Contains("원본 2줄", StringComparison.Ordinal) && summary.Contains("+00:00:00.000", StringComparison.Ordinal) && summary.Contains(" 0 ms", StringComparison.Ordinal);
             }, TimeSpan.FromSeconds(10), "same record is zero");
             GoTo(session, "7");
-            bool compareEnabled = AnalysisItemEnabled(session, "기준과 현재 줄 시간 차이");
-            if (compareEnabled)
-            {
-                ClickAnalysisItem(session, "기준과 현재 줄 시간 차이");
-                session.WaitUntil(() => session.Status().Contains("유효한 시간이 없습니다", StringComparison.Ordinal), TimeSpan.FromSeconds(10), "invalid timestamp warning");
-            }
+            Assert.False(AnalysisItemEnabled(session, "기준과 현재 줄 시간 차이"), "invalid timestamp must disable compare");
+            Assert.False(AnalysisItemEnabled(session, "현재 줄을 시간 비교 기준으로 지정"), "invalid timestamp must disable anchor");
             Assert.Contains("+00:00:00.000", Find(session, "TimeSummary")?.Name ?? "", StringComparison.Ordinal);
             Assert.Contains(" 0 ms", Find(session, "TimeSummary")?.Name ?? "", StringComparison.Ordinal);
         });

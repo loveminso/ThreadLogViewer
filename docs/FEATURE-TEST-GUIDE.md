@@ -2,7 +2,7 @@
 
 수정일: 2026-10-18 · 기준 버전: v0.8.2
 
-높음 후보 중 북마크를 제외한 10개가 구현되었다. 아래 절차는 조작 방법과 기대 결과를 정리한다. 기능 표의 GUI는 FlaUI UI 테스트가 판정하며, 기능과 테스트 이름 대응은 [현재 높은 우선순위 10개](#현재-높은-우선순위-10개)의 매핑 표를 따른다. 수동 확인은 SmartScreen만 남는다. 실제 Explorer 끌어 놓기는 알려진 한계다. [기본 단축키 표](SHORTCUTS.md)와 함께 사용한다. 사용자 지정 단축키는 후속 범위다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛰며, 앱의 BOM 동작은 바꾸지 않는다.
+높음 후보 중 북마크를 제외한 10개가 구현되었다. 아래 절차는 조작 방법과 기대 결과를 정리한다. 기능 표의 GUI는 아래 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정하며, 기능과 테스트 이름 대응은 [현재 높은 우선순위 10개](#현재-높은-우선순위-10개)의 매핑 표를 따른다. 수동 확인은 SmartScreen만 남는다. 실제 Explorer 끌어 놓기는 알려진 한계다. [기본 단축키 표](SHORTCUTS.md)와 함께 사용한다. 사용자 지정 단축키는 후속 범위다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛰며, 앱의 BOM 동작은 바꾸지 않는다.
 
 이번 수정의 빌드·자동 테스트·GUI·성능 여부는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md), 자동 검증 명령은 [TESTING](TESTING.md)에 기록한다. 이전 여러 줄 선택·즉시 강조는 [v0.6.2](VALIDATION-v0.6.2.md), 줄 선택은 [v0.6.1](VALIDATION-v0.6.1.md), 줄 우클릭·범위 탭·강조 창은 [v0.6.0](VALIDATION-v0.6.0.md), 메뉴·탭은 [v0.5.0](VALIDATION-v0.5.0.md), 분석 화면은 [v0.4.1](VALIDATION-v0.4.1.md), 합성 성능은 [v0.4](VALIDATION-v0.4.md)에 보존한다. 자동 WPF 테스트와 합성 콘텐츠 렌더링은 FlaUI UI 테스트·SmartScreen 수동 확인과 구분한다.
 
@@ -208,7 +208,7 @@ CRLF/LF/CR 혼합 선택, 가상 행 거절, 여백 좌표와 실제 선택 이�
 
 ## 현재 높은 우선순위 10개
 
-기능 표의 GUI는 Windows CI의 FlaUI UI 테스트(`tests/ThreadLogViewer.UiTests`, 잡당 세 회차)가 판정한다. 회차 기대 수는 통과 13, 건너뜀 1, 전체 14, 실패 0이다. 판정 범위는 게시 실행·메인 창, 명령줄 열기, OLE 끌어 놓기, 내용 포함 필터, 내보내기, 검색 입력·Enter/Shift+Enter 결과 이동, 강조 준비 실패, 올바른 문구 강조, 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치, 설정 저장, 두 기록 시간 차이, 추가 중 F5 새로 고침, 열린 로그 폴더 비변경이다. 기능과 테스트 이름 대응은 표 다음의 매핑을 따른다. 수동 확인은 SmartScreen만 남는다. 알려진 한계: 끌어 놓기는 CI에서 테스트 프로세스 OLE 드래그 소스로 검증하며 실제 Explorer 창 원본은 대체하지 않는다. 주변 보기·시간은 분석 메뉴의 현재 줄 동작으로 판정하고, 빠른 강조는 **Shift+F8**, 상세 강조 규칙은 **강조 문구 관리… 메뉴**, 필터는 왼쪽 **내용 필터**를 사용한다. 건너뛰는 UI 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending` 하나다. 이유: 수정 4. UTF-8 BOM을 확정 인코딩으로 보면 읽기 스냅샷이 문자 중간에서 끝날 때 새로 고침이 실패한다. 앱 동작은 바꾸지 않는다.
+기능 표의 GUI는 Windows CI의 FlaUI UI 테스트(`tests/ThreadLogViewer.UiTests`, 잡당 세 회차)가 판정한다. 회차 기대 수는 통과 13, 건너뜀 1, 전체 14, 실패 0이다. 판정 범위는 게시 실행·메인 창, 명령줄 열기, OLE 끌어 놓기, 내용 포함 필터, 내보내기, 검색 입력·Enter/Shift+Enter 결과 이동, 강조 준비 실패, 올바른 문구 강조, 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치, 설정 저장, 두 기록 시간 차이, 추가 중 F5 새로 고침, 열린 로그 폴더 비변경이다. 번호 4·5·7은 검색 이동·포함 필터 일부만 판정하며, 대소문자·단어·정규식 옵션, 잘못된 식 안내, 모두/하나라도 포함과 제외 조합은 UI 테스트가 없다. 번호 8·11은 우클릭 메뉴 대신 분석 메뉴로 판정한다. 번호 10의 저장 실패 동작과 번호 9의 필터 작업 중 위치 이동은 UI 테스트가 없다. 기능과 테스트 이름 대응은 표 다음의 매핑을 따른다. 수동 확인은 SmartScreen만 남는다. 알려진 한계: 끌어 놓기는 CI에서 테스트 프로세스 OLE 드래그 소스로 검증하며 실제 Explorer 창 원본은 대체하지 않는다. 주변 보기·시간은 분석 메뉴의 현재 줄 동작으로 판정하고, 빠른 강조는 **Shift+F8**, 상세 강조 규칙은 **강조 문구 관리… 메뉴**, 필터는 왼쪽 **내용 필터**를 사용한다. 건너뛰는 UI 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending` 하나다. 이유: 수정 4. UTF-8 BOM을 확정 인코딩으로 보면 읽기 스냅샷이 문자 중간에서 끝날 때 새로 고침이 실패한다. 앱 동작은 바꾸지 않는다.
 
 | 번호 | 기능 | 테스트 조작 | 정상 결과 |
 |---:|---|---|---|
@@ -227,16 +227,16 @@ CRLF/LF/CR 혼합 선택, 가상 행 거절, 여백 좌표와 실제 선택 이�
 |---:|---|---|
 | 1 | 원본 줄 이동 | `Scenario07_JumpToOriginalLine` |
 | 2 | 현재 위치와 선택 정보 | `Scenario08_PositionAndSelectionInfo` |
-| 4 | 검색 옵션 | `Scenario03_SearchEnterAndShiftEnterMoveSelection` |
+| 4 | 검색 옵션 | `Scenario03_SearchEnterAndShiftEnterMoveSelection` (일부) |
 | 5 | 검색 결과 목록 | `Scenario03_SearchEnterAndShiftEnterMoveSelection`, `Scenario12_SettingsPersistAfterRestart` |
 | 6 | 문구 강조 | `Scenario09_ValidHighlightRuleHighlightsPhrase`, `Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning` |
-| 7 | 내용 필터 | `Scenario02_OpenDropFilterAndExport`, `Scenario06_OpenedLogDirectoryGainsNoFiles`, `Scenario11_FilterKeepsOrMovesPosition` |
+| 7 | 내용 필터 | `Scenario02_OpenDropFilterAndExport`, `Scenario06_OpenedLogDirectoryGainsNoFiles`, `Scenario11_FilterKeepsOrMovesPosition` (일부) |
 | 8 | 주변 로그 | `Scenario10_SurroundingLogKeepsFilterOnReturn` |
 | 9 | 필터 후 위치 유지 | `Scenario11_FilterKeepsOrMovesPosition` |
 | 10 | 설정 저장 | `Scenario12_SettingsPersistAfterRestart` |
 | 11 | 두 기록 시간 차이 | `Scenario13_TimeDifferenceBetweenRecords` |
 
-창 실행은 `Scenario01_SelfContainedExeShowsMainWindow`, 추가 중 새로 고침은 `Scenario05_RefreshWhileAppendingKorean`이 판정한다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛴다. 자동으로 판정하지 않는 GUI는 SmartScreen과 실제 Explorer 끌어 놓기뿐이다.
+창 실행은 `Scenario01_SelfContainedExeShowsMainWindow`, 추가 중 새로 고침은 `Scenario05_RefreshWhileAppendingKorean`이 판정한다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛴다. 수동 확인은 SmartScreen만 남는다. 실제 Explorer 끌어 놓기와 위에 적은 UI 테스트 없는 항목은 알려진 한계다.
 
 숨긴 검색 결과·시간 위치는 숨김 표시가 있다. 해당 항목을 선택하면 주변 로그가 열리고, 복귀 버튼으로 기존 조건과 위치를 복원한다. 기본 주변 범위는 앞뒤 20기록이며 우클릭 메뉴에서 5/20/100기록 또는 ‘직접 지정…’의 0~10,000기록을 정한다. 분리 탭의 주변 보기·검색·내보내기는 지정 원본 범위로 잘리며 범위 밖 줄은 포함하지 않는다. 본문 우클릭의 시간 결과·텍스트 동작은 하위 메뉴에 있으며 원본 줄 이동은 바로 실행하는 항목이다.
 

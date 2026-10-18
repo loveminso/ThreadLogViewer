@@ -31,11 +31,13 @@ Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10
 
 ## 검증 상태
 
-2026-10-18 기준: `main`에 병합된 최신 코드는 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)(PR #5, [run 39129854369](https://github.com/loveminso/ThreadLogViewer/actions/runs/39129854369))에서 Release 빌드 **경고 0/오류 0**, 단위 테스트 **355/355 통과**, FlaUI UI 테스트 **3회 연속** 각 **6 통과 / 1 건너뜀 / 7 합계**를 확인했습니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`가 여전히 게시된 v0.8.1이면 테스트·ZIP 생성을 건너뜁니다. v0.8.2 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)에서 구분합니다.
+2026-10-18 기준: 미출시 변경의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml) 기준은 Release 빌드 **경고 0/오류 0**, 단위 테스트 **355/355 통과**, FlaUI UI 테스트 **3회 연속** 각 **13 통과 / 1 건너뜀 / 14 합계**입니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`가 여전히 게시된 v0.8.1이면 테스트·ZIP 생성을 건너뜁니다. v0.8.2 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)에서 구분합니다.
 
 GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)에서 Release 빌드·전체 자동 테스트·런타임과 라이선스 포함 여부·EXE/DLL 버전·ZIP의 모든 파일을 검증한 뒤 게시합니다. 릴리스 설명에 해당 빌드의 소스 커밋·테스트 결과·ZIP SHA-256을 기록하며, README 다운로드 링크로 받은 ZIP의 해시도 대조합니다. 이 자동 검증은 실제 GUI·모니터 DPI·성능 실측을 대신하지 않습니다.
 
 아래 버전별 항목은 당시의 구현·검증 기록입니다. 과거 항목에 남아 있는 북마크와 로컬 배포 경로는 현재 기능·최신 다운로드를 뜻하지 않습니다.
+
+**main(미출시)**: 기능 1·2·6·8·9·10·11의 FlaUI UI 테스트(`Scenario07`~`Scenario13`)를 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다.
 
 ## v0.8.2 — 공유 읽기·예외 안정화·UI 자동화
 
@@ -47,7 +49,7 @@ GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogVie
   - CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.
   - 강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다.
   - 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
-  - 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 `Scenario07_JumpToOriginalLine`, `Scenario08_PositionAndSelectionInfo`, `Scenario10_SurroundingLogKeepsFilterOnReturn`, `Scenario11_FilterKeepsOrMovesPosition`, `Scenario12_SettingsPersistAfterRestart`, `Scenario13_TimeDifferenceBetweenRecords`가 판정한다. 대응은 [기능 테스트 방법](docs/FEATURE-TEST-GUIDE.md) 매핑 표를 따른다.
+  - 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 UI 자동 테스트가 없습니다.
 
 v0.8.2 릴리스 검증·CI 수치·한계는 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)을 따릅니다. 공개 실행본은 위의 최신 실행 ZIP에서 받습니다.
 

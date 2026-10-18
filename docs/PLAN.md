@@ -1,5 +1,7 @@
 # 구현 범위와 후속 계획
 
+**main(미출시)**: 기능 1·2·6·8·9·10·11의 FlaUI UI 테스트(`Scenario07`~`Scenario13`)를 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다.
+
 ## v0.8.2 공유 읽기·예외·UI 자동화
 
 - 다른 프로그램이 읽기 공유를 허용한 채 열거나 쓰고 있는 로그도 열 수 있습니다(FileShare.ReadWrite·Delete). 다른 프로그램이 파일을 독점으로 열었으면 열 수 없습니다.
@@ -9,7 +11,7 @@
 - CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.
 - 강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다.
 - 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
-- 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 `Scenario07_JumpToOriginalLine`, `Scenario08_PositionAndSelectionInfo`, `Scenario10_SurroundingLogKeepsFilterOnReturn`, `Scenario11_FilterKeepsOrMovesPosition`, `Scenario12_SettingsPersistAfterRestart`, `Scenario13_TimeDifferenceBetweenRecords`가 판정한다. 대응은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md) 매핑 표를 따른다.
+- 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 UI 자동 테스트가 없습니다.
 
 ## v0.8.1 북마크 제거
 
