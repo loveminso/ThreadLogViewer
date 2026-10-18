@@ -197,7 +197,7 @@
           <TextBlock Text="최초 → 마지막 기록 · 파일 순서" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="6,12,0,0" />
           </StackPanel>
           </ScrollViewer>
-          <ListBox x:Name="ThreadList" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+          <ListBox x:Name="ThreadList" AutomationProperties.AutomationId="ThreadList" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <Border Padding="7,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
@@ -217,7 +217,7 @@
           </ListBox>
         </DockPanel>
       </Border>
-      <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}" />
+      <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}" AutomationProperties.AutomationId="PanelSplitter" />
       <Grid x:Name="LogContentGrid" Grid.Column="2">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -248,10 +248,10 @@
           <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock x:Name="ContextStatus" TextWrapping="Wrap" FontWeight="SemiBold" />
+              <TextBlock x:Name="ContextStatus" AutomationProperties.AutomationId="ContextStatus" TextWrapping="Wrap" FontWeight="SemiBold" />
               <TextBlock Text="스레드·내용 필터를 잠시 적용하지 않는 주변 보기입니다." FontSize="11" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
             </StackPanel>
-            <Button Grid.Column="1" Content="기존 필터로 돌아가기" Click="ReturnContext_Click" Margin="10,0,0,0" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="기존 필터로 돌아가기" AutomationProperties.AutomationId="ReturnContextButton" Click="ReturnContext_Click" Margin="10,0,0,0" VerticalAlignment="Center" />
           </Grid>
         </Border>
         <Border x:Name="SearchBar" Visibility="Collapsed" Padding="15,7" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
@@ -302,7 +302,7 @@
           </ContextMenu></Border.ContextMenu>
           <DockPanel>
             <Button DockPanel.Dock="Right" Content="×" Click="ClearTime_Click" ToolTip="시간 비교 해제" AutomationProperties.Name="시간 비교 해제" Padding="5,0" MinHeight="24" />
-            <TextBlock x:Name="TimeSummary" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="12" />
+            <TextBlock x:Name="TimeSummary" AutomationProperties.AutomationId="TimeSummary" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="12" />
           </DockPanel>
         </Border>
         <ScrollViewer x:Name="ToolsScroll" Visibility="{Binding Visibility, ElementName=GoToPanel, FallbackValue=Collapsed}" MaxHeight="230" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -311,10 +311,10 @@
             <DockPanel>
               <Button DockPanel.Dock="Right" Content="×" Click="CloseGoTo_Click" ToolTip="닫기 · Esc" />
               <TextBlock Text="원본 줄" VerticalAlignment="Center" Margin="0,0,8,0" />
-              <TextBox x:Name="GoToBox" Width="105" HorizontalAlignment="Left" KeyDown="GoTo_KeyDown" AutomationProperties.Name="원본 줄 번호" />
-              <Button Content="이동" Click="GoToSubmit_Click" Margin="8,0" />
-              <Button x:Name="HiddenContextButton" Content="숨긴 줄 문맥" Click="HiddenContext_Click" Visibility="Collapsed" />
-              <TextBlock x:Name="GoToStatus" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <TextBox x:Name="GoToBox" AutomationProperties.AutomationId="GoToBox" Width="105" HorizontalAlignment="Left" KeyDown="GoTo_KeyDown" AutomationProperties.Name="원본 줄 번호" />
+              <Button Content="이동" AutomationProperties.AutomationId="GoToSubmitButton" Click="GoToSubmit_Click" Margin="8,0" />
+              <Button x:Name="HiddenContextButton" AutomationProperties.AutomationId="HiddenContextButton" Content="숨긴 줄 문맥" Click="HiddenContext_Click" Visibility="Collapsed" />
+              <TextBlock x:Name="GoToStatus" AutomationProperties.AutomationId="GoToStatus" VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>
           </Border>
           <Expander x:Name="AnalysisPanel" Visibility="Collapsed" Header="로그 분석" Foreground="{DynamicResource TextBrush}" Background="{DynamicResource PanelBrush}" Padding="12,4">
@@ -365,7 +365,7 @@
                   <Button x:Name="KeywordAddButton" Grid.Row="1" Grid.Column="2" Content="강조 규칙 추가" Click="AddKeyword_Click" IsEnabled="False" />
                 </Grid>
                 <TextBlock Text="예: timeout · 입력 후 Enter 또는 강조 규칙 추가" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0" />
-                <TextBlock x:Name="KeywordStatus" FontSize="11" Text="0/8 규칙" Margin="0,6,0,0" TextWrapping="Wrap" />
+                <TextBlock x:Name="KeywordStatus" AutomationProperties.AutomationId="KeywordStatus" FontSize="11" Text="0/8 규칙" Margin="0,6,0,0" TextWrapping="Wrap" />
                 <TextBlock x:Name="KeywordEmptyHint" Text="등록한 강조 문구가 없습니다." FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,0" />
                 <ListBox x:Name="KeywordList" MaxHeight="86" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0"><ListBox.ItemTemplate><DataTemplate><DockPanel Margin="0,3">
                   <Button DockPanel.Dock="Right" Content="삭제" Tag="{Binding}" Click="RemoveKeyword_Click" FontSize="11" Padding="6,2" MinHeight="24" />
@@ -379,7 +379,7 @@
         </StackPanel>
         </StackPanel>
         </ScrollViewer>
-        <avalon:TextEditor x:Name="Editor" Grid.Row="4" PreviewMouseLeftButtonDown="Editor_LeftButtonDown" PreviewMouseRightButtonDown="Editor_RightButtonDown" PreviewMouseRightButtonUp="Editor_RightButtonUp" IsReadOnly="True" AllowDrop="True" ShowLineNumbers="False" FontFamily="Consolas, D2Coding, Malgun Gothic" FontSize="14" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,10,10,8" AutomationProperties.Name="로그 원문">
+        <avalon:TextEditor x:Name="Editor" AutomationProperties.AutomationId="LogEditor" Grid.Row="4" PreviewMouseLeftButtonDown="Editor_LeftButtonDown" PreviewMouseRightButtonDown="Editor_RightButtonDown" PreviewMouseRightButtonUp="Editor_RightButtonUp" IsReadOnly="True" AllowDrop="True" ShowLineNumbers="False" FontFamily="Consolas, D2Coding, Malgun Gothic" FontSize="14" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,10,10,8" AutomationProperties.Name="로그 원문">
           <avalon:TextEditor.ContextMenu>
             <ContextMenu x:Name="LineContextMenu" Opened="LineContext_Opened" Closed="LineContext_Closed">
               <MenuItem Header="로그의 줄을 우클릭하세요" Tag="line-title" IsEnabled="False" />
@@ -431,7 +431,7 @@
           </StackPanel>
         </ScrollViewer>
         <GridSplitter x:Name="ResultsSplitter" Grid.Row="5" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" DragIncrement="1" KeyboardIncrement="10" Focusable="True" FocusVisualStyle="{StaticResource FocusRing}" Cursor="SizeNS" Background="{DynamicResource BorderBrush}" Visibility="Collapsed" ToolTip="위아래로 끌어 검색 결과 높이 조절 · 방향키 ↑ 확대 / ↓ 축소" AutomationProperties.Name="검색 결과 높이 조절" DragStarted="ResultsSplitter_DragStarted" DragDelta="ResultsSplitter_DragDelta" DragCompleted="ResultsSplitter_DragCompleted" PreviewKeyDown="ResultsSplitter_PreviewKeyDown" />
-        <Border x:Name="ResultsPanel" Grid.Row="6" Visibility="Collapsed" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6" ClipToBounds="True">
+        <Border x:Name="ResultsPanel" AutomationProperties.AutomationId="ResultsPanel" Grid.Row="6" Visibility="Collapsed" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6" ClipToBounds="True">
           <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition x:Name="ResultsBodyRow" Height="*" /></Grid.RowDefinitions>
             <DockPanel x:Name="ResultsHeader" Margin="0,0,0,6">
