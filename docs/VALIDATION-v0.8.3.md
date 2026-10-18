@@ -9,7 +9,7 @@
 - **작은 화면**([PR #13](https://github.com/loveminso/ThreadLogViewer/pull/13)): 강조 문구 관리와 단축키 도움말 창이 메인 창 가운데에 열리고 1024×768 화면 안에 맞춥니다. 창이 좁으면 스레드 패널이 줄어들어 로그 본문이 넓어지며, 저장한 패널 너비는 유지합니다.
 - 강조 문구 관리에서 새 규칙을 추가하면 아직 쓰지 않은 색을 받습니다. 도움말 창의 텍스트를 복사할 수 있습니다.
 - 로그 본문, 보여줄 기록·숨길 기록 입력, 스레드 패널 너비 조절 분할선에 접근성 이름을 붙였습니다.
-- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7)): `Scenario07`~`Scenario13`을 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다.
+- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7)): `Scenario07`~`Scenario13`을 추가했습니다. 회차마다 14 통과 / 1 건너뜀 / 15 합계입니다.
 - **CI**([PR #10](https://github.com/loveminso/ThreadLogViewer/pull/10)): 합성 화면 갤러리와 경고만 UI 린트를 PR CI에 포함합니다.
 - **문서**([PR #9](https://github.com/loveminso/ThreadLogViewer/pull/9)): [DESIGN.md](DESIGN.md)를 추가했습니다.
 
@@ -20,9 +20,21 @@
 - 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
 - 설정 읽기·저장 실패 경로, 필터 작업 중 위치 이동, 검색 옵션 일부는 UI 자동 테스트가 없습니다.
 
-## Windows CI (v0.8.3 릴리스 준비 PR)
+## Windows CI (v0.8.3 릴리스 준비 PR #14)
 
-`main` 병합 전 v0.8.3 릴리스 준비는 PR 이벤트의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)로 검증한다. 성공 실행과 TRX 건수는 해당 PR 설명에 기록한다.
+`main` 병합 전 v0.8.3 릴리스 준비는 [PR #14](https://github.com/loveminso/ThreadLogViewer/pull/14)의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)로 검증한다.
+
+| 검증 | 결과 | 기록 |
+|---|---|---|
+| PR CI (PR #14) | 성공 | [run 39176274294](https://github.com/loveminso/ThreadLogViewer/actions/runs/39176274294) |
+| Release 빌드 | 경고 0/오류 0 | 동일 run |
+| 단위 테스트 | 381/381 통과, 실패 0, 건너뜀 0 | `tests.trx` (동일 run job summary) |
+| UI iteration 1 | 14 통과 / 1 건너뜀 / 0 실패 / 15 합계 | `ui-tests-1.trx` |
+| UI iteration 2 | 14 통과 / 1 건너뜀 / 0 실패 / 15 합계 | `ui-tests-2.trx` |
+| UI iteration 3 | 14 통과 / 1 건너뜀 / 0 실패 / 15 합계 | `ui-tests-3.trx` |
+| UI review gallery | 성공 | `ui-review-screenshots` 아티팩트 |
+
+건너뛴 1건은 `Scenario05_Utf8Bom_RefreshWhileAppending`(UTF-8 BOM + 쓰기 중 F5 한계)이다. SmartScreen·실제 모니터 DPI·새 성능 측정은 이 CI에 포함하지 않았다.
 
 ## v0.8.3 릴리스 후 Windows release
 

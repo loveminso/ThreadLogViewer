@@ -31,7 +31,7 @@ Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10
 
 ## 검증 상태
 
-2026-10-18 기준: v0.8.3 릴리스 준비 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml) 기준은 Release 빌드 **경고 0/오류 0**, 단위 테스트 **358/358 통과**, FlaUI UI 테스트 **3회 연속** 각 **13 통과 / 1 건너뜀 / 14 합계**입니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`의 버전이 이미 게시된 버전(현재 v0.8.2)이면 테스트·ZIP 생성을 건너뜁니다. v0.8.3 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.3 검증 기록](docs/VALIDATION-v0.8.3.md)에서 구분합니다.
+2026-10-18 기준: v0.8.3 릴리스 준비 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml) 기준은 Release 빌드 **경고 0/오류 0**, 단위 테스트 **381/381 통과**, FlaUI UI 테스트 **3회 연속** 각 **14 통과 / 1 건너뜀 / 15 합계**입니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`의 버전이 이미 게시된 버전(현재 v0.8.2)이면 테스트·ZIP 생성을 건너뜁니다. v0.8.3 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.3 검증 기록](docs/VALIDATION-v0.8.3.md)에서 구분합니다.
 
 GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)에서 Release 빌드·전체 자동 테스트·런타임과 라이선스 포함 여부·EXE/DLL 버전·ZIP의 모든 파일을 검증한 뒤 게시합니다. 릴리스 설명에 해당 빌드의 소스 커밋·테스트 결과·ZIP SHA-256을 기록하며, README 다운로드 링크로 받은 ZIP의 해시도 대조합니다. 이 자동 검증은 실제 GUI·모니터 DPI·성능 실측을 대신하지 않습니다.
 
@@ -44,7 +44,7 @@ GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogVie
 - **작은 화면**([PR #13](https://github.com/loveminso/ThreadLogViewer/pull/13)): 강조 문구 관리와 단축키 도움말 창이 메인 창 가운데에 열리고 1024×768 화면 안에 맞춥니다. 창이 좁으면 스레드 패널이 줄어들어 로그 본문이 넓어지며, 저장한 패널 너비는 유지합니다.
 - 강조 문구 관리에서 새 규칙을 추가하면 아직 쓰지 않은 색을 받습니다. 도움말 창의 텍스트를 복사할 수 있습니다.
 - 로그 본문, 보여줄 기록·숨길 기록 입력, 스레드 패널 너비 조절 분할선에 접근성 이름을 붙였습니다.
-- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7)): 기능 1·2·6·8·9·10·11의 `Scenario07`~`Scenario13`을 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다.
+- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7)): 기능 1·2·6·8·9·10·11의 `Scenario07`~`Scenario13`을 추가했습니다. 회차마다 14 통과 / 1 건너뜀 / 15 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다.
 - **CI**([PR #10](https://github.com/loveminso/ThreadLogViewer/pull/10)): 합성 화면 갤러리와 경고만 UI 린트를 PR CI에 포함합니다.
 - **문서**([PR #9](https://github.com/loveminso/ThreadLogViewer/pull/9)): 현재 구현 구조를 설명하는 [DESIGN.md](docs/DESIGN.md)를 추가했습니다.
 - **알려진 한계**
