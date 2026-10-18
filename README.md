@@ -31,7 +31,7 @@ Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10
 
 ## 검증 상태
 
-2026-10-18 기준: 미출시 변경의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml) 기준은 Release 빌드 **경고 0/오류 0**, 단위 테스트 **355/355 통과**, FlaUI UI 테스트 **3회 연속** 각 **13 통과 / 1 건너뜀 / 14 합계**입니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`의 버전이 이미 게시된 버전(현재 v0.8.2)이면 테스트·ZIP 생성을 건너뜁니다. v0.8.2 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)에서 구분합니다.
+2026-10-18 기준: 미출시 변경의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml) 기준은 Release 빌드 **경고 0/오류 0**, 단위 테스트 **358/358 통과**, FlaUI UI 테스트 **3회 연속** 각 **13 통과 / 1 건너뜀 / 14 합계**입니다. `main` push의 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)는 `Directory.Build.props`의 버전이 이미 게시된 버전(현재 v0.8.2)이면 테스트·ZIP 생성을 건너뜁니다. v0.8.2 새 성능 측정은 실행하지 않았습니다. 빌드·자동 테스트·FlaUI UI·합성 화면·수동 GUI·측정 성능은 [v0.8.2 검증 기록](docs/VALIDATION-v0.8.2.md)에서 구분합니다.
 
 GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogViewer/actions/workflows/windows-release.yml)에서 Release 빌드·전체 자동 테스트·런타임과 라이선스 포함 여부·EXE/DLL 버전·ZIP의 모든 파일을 검증한 뒤 게시합니다. 릴리스 설명에 해당 빌드의 소스 커밋·테스트 결과·ZIP SHA-256을 기록하며, README 다운로드 링크로 받은 ZIP의 해시도 대조합니다. 이 자동 검증은 실제 GUI·모니터 DPI·성능 실측을 대신하지 않습니다.
 

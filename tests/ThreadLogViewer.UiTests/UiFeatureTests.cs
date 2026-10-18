@@ -484,10 +484,28 @@ public sealed class UiFeatureTests(PublishedApp app)
 
     internal static void AssertRegisteredPhrase(UiSession session, string phrase)
     {
-        ClickAnalysisItem(session, "강조 문구 관리");
         Window? dialog = null;
-        session.WaitUntil(() => (dialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(10), "highlight manager");
-        var edits = dialog!.FindAllDescendants(cf => cf.ByName("등록된 강조 문구 편집"));
+        for (int attempt = 1; dialog is null && attempt <= 2; attempt++)
+        {
+            if (attempt > 1)
+            {
+                session.FocusWindow();
+                session.Press(VirtualKeyShort.ESCAPE);
+                Wait.UntilInputIsProcessed();
+                Thread.Sleep(200);
+            }
+            ClickAnalysisItem(session, "강조 문구 관리");
+            try
+            {
+                session.WaitUntil(() => (dialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(8), "highlight manager");
+            }
+            catch (Xunit.Sdk.XunitException) when (attempt == 1)
+            {
+            }
+        }
+        if (dialog is null)
+            throw new Xunit.Sdk.XunitException("highlight manager " + session.Describe());
+        var edits = dialog.FindAllDescendants(cf => cf.ByName("등록된 강조 문구 편집"));
         Assert.Contains(edits, edit => string.Equals(edit.AsTextBox().Text, phrase, StringComparison.Ordinal));
         var cancel = dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("취소")))
             ?? throw new Xunit.Sdk.XunitException("Highlight cancel was not found.");
