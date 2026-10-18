@@ -129,16 +129,6 @@ public sealed class UiScenarioTests(PublishedApp app)
         RefreshWhileAppending(LogEncodingKind.Utf8Bom, pauseDuringRefresh: false);
 
     [Fact]
-    public void Scenario99_DeliberateFailureCapturesScreenshot() =>
-        Run(null, TimeSpan.FromMinutes(2), session =>
-        {
-            Assert.Contains("ThreadLog Viewer", session.Window.Title, StringComparison.Ordinal);
-            Assert.False(session.App.HasExited);
-            throw new Xunit.Sdk.XunitException(
-                "Deliberate failure after the main window is visible, to prove the ui-screenshots artifact. Revert this test.");
-        });
-
-    [Fact]
     public void Scenario06_OpenedLogDirectoryGainsNoFiles()
     {
         string folder = NewFolder("clean");

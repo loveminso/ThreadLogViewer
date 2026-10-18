@@ -626,17 +626,52 @@ internal sealed class UiSession : IDisposable
         return edit.Name ?? "";
     }
 
-    private static void CommitExportDialog(Window dialog)
+    private void CommitExportDialog(Window dialog)
     {
-        // Enter confirms the combo's original suggestion. Click Save so the dialog reads the paste.
+        // A single click on the first AutomationId "1" can hit an inner element or an open
+        // suggestion list and leave the dialog up. Prefer the Save button, and retry with
+        // Invoke, a click, and Alt+S while it is still open.
         if (!DialogIsOpen(dialog))
             throw new Xunit.Sdk.XunitException("Export dialog closed before Save was clicked. title=" + SafeTitle(dialog));
-        var save = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))
-            ?? dialog.FindFirstDescendant(cf => cf.ByName("Save"))
-            ?? dialog.FindFirstDescendant(cf => cf.ByName("저장"))
-            ?? throw new InvalidOperationException("Export dialog has no Save button. title=" + SafeTitle(dialog));
-        save.Focus();
-        save.AsButton().Click();
+        for (int attempt = 1; attempt <= 4 && DialogIsOpen(dialog); attempt++)
+        {
+            if (dialog.Properties.NativeWindowHandle.IsSupported)
+                SetForegroundWindow(dialog.Properties.NativeWindowHandle.Value);
+            Keyboard.Type(VirtualKeyShort.TAB);
+            Wait.UntilInputIsProcessed();
+            var save = FindSaveButton(dialog);
+            if (save is not null)
+            {
+                try { save.AsButton().Invoke(); }
+                catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+                if (!DialogIsOpen(dialog))
+                    return;
+                try { save.AsButton().Click(); }
+                catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+            }
+            if (!DialogIsOpen(dialog))
+                return;
+            Keyboard.TypeSimultaneously(VirtualKeyShort.ALT, VirtualKeyShort.KEY_S);
+            Wait.UntilInputIsProcessed();
+            Thread.Sleep(300);
+            if (!DialogIsOpen(dialog) || Status().Contains("내보내기", StringComparison.Ordinal))
+                return;
+            Step("export commit attempt " + attempt + " still open");
+        }
+    }
+
+    private static AutomationElement? FindSaveButton(Window dialog)
+    {
+        try
+        {
+            return dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName("Save")))
+                ?? dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName("저장")))
+                ?? dialog.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByAutomationId("1")));
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private static string SafeTitle(Window dialog)
