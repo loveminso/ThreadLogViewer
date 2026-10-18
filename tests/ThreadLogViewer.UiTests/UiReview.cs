@@ -191,8 +191,11 @@ internal static class UiReview
                 OpenFileMenu(session);
                 Shoot(session, lint, output, shots, "menus", "파일 메뉴", theme, scale, size.Width, size.Height, null, steady: false);
                 session.Press(VirtualKeyShort.ESCAPE);
+                ParkPointer(session);
                 session.Press(VirtualKeyShort.F1);
                 Window about = WaitForAbout(session);
+                ParkPointer(session);
+                Thread.Sleep(200);
                 Shoot(session, lint, output, shots, "about", "단축키 도움말", theme, scale, size.Width, size.Height, about, steady: false);
                 CloseAbout(about);
                 session.WaitUntil(() => FindAbout(session) is null, TimeSpan.FromSeconds(8), "help dialog stayed open");
@@ -236,6 +239,19 @@ internal static class UiReview
         lint.Inspect(session.Automation, roots, tabRoot, state, theme, width + "x" + height, scale);
         shots.Add(new UiReviewShot(file, state, label, theme, width, height, scale, lint.LastTabOrder.ToArray()));
         Console.WriteLine("captured " + file);
+    }
+
+    private static void ParkPointer(UiSession session)
+    {
+        try
+        {
+            var bounds = session.Window.BoundingRectangle;
+            if (bounds.Width > 80 && bounds.Height > 80)
+                Mouse.MoveTo(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+        }
     }
 
     private static void Resize(UiSession session, int width, int height)
