@@ -19,6 +19,7 @@ public sealed class HighlightManagementEditor
         if (!HighlightPrompt.IsValid(rules)) throw new ArgumentException("유효하지 않은 강조 규칙입니다.", nameof(rules));
         Rules = new(rules.Select(rule => new EditableHighlightRule(rule)));
         PendingPhrase = seed;
+        PendingColorIndex = HighlightPrompt.UnusedColorIndex(Rules.Select(rule => rule.ColorIndex));
     }
     public ObservableCollection<EditableHighlightRule> Rules { get; }
     public string PendingPhrase { get; set; }
@@ -71,6 +72,19 @@ public static class HighlightPrompt
     public const int MaximumRules = 8, MaximumPhraseLength = 4096;
     private static readonly string[] ColorNames = ["주황", "보라", "청록", "파랑", "분홍", "초록"];
     public static string ColorName(int colorIndex) => (uint)colorIndex < (uint)ColorNames.Length ? ColorNames[colorIndex] : "";
+    /// <summary>First unused palette index, then the rule count modulo the palette. Same choice as Shift+F8.</summary>
+    public static int UnusedColorIndex(IEnumerable<int> usedColors)
+    {
+        int[] used = usedColors as int[] ?? usedColors.ToArray();
+        for (int color = 0; color < ColorNames.Length; color++)
+        {
+            bool taken = false;
+            for (int index = 0; index < used.Length; index++)
+                if (used[index] == color) { taken = true; break; }
+            if (!taken) return color;
+        }
+        return used.Length % ColorNames.Length;
+    }
     public static string? PhraseError(string? phrase) => string.IsNullOrWhiteSpace(phrase) ? "강조할 문구를 입력하세요. 공백만으로는 등록할 수 없습니다." :
         phrase.Length > MaximumPhraseLength ? "강조할 문구는 4,096자 이내로 입력하세요." : null;
     public static bool IsValid(IReadOnlyList<HighlightRuleDraft> rules) => rules.Count <= MaximumRules &&
@@ -81,9 +95,8 @@ public static class HighlightPrompt
         var editor = new HighlightManagementEditor(rules, seed);
         var dialog = new Window
         {
-            Owner = owner, Title = "강조 문구 관리", Width = 650, Height = 500,
-            MinWidth = 530, MinHeight = 390, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ShowInTaskbar = false, ResizeMode = ResizeMode.CanResize, FontFamily = new FontFamily("Segoe UI, Malgun Gothic"), FontSize = 13
+            Title = "강조 문구 관리", ShowInTaskbar = false, ResizeMode = ResizeMode.CanResize,
+            WindowStartupLocation = WindowStartupLocation.Manual, FontFamily = new FontFamily("Segoe UI, Malgun Gothic"), FontSize = 13
         };
         AutomationProperties.SetAutomationId(dialog, "HighlightManagerWindow");
         dialog.SetResourceReference(Control.BackgroundProperty, "PanelBrush");
@@ -92,6 +105,7 @@ public static class HighlightPrompt
         var view = CreateView(editor, applied => { result = applied; dialog.DialogResult = true; }, () => dialog.DialogResult = false);
         dialog.Content = view;
         dialog.Loaded += (_, _) => { var input = (TextBox)view.FindName("HighlightPendingBox"); input.Focus(); input.SelectAll(); };
+        OwnedDialogPlacement.Bind(dialog, owner, 650, 500, 530, 390);
         return dialog.ShowDialog() == true ? result : null;
     }
 
@@ -143,7 +157,13 @@ public static class HighlightPrompt
                 ruleColor.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedIndexProperty, new Binding(nameof(EditableHighlightRule.ColorIndex)) { Mode = BindingMode.TwoWay });
                 AutomationProperties.SetName(ruleColor, "등록된 문구 강조 색상");
                 var remove = new Button { Content = "삭제", MinWidth = 54 };
-                remove.Click += (_, _) => { editor.Rules.Remove(draft); RebuildRows(); status.Text = $"{editor.Rules.Count}/8개 · 삭제는 ‘적용’을 누르면 반영됩니다."; };
+                remove.Click += (_, _) =>
+                {
+                    editor.Rules.Remove(draft);
+                    SelectUnusedColor();
+                    RebuildRows();
+                    status.Text = $"{editor.Rules.Count}/8개 · 삭제는 ‘적용’을 누르면 반영됩니다.";
+                };
                 row.Children.Add(enabled); Grid.SetColumn(phrase, 1); row.Children.Add(phrase);
                 Grid.SetColumn(ruleColor, 2); row.Children.Add(ruleColor); Grid.SetColumn(remove, 3); row.Children.Add(remove); rows.Children.Add(row);
             }
@@ -154,8 +174,14 @@ public static class HighlightPrompt
         {
             editor.PendingPhrase = input.Text; editor.PendingColorIndex = color.SelectedIndex;
             if (!editor.TryAdd(out string message)) { status.Text = message; return; }
-            input.Clear(); status.Text = message; RebuildRows(); input.Focus();
+            input.Clear(); SelectUnusedColor(); status.Text = message; RebuildRows(); input.Focus();
         };
+        void SelectUnusedColor()
+        {
+            int next = UnusedColorIndex(editor.Rules.Select(rule => rule.ColorIndex));
+            editor.PendingColorIndex = next;
+            color.SelectedIndex = next;
+        }
         input.TextChanged += (_, _) =>
         {
             editor.PendingPhrase = input.Text;

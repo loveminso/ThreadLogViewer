@@ -8,7 +8,6 @@ namespace ThreadLogViewer.App;
 public partial class MainWindow
 {
     private const int MaximumQuickHighlightPhraseLength = HighlightPrompt.MaximumPhraseLength;
-    private static readonly string[] QuickHighlightColorNames = ["주황", "보라", "청록", "파랑", "분홍", "초록"];
 
     private void ToggleHighlight_Click(object sender, RoutedEventArgs e) => ToggleHighlightAtSelection();
 
@@ -49,13 +48,11 @@ public partial class MainWindow
         }
         if (keywordRules.Count >= HighlightPrompt.MaximumRules)
         { OperationStatus.Text = "강조 문구는 최대 8개입니다. 기존 문구에서 Shift+F8로 해제하거나 ‘강조 문구 관리’에서 문구를 삭제·수정하세요. 사용만 끄면 등록 수는 유지됩니다."; return false; }
-        int colorIndex = Enumerable.Range(0, QuickHighlightColorNames.Length)
-            .FirstOrDefault(color => keywordRules.All(rule => rule.ColorIndex != color), -1);
-        if (colorIndex < 0) colorIndex = keywordRules.Count % QuickHighlightColorNames.Length;
+        int colorIndex = HighlightPrompt.UnusedColorIndex(keywordRules.Select(rule => rule.ColorIndex));
         var added = new KeywordRuleItem(phrase, colorIndex);
         added.PropertyChanged += Keyword_Changed;
         keywordRules.Add(added);
-        OperationStatus.Text = $"문구 강조 추가 · {QuickHighlightColorNames[colorIndex]} · {keywordRules.Count}/8개 · 같은 문구에서 Shift+F8로 해제";
+        OperationStatus.Text = $"문구 강조 추가 · {HighlightPrompt.ColorName(colorIndex)} · {keywordRules.Count}/8개 · 같은 문구에서 Shift+F8로 해제";
         AsyncEvent.Run(RefreshKeywordsAsync);
         return true;
     }

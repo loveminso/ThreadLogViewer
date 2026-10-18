@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window
     public MainWindow(string? settingsDirectory, bool persistSettings)
     {
         InitializeComponent();
+        AutomationProperties.SetName(Editor.TextArea, "로그 본문");
         UiReviewHarness.Apply(this);
         Editor.TextArea.AllowDrop = true;
         Editor.TextArea.LeftMargins.Add(margin);

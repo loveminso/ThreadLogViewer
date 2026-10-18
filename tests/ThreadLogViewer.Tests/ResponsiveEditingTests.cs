@@ -115,6 +115,27 @@ public sealed class ResponsiveEditingTests
     });
 
     [Fact]
+    public Task NarrowClientShrinksTheThreadColumnSoTheLogBodyGetsWidth() => InSta(async () =>
+    {
+        using var folder = new Folder();
+        var window = new MainWindow(folder.Path, false);
+        try
+        {
+            await Load(window);
+            await Layout(window, 672, 480, 448);
+            var editor = Control<TextEditor>(window, "Editor");
+            var column = Control<ColumnDefinition>(window, "ThreadColumn");
+            Assert.True(column.ActualWidth <= 200, $"Narrow sidebar width: {column.ActualWidth:0.##}.");
+            Assert.True(editor.ActualWidth >= 430, $"Narrow editor width: {editor.ActualWidth:0.##}.");
+            Assert.Equal(295, column.Width.Value);
+            await Layout(window, 1280, 800, 760);
+            Assert.InRange(column.ActualWidth, 270, 320);
+            Assert.True(editor.ActualWidth > column.ActualWidth);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public Task EditingMenuRoutesCanExecuteAndExecutionToLastInputWithoutClipboardAccess() => InSta(async () =>
     {
         using var folder = new Folder(); var window = new MainWindow(folder.Path, false);

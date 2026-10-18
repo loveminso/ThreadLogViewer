@@ -122,6 +122,13 @@ public partial class MainWindow
 
             double sidebarMaximum = Math.Min(600, Math.Max(0, WorkspaceGrid.ActualWidth - 364));
             double sidebarMinimum = Math.Min(275, sidebarMaximum);
+            // A 1024px window at 150% lays out near 680 DIP. Give that width to the log body.
+            if (WorkspaceGrid.ActualWidth < 900)
+            {
+                double narrowCap = Math.Min(200, Math.Max(0, WorkspaceGrid.ActualWidth - 284));
+                if (narrowCap < 120) sidebarMaximum = sidebarMinimum = 0;
+                else { sidebarMaximum = narrowCap; sidebarMinimum = Math.Min(160, narrowCap); }
+            }
             if (ThreadColumn.MinWidth > sidebarMaximum) ThreadColumn.MinWidth = sidebarMaximum;
             if (ThreadColumn.MaxWidth != sidebarMaximum) ThreadColumn.MaxWidth = sidebarMaximum;
             if (ThreadColumn.MinWidth != sidebarMinimum) ThreadColumn.MinWidth = sidebarMinimum;

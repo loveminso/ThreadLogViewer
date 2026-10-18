@@ -29,21 +29,27 @@ CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행�
 
 ## UI 리뷰 갤러리와 린트
 
-UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 13, 건너뜀 1, 전체 14, 실패 0과 `$required`는 그대로다. 건너뛰는 테스트는 계속 `Scenario05_Utf8Bom_RefreshWhileAppending`뿐이다.
+UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 14, 건너뜀 1, 전체 15, 실패 0과 `$required`는 그대로다. 건너뛰는 테스트는 계속 `Scenario05_Utf8Bom_RefreshWhileAppending`뿐이다.
 
 갤러리는 임시 폴더의 합성 로그만 연다. 상태는 빈 시작, 연 로그, 검색 결과, 적용된 필터, 주변 로그, 강조 문구 관리, 강조 준비 실패 안내, 파일 메뉴, 단축키 도움말이다. 각 상태를 1024×768과 1920×1080, 배율 100%와 150%, 다크와 라이트로 찍는다. 앱에 두 테마가 이미 있으므로 테마를 추가하지 않는다. 기대 파일 수는 9×2×2×2인 72다.
 
-CI는 Windows 세션 DPI를 바꾸지 않는다. 150%는 뷰어 프로세스에만 `THREADLOGVIEWER_UI_REVIEW=1`과 `THREADLOGVIEWER_UI_REVIEW_SCALE=150`을 넣고, 그 프로세스가 메인 창 내용에 1.5 `LayoutTransform`을 적용한다. 바깥 픽셀 크기는 요청한 창 크기이고, 배치 DIP는 대략 그 크기를 1.5로 나눈 값이다. 고정 픽셀 창을 150% 모니터에 둔 경우에 가깝고, Per-Monitor V2 글자 힌트는 거치지 않는다. 제목 표시줄은 세션 DPI다. 메뉴 팝업, 강조 문구 관리 창, 도움말 MessageBox는 별도 창이라 이 변환으로 커지지 않는다. 변수가 없으면 배치, 렌더 모드, 모니터 클램프는 기존과 같다. 갤러리 프로세스는 PrintWindow가 검게 찍히지 않도록 소프트웨어 렌더링을 쓰고, 1920×1080이 작은 바탕화면에도 들어가도록 작업 영역 클램프를 건너뛴다. 화면 해상도를 1920×1080으로 올리려 시도할 수 있으나 DPI는 바꾸지 않고, 실패해도 단계가 실패하지는 않는다. 바꾸기에 성공해도 갤러리 실행은 그 해상도를 원래 값으로 되돌리지 않는다. 결과는 색인에 적는다.
+CI는 Windows 세션 DPI를 바꾸지 않는다. 150%는 뷰어 프로세스에만 `THREADLOGVIEWER_UI_REVIEW=1`과 `THREADLOGVIEWER_UI_REVIEW_SCALE=150`을 넣고, 그 프로세스가 메인 창 내용에 1.5 `LayoutTransform`을 적용한다. 바깥 픽셀 크기는 요청한 창 크기이고, 배치 DIP는 대략 그 크기를 1.5로 나눈 값이다. 고정 픽셀 창을 150% 모니터에 둔 경우에 가깝고, Per-Monitor V2 글자 힌트는 거치지 않는다. 제목 표시줄은 세션 DPI다. 메뉴 팝업은 별도 창이라 이 변환으로 커지지 않는다. 강조 문구 관리와 단축키 도움말도 별도 창이며 150% `LayoutTransform`을 따르지 않는다. 두 창은 소유 창 HWND를 기준으로 두고 그 모니터 작업 영역 안에 맞춘다. 변수가 없으면 배치, 렌더 모드, 모니터 클램프는 기존과 같다. 갤러리 프로세스는 PrintWindow가 검게 찍히지 않도록 소프트웨어 렌더링을 쓰고, 1920×1080이 작은 바탕화면에도 들어가도록 작업 영역 클램프를 건너뛴다. 화면 해상도를 1920×1080으로 올리려 시도할 수 있으나 DPI는 바꾸지 않고, 실패해도 단계가 실패하지는 않는다. 바꾸기에 성공해도 갤러리 실행은 그 해상도를 원래 값으로 되돌리지 않는다. 결과는 색인에 적는다.
 
 실패 안내는 상태 막대의 `강조 준비 실패`다. 짝 없는 서로게이트 강조 규칙을 하나 더한 뒤에 보인다. 처리되지 않은 UI 예외의 모달 MessageBox는 열지 않는다.
 
 산출물은 아티팩트 `ui-review-screenshots`다. PNG, `index.md`, `index.html`, `ui-lint.md`, `ui-lint.json`이 들어 있다. 린트는 잘린 텍스트, 창이나 부모 밖에 있는 요소, 탭 순서, 접근 가능한 이름이 비어 있는 조작 컨트롤을 경고로 적는다. 경고는 빌드를 실패시키지 않는다. 리뷰 단계 자체의 충돌이나 빈 화면만 실패다. UIA는 WPF DesiredSize를 주지 않으므로 잘림은 Segoe UI 폭 추정이다. 상태·테마·배율마다 경고를 400건까지만 저장하고, 넘친 수는 `ui-lint.json`의 `dropped`와 `capped`에 적으며, 저장분만 전체 개수처럼 읽지 않는다. 잡 요약의 UI review 절에 범주별 저장 개수와 배율·버킷별 생략 개수가 나온다.
 
+린트가 빼는 오탐은 세 가지다.
+
+- `SystemMenuBar`: 자동화 ID가 `SystemMenuBar`이거나, 종류가 메뉴 막대이면서 이름이 `System`인 요소는 범위 검사에서 뺀다. 제목 표시줄의 시스템 메뉴는 부모보다 작게 보고되어 창 밖으로 잡힌다.
+- 메뉴 팝업의 `outside-bounds`: 종류가 `Menu` 또는 `MenuItem`인 요소는 창 밖과 부모 밖 검사를 모두 뺀다. 열린 메뉴는 소유 창 밖에 그려지므로 잘림이 아니다. 메뉴가 아닌 잘린 텍스트는 그대로 남긴다.
+- 메뉴 머리글의 말줄임: 부모가 `MenuItem`인 텍스트는 잘림 검사에서 뺀다. 접근 가능한 이름에 `(_F)` 같은 접근 키가 붙어 화면에 없는 폭으로 재고, 메뉴 머리글의 `…`도 같은 오탐이다. 내용 필터 머리글과 검색 결과의 말줄임은 부모가 메뉴 항목이 아니므로 그대로 검사한다.
+
 `Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning`은 합성 로그를 연 뒤 올바른 문구를 강조하고, ‘강조 문구 관리’에서 깨진 UTF-16 강조 문구(짝 없는 서로게이트)를 하나 더 적용한다. 준비 단계가 그 규칙만 건너뛰면 상태 막대에 실패한 규칙을 가리키는 `강조 준비 실패`가 보이고, 올바른 문구는 계속 강조되며, 메인 창은 열린 채로 남는다. 일반 문구와 올바른 서로게이트 쌍은 그대로 준비된다. UTF-8 BOM의 잘린 마지막 문자는 아직 실패한다(fix 4). `LogFileReader.Decode`는 BOM을 확정 인코딩으로 보고 엄격한 UTF-8로 디코딩하며, BOM 없는 UTF-8만 끝의 미완성 문자를 버린다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 그래서 건너뛰고 앱 동작은 바꾸지 않는다. BOM 없는 UTF-8과 CP949는 F5 20회를 실행한다. CP949는 2바이트 문자가 읽기 길이에 걸리면 실패할 수 있어, 도우미가 파일을 연 채 F5 사이에만 완전한 줄을 추가하고 F5 순간에는 쓰지 않는다.
 
 ## 실제 화면과 성능
 
-`Scenario01`~`Scenario13`이 기능 표의 GUI를 판정한다. 세 회차 모두 통과 13, 건너뜀 1, 전체 14, 실패 0이다. 건너뛰는 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending`이며 이유는 수정 4다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
+`Scenario01`~`Scenario14`가 기능 표의 GUI와 작은 화면의 강조·도움말 창을 판정한다. 세 회차 모두 통과 14, 건너뜀 1, 전체 15, 실패 0이다. `Scenario14_HighlightAndHelpWindowsFitWorkArea`는 메인 창을 1024×768에 둔 뒤 강조 문구 관리와 단축키 도움말이 그 모니터 작업 영역 안에 있고, `적용`·`취소`·`확인`이 화면 안에 있으며 오프스크린이 아닌지 본다. 건너뛰는 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending`이며 이유는 수정 4다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
 

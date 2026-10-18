@@ -19,6 +19,8 @@ public sealed class UiReviewHarnessTests
         Assert.False(UiReviewHarness.IsActive("true"));
         Assert.False(UiReviewHarness.IsActive("150"));
         Assert.False(UiReviewHarness.IsActive("1.0"));
+        Assert.False(UiReviewHarness.IsActive(" 1"));
+        Assert.False(UiReviewHarness.IsActive("1 "));
         Assert.True(UiReviewHarness.IsActive("1"));
     }
 
@@ -42,7 +44,7 @@ public sealed class UiReviewHarnessTests
     [Fact]
     public void InactiveReviewChangesNothing()
     {
-        foreach (string? review in new string?[] { null, "", "0", "true", "150" })
+        foreach (string? review in new string?[] { null, "", "0", "true", "150", " 1", "1 " })
         {
             UiReviewHarness.ReviewEffects effects = UiReviewHarness.Effects(review, "150");
             Assert.False(effects.Active);

@@ -122,6 +122,9 @@ internal sealed class UiReviewLint
         string name = Clean(element.Properties.Name.ValueOrDefault);
         if (name.Length == 0)
             return;
+        // Menu headers expose "파일(_F)" and an ellipsis that is not drawn text. Other ellipsis stays.
+        if (ParentIsMenuItem(element))
+            return;
         Rectangle bounds = SafeBounds(element);
         if (bounds.Width <= 1 || bounds.Height <= 1)
             return;
@@ -163,6 +166,8 @@ internal sealed class UiReviewLint
     {
         Rectangle bounds = SafeBounds(element);
         if (bounds.Width <= 1 || bounds.Height <= 1 || window.Width <= 1)
+            return;
+        if (IsSystemMenuBar(element) || IsMenuPopup(element))
             return;
         if (Scrolls(element) || AncestorScrolls(element, root))
             return;
@@ -302,6 +307,34 @@ internal sealed class UiReviewLint
     {
         public int Stored;
         public int Dropped;
+    }
+
+    private static bool IsSystemMenuBar(AutomationElement element)
+    {
+        string id = Clean(element.Properties.AutomationId.ValueOrDefault);
+        if (id.Equals("SystemMenuBar", StringComparison.OrdinalIgnoreCase))
+            return true;
+        string name = Clean(element.Properties.Name.ValueOrDefault);
+        return TypeOf(element) == ControlType.MenuBar && name.Equals("System", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMenuPopup(AutomationElement element)
+    {
+        var type = TypeOf(element);
+        return type == ControlType.Menu || type == ControlType.MenuItem;
+    }
+
+    private static bool ParentIsMenuItem(AutomationElement element)
+    {
+        try
+        {
+            var parent = element.Parent;
+            return parent is not null && TypeOf(parent) == ControlType.MenuItem;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private static bool Is(ControlType actual, params ControlType[] types)
