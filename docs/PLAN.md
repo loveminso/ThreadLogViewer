@@ -117,6 +117,7 @@
 
 ## 기능 추가 검토 문서
 
+- [현재 구조](DESIGN.md): 코드 기준의 구성, 데이터 흐름, 테스트, 알려진 한계.
 - [추가 후보 전체 표](FEATURE-CANDIDATES.md): 37개 후보와 우선순위 보관.
 - [높은 우선순위 기능 상세 설계](HIGH-PRIORITY-FEATURES.md): 높음으로 분류한 1~11번의 동작, 구현 구조, 경계 조건, 검증 계획.
 - [기능 테스트 방법](FEATURE-TEST-GUIDE.md): 북마크를 제외한 현재 기능의 조작과 기대 결과. GUI는 CI UI 테스트가 판정한다. 수동 확인은 SmartScreen만 남고, 실제 Explorer 끌어 놓기는 알려진 한계다.

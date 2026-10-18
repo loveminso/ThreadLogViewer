@@ -27,7 +27,7 @@ Windows x64용 SSD 멀티스레드 **읽기 전용** 로그 뷰어. C# + .NET 10
 
 북마크는 v0.8.1에서 제거했습니다. F2·Shift+F2·Ctrl+F2는 북마크 동작을 제공하지 않습니다. 기존 schema 1 분석 파일의 북마크 필드는 무시하며 다른 상태는 복원합니다.
 
-[사용법](#사용법) · [전체 기능 확인 절차](docs/FEATURE-TEST-GUIDE.md) · [전체 단축키 표](docs/SHORTCUTS.md) · [현재 후속 계획](docs/PLAN.md)
+[사용법](#사용법) · [현재 구조](docs/DESIGN.md) · [전체 기능 확인 절차](docs/FEATURE-TEST-GUIDE.md) · [전체 단축키 표](docs/SHORTCUTS.md) · [현재 후속 계획](docs/PLAN.md)
 
 ## 검증 상태
 
