@@ -643,21 +643,28 @@ internal sealed class UiSession : IDisposable
             if (save is not null)
             {
                 try { save.AsButton().Invoke(); }
-                catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
-                if (!DialogIsOpen(dialog))
+                catch (Exception ex) when (ex is not OutOfMemoryException) { }
+                if (ExportSettled() || !DialogIsOpen(dialog))
                     return;
                 try { save.AsButton().Click(); }
-                catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+                catch (Exception ex) when (ex is not OutOfMemoryException) { }
             }
-            if (!DialogIsOpen(dialog))
+            if (ExportSettled() || !DialogIsOpen(dialog))
                 return;
             Keyboard.TypeSimultaneously(VirtualKeyShort.ALT, VirtualKeyShort.KEY_S);
             Wait.UntilInputIsProcessed();
             Thread.Sleep(300);
-            if (!DialogIsOpen(dialog) || Status().Contains("내보내기", StringComparison.Ordinal))
+            if (ExportSettled() || !DialogIsOpen(dialog))
                 return;
             Step("export commit attempt " + attempt + " still open");
         }
+    }
+
+    private bool ExportSettled()
+    {
+        string status = Status();
+        return status.Contains("내보내기 완료", StringComparison.Ordinal)
+            || status.Contains("내보내기 실패", StringComparison.Ordinal);
     }
 
     private static AutomationElement? FindSaveButton(Window dialog)
