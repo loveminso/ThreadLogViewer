@@ -35,13 +35,18 @@ internal sealed class UiSession : IDisposable
         ExePath = exePath;
     }
 
-    public static UiSession Launch(string exePath, string? argument, string screenshotDirectory, string name)
+    public static UiSession Launch(string exePath, string? argument, string screenshotDirectory, string name, IReadOnlyDictionary<string, string>? environment = null)
     {
         var start = new ProcessStartInfo(exePath)
         {
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(exePath)!
         };
+        if (environment is not null)
+        {
+            foreach (var pair in environment)
+                start.Environment[pair.Key] = pair.Value;
+        }
         if (!string.IsNullOrEmpty(argument))
             start.ArgumentList.Add(argument);
         var automation = new UIA3Automation();

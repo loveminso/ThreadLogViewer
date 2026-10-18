@@ -37,6 +37,9 @@ public partial class MainWindow
         windowLayoutReady = true;
         SourceInitialized += WindowLayout_SourceInitialized;
         WorkspaceGrid.LayoutUpdated += WindowLayout_Updated;
+        // The gallery sets the outer pixel size itself. Skip the monitor clamp only in that process.
+        if (UiReviewHarness.IsActive())
+            return;
         // SystemParameters already returns DIPs; the 96-DPI identity conversion is deliberate.
         var workArea = SystemParameters.WorkArea;
         ApplyWindowBounds(WindowLayoutPolicy.Calculate(workArea.Width, workArea.Height));
@@ -69,6 +72,8 @@ public partial class MainWindow
 
     private void UpdateMonitorWindowBounds()
     {
+        if (UiReviewHarness.IsActive())
+            return;
         IntPtr handle = new WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero) return;
         var monitor = new WindowMonitorInfo { Size = Marshal.SizeOf<WindowMonitorInfo>() };
