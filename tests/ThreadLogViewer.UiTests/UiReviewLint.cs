@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -10,6 +11,11 @@ namespace ThreadLogViewer.UiTests;
 
 internal sealed record UiReviewFinding(string Category, string State, string Theme, string Size, int Scale, string Detail);
 
+internal readonly record struct UiReviewFilterCounts(int SystemMenuBar, int MenuPopup, int MenuHeader)
+{
+    internal int Total => SystemMenuBar + MenuPopup + MenuHeader;
+}
+
 internal sealed record UiReviewBucket(string State, string Theme, int Scale, int Stored, int Dropped)
 {
     public bool Capped => Dropped > 0;
@@ -18,6 +24,23 @@ internal sealed record UiReviewBucket(string State, string Theme, int Scale, int
 internal sealed class UiReviewLint
 {
     internal const int FindingCap = 400;
+
+    private static readonly Regex ReviewFolderPrefix = new(
+        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData[\\/]+Local[\\/]+Temp[\\/]+tlv-ui-review-[0-9a-f]+",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex UserAppDataPrefix = new(
+        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    internal static string RedactReviewPaths(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+        string text = ReviewFolderPrefix.Replace(value, "<temp>");
+        return UserAppDataPrefix.Replace(text, "<temp>");
+    }
+
     internal const string TruncatedText = "truncated-text";
     internal const string OutsideBounds = "outside-bounds";
     internal const string TabOrder = "tab-order";
@@ -42,6 +65,7 @@ internal sealed class UiReviewLint
     private readonly List<UiReviewFinding> findings = [];
     private readonly Dictionary<BucketKey, BucketCount> buckets = [];
     private readonly Font measureFont;
+    private int filteredSystemMenuBar, filteredMenuPopup, filteredMenuHeader;
 
     internal UiReviewLint(double contentScale)
     {
@@ -51,6 +75,8 @@ internal sealed class UiReviewLint
     }
 
     internal IReadOnlyList<UiReviewFinding> Findings => findings;
+
+    internal UiReviewFilterCounts FilterCounts => new(filteredSystemMenuBar, filteredMenuPopup, filteredMenuHeader);
 
     internal IReadOnlyList<UiReviewBucket> Buckets => buckets.Select(pair =>
         new UiReviewBucket(pair.Key.State, pair.Key.Theme, pair.Key.Scale, pair.Value.Stored, pair.Value.Dropped)).ToArray();
@@ -62,11 +88,13 @@ internal sealed class UiReviewLint
     internal void Inspect(UIA3Automation automation, IEnumerable<AutomationElement> roots, AutomationElement tabRoot, string state, string theme, string size, int scale)
     {
         LastTabOrder.Clear();
+        AutomationElement? mainWindow = null;
         foreach (var root in roots)
         {
+            mainWindow ??= root;
             Rectangle window = SafeBounds(root);
             var seen = new HashSet<string>();
-            Walk(root, root, window, state, theme, size, scale, 0, seen);
+            Walk(root, root, mainWindow ?? root, window, state, theme, size, scale, 0, seen);
         }
         try
         {
@@ -78,7 +106,7 @@ internal sealed class UiReviewLint
         }
     }
 
-    private void Walk(AutomationElement element, AutomationElement root, Rectangle window, string state, string theme, string size, int scale, int depth, HashSet<string> seen)
+    private void Walk(AutomationElement element, AutomationElement root, AutomationElement mainWindow, Rectangle window, string state, string theme, string size, int scale, int depth, HashSet<string> seen)
     {
         if (depth > 24 || !seen.Add(Identity(element)))
             return;
@@ -90,7 +118,7 @@ internal sealed class UiReviewLint
                 {
                     InspectName(element, state, theme, size, scale);
                     InspectTruncation(element, state, theme, size, scale);
-                    InspectBounds(element, root, window, state, theme, size, scale);
+                    InspectBounds(element, root, mainWindow, window, state, theme, size, scale);
                 }
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -101,7 +129,7 @@ internal sealed class UiReviewLint
         try { children = element.FindAllChildren(); }
         catch (Exception ex) when (ex is not OutOfMemoryException) { return; }
         foreach (var child in children)
-            Walk(child, root, window, state, theme, size, scale, depth + 1, seen);
+            Walk(child, root, mainWindow, window, state, theme, size, scale, depth + 1, seen);
     }
 
     private void InspectName(AutomationElement element, string state, string theme, string size, int scale)
@@ -123,22 +151,41 @@ internal sealed class UiReviewLint
         if (name.Length == 0)
             return;
         Rectangle bounds = SafeBounds(element);
-        if (bounds.Width <= 1 || bounds.Height <= 1)
+        string? raw = TruncationDetail(element, name, bounds, scale);
+        if (!ParentIsMenuItem(element))
+        {
+            if (raw is not null)
+                Add(TruncatedText, state, theme, size, scale, raw);
             return;
+        }
+        string stripped = StripMenuAccessKey(name);
+        string? measured = string.Equals(stripped, name, StringComparison.Ordinal)
+            ? raw
+            : TruncationDetail(element, stripped, bounds, scale);
+        if (raw is not null && measured is null)
+        {
+            filteredMenuHeader++;
+            return;
+        }
+        if (measured is not null)
+            Add(TruncatedText, state, theme, size, scale, measured);
+    }
+
+    private string? TruncationDetail(AutomationElement element, string name, Rectangle bounds, int scale)
+    {
+        if (name.Length == 0 || bounds.Width <= 1 || bounds.Height <= 1)
+            return null;
         bool ellipsis = name.Contains('…') || name.EndsWith("...", StringComparison.Ordinal);
         string help = Clean(element.Properties.HelpText.ValueOrDefault);
         if (ellipsis && help.Length > name.Length)
-        {
-            Add(TruncatedText, state, theme, size, scale, "Ellipsis trimming on " + Describe(element));
-            return;
-        }
+            return "Ellipsis trimming on " + Describe(element);
         double line = 32.0 * (scale == 150 ? 1.5 : 1.0);
         if (bounds.Height > line)
-            return;
+            return null;
         int desired = DesiredWidth(name);
         int excess = desired - bounds.Width;
         if (excess <= 8)
-            return;
+            return null;
         bool strong = desired > bounds.Width * 1.25 + 8;
         bool stretched = false;
         try
@@ -154,37 +201,49 @@ internal sealed class UiReviewLint
         {
         }
         if (!strong && !stretched && !ellipsis)
-            return;
-        Add(TruncatedText, state, theme, size, scale,
-            Describe(element) + " estimated width " + desired + "px exceeds bounds " + bounds.Width + "px");
+            return null;
+        return Describe(element) + " estimated width " + desired + "px exceeds bounds " + bounds.Width + "px";
     }
 
-    private void InspectBounds(AutomationElement element, AutomationElement root, Rectangle window, string state, string theme, string size, int scale)
+    private void InspectBounds(AutomationElement element, AutomationElement root, AutomationElement mainWindow, Rectangle window, string state, string theme, string size, int scale)
     {
         Rectangle bounds = SafeBounds(element);
         if (bounds.Width <= 1 || bounds.Height <= 1 || window.Width <= 1)
             return;
         if (Scrolls(element) || AncestorScrolls(element, root))
             return;
+        string? detail = null;
         if (!Contains(window, bounds, 6))
+            detail = Describe(element) + " is outside the window " + Format(bounds);
+        else
         {
-            Add(OutsideBounds, state, theme, size, scale, Describe(element) + " is outside the window " + Format(bounds));
+            try
+            {
+                var parent = element.Parent;
+                if (parent is not null && !ReferenceEquals(parent, root) && !Scrolls(parent))
+                {
+                    Rectangle parentBounds = SafeBounds(parent);
+                    if (parentBounds.Width > 1 && parentBounds.Height > 1 && !Contains(parentBounds, bounds, 6))
+                        detail = Describe(element) + " is outside its parent " + Format(bounds);
+                }
+            }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            {
+            }
+        }
+        if (detail is null)
+            return;
+        if (IsSystemMenuBar(element))
+        {
+            filteredSystemMenuBar++;
             return;
         }
-        try
+        if (IsMenuPopup(element, mainWindow))
         {
-            var parent = element.Parent;
-            if (parent is null || ReferenceEquals(parent, root) || Scrolls(parent))
-                return;
-            Rectangle parentBounds = SafeBounds(parent);
-            if (parentBounds.Width <= 1 || parentBounds.Height <= 1)
-                return;
-            if (!Contains(parentBounds, bounds, 6))
-                Add(OutsideBounds, state, theme, size, scale, Describe(element) + " is outside its parent " + Format(bounds));
+            filteredMenuPopup++;
+            return;
         }
-        catch (Exception ex) when (ex is COMException or InvalidOperationException)
-        {
-        }
+        Add(OutsideBounds, state, theme, size, scale, detail);
     }
 
     private void InspectTabOrder(UIA3Automation automation, AutomationElement root, string state, string theme, string size, int scale)
@@ -293,7 +352,7 @@ internal sealed class UiReviewLint
             return;
         }
         count.Stored++;
-        findings.Add(new UiReviewFinding(category, state, theme, size, scale, Clean(detail)));
+        findings.Add(new UiReviewFinding(category, state, theme, size, scale, RedactReviewPaths(Clean(detail))));
     }
 
     private readonly record struct BucketKey(string State, string Theme, int Scale);
@@ -302,6 +361,139 @@ internal sealed class UiReviewLint
     {
         public int Stored;
         public int Dropped;
+    }
+
+    private static bool IsSystemMenuBar(AutomationElement element)
+    {
+        string id = Clean(element.Properties.AutomationId.ValueOrDefault);
+        if (id.Equals("SystemMenuBar", StringComparison.OrdinalIgnoreCase))
+            return true;
+        string name = Clean(element.Properties.Name.ValueOrDefault);
+        return TypeOf(element) == ControlType.MenuBar && name.Equals("System", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMenuPopup(AutomationElement element, AutomationElement mainWindow)
+    {
+        var type = TypeOf(element);
+        if (type != ControlType.Menu && type != ControlType.MenuItem)
+            return false;
+        // WPF popup items stay under the main window in the UIA tree and often report its HWND.
+        // The window actually under the item is the popup. The menu bar stays on the main window.
+        IntPtr mainRoot = TopLevelHwnd(mainWindow);
+        IntPtr atPoint = WindowRootAt(SafeBounds(element));
+        if (atPoint != IntPtr.Zero && mainRoot != IntPtr.Zero)
+            return atPoint != mainRoot;
+        IntPtr elementRoot = TopLevelHwnd(element);
+        if (elementRoot != IntPtr.Zero && mainRoot != IntPtr.Zero)
+            return elementRoot != mainRoot;
+        AutomationElement? elementWindow = NearestWindow(element);
+        AutomationElement main = NearestWindow(mainWindow) ?? mainWindow;
+        return elementWindow is not null && !SameRuntimeId(elementWindow, main);
+    }
+
+    private static IntPtr WindowRootAt(Rectangle bounds)
+    {
+        if (bounds.Width <= 1 || bounds.Height <= 1)
+            return IntPtr.Zero;
+        var point = new WinPoint { X = bounds.Left + bounds.Width / 2, Y = bounds.Top + bounds.Height / 2 };
+        IntPtr hwnd = WindowFromPoint(point);
+        if (hwnd == IntPtr.Zero)
+            return IntPtr.Zero;
+        IntPtr root = GetAncestor(hwnd, 2);
+        return root == IntPtr.Zero ? hwnd : root;
+    }
+
+    private static IntPtr TopLevelHwnd(AutomationElement element)
+    {
+        AutomationElement? current = element;
+        for (int depth = 0; depth < 24 && current is not null; depth++)
+        {
+            try
+            {
+                IntPtr hwnd = current.Properties.NativeWindowHandle.ValueOrDefault;
+                if (hwnd != IntPtr.Zero)
+                {
+                    IntPtr root = GetAncestor(hwnd, 2);
+                    return root == IntPtr.Zero ? hwnd : root;
+                }
+                current = current.Parent;
+            }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            {
+                return IntPtr.Zero;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static AutomationElement? NearestWindow(AutomationElement element)
+    {
+        AutomationElement? current = element;
+        for (int depth = 0; depth < 24 && current is not null; depth++)
+        {
+            if (TypeOf(current) == ControlType.Window)
+                return current;
+            try { current = current.Parent; }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException) { return null; }
+        }
+        return null;
+    }
+
+    private static bool SameRuntimeId(AutomationElement left, AutomationElement right)
+    {
+        try
+        {
+            int[] a = left.Properties.RuntimeId.ValueOrDefault ?? [];
+            int[] b = right.Properties.RuntimeId.ValueOrDefault ?? [];
+            return a.Length > 0 && a.AsSpan().SequenceEqual(b);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static string StripMenuAccessKey(string name)
+    {
+        var builder = new System.Text.StringBuilder(name.Length);
+        for (int i = 0; i < name.Length; i++)
+        {
+            if (name[i] == '(' && i + 3 < name.Length && name[i + 1] == '_' && name[i + 3] == ')')
+            {
+                i += 3;
+                continue;
+            }
+            if (name[i] == '_')
+                continue;
+            builder.Append(name[i]);
+        }
+        return builder.ToString();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WinPoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(WinPoint point);
+
+    private static bool ParentIsMenuItem(AutomationElement element)
+    {
+        try
+        {
+            var parent = element.Parent;
+            return parent is not null && TypeOf(parent) == ControlType.MenuItem;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private static bool Is(ControlType actual, params ControlType[] types)
@@ -382,7 +574,7 @@ internal sealed class UiReviewLint
 
     private static string Label(AutomationElement element)
     {
-        string name = Clean(element.Properties.Name.ValueOrDefault);
+        string name = RedactReviewPaths(Clean(element.Properties.Name.ValueOrDefault));
         string id = Clean(element.Properties.AutomationId.ValueOrDefault);
         string type = TypeOf(element).ToString();
         if (name.Length > 0 && id.Length > 0)

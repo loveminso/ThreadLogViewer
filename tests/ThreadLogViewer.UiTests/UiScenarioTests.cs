@@ -134,8 +134,7 @@ public sealed class UiScenarioTests(PublishedApp app)
                 string status = session.Status();
                 return status.Contains("강조 준비 실패", StringComparison.Ordinal) &&
                        status.Contains("broken", StringComparison.Ordinal) &&
-                       status.Contains("2번", StringComparison.Ordinal) &&
-                       status.Contains("2번 주황", StringComparison.Ordinal) &&
+                       status.Contains("2번 보라", StringComparison.Ordinal) &&
                        status.Contains("1곳", StringComparison.Ordinal) &&
                        !status.Contains("강조 준비 중", StringComparison.Ordinal);
             }, TimeSpan.FromSeconds(15), "bad rule skipped while the valid phrase stayed highlighted");
@@ -144,6 +143,48 @@ public sealed class UiScenarioTests(PublishedApp app)
             Assert.Contains("highlight.log", session.Text("FileLabel"), StringComparison.Ordinal);
             Assert.DoesNotContain("\uD800", session.Status(), StringComparison.Ordinal);
             UiFeatureTests.AssertRegisteredPhrase(session, "keep-phrase");
+        });
+        Assert.Equal(hash, Hash(log));
+    }
+
+    [Fact]
+    public void Scenario14_HighlightAndHelpWindowsFitWorkArea()
+    {
+        string folder = NewFolder("fit");
+        string log = Path.Combine(folder, "fit.log");
+        SyntheticLog.Write(log, LogEncodingKind.Utf8, SyntheticLog.Line(1, 1, "synthetic layout fit-phrase"));
+        string hash = Hash(log);
+        Run(log, TimeSpan.FromMinutes(3), session =>
+        {
+            session.WaitForOpen("fit.log");
+            PlaceMainWindow(session);
+            Window highlight = OpenHighlightManager(session);
+            try
+            {
+                PlaceMainWindow(session);
+                Thread.Sleep(300);
+                AssertInsideWorkArea(highlight, "highlight manager");
+                AssertButtonInside(highlight, "HighlightApplyButton", "적용");
+                AssertButtonInside(highlight, null, "취소");
+            }
+            finally
+            {
+                CloseNamedButton(highlight, "취소");
+            }
+            session.WaitUntil(() => HighlightDialog(session) is null, TimeSpan.FromSeconds(8), "highlight manager stayed open");
+            session.Press(VirtualKeyShort.F1);
+            Window? help = null;
+            session.WaitUntil(() => (help = HelpDialog(session)) is not null, TimeSpan.FromSeconds(8), "help window did not open");
+            Window about = help ?? throw new Xunit.Sdk.XunitException("help window did not open");
+            try
+            {
+                AssertInsideWorkArea(about, "help");
+                AssertButtonInside(about, "HelpOkButton", "확인");
+            }
+            finally
+            {
+                CloseNamedButton(about, "확인");
+            }
         });
         Assert.Equal(hash, Hash(log));
     }
@@ -285,6 +326,29 @@ public sealed class UiScenarioTests(PublishedApp app)
 
     private static void AddUnpreparedHighlightRule(UiSession session, int expectedCount = 1)
     {
+        Window dialog = OpenHighlightManager(session);
+        var box = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightPendingBox"))?.AsTextBox()
+            ?? throw new Xunit.Sdk.XunitException("Highlight phrase box was not found.");
+        const string badPhrase = "broken\uD800";
+        box.Text = badPhrase;
+        session.WaitUntil(() => (box.Text ?? "").Contains('\uD800'), TimeSpan.FromSeconds(5), "bad highlight phrase was not entered");
+        var add = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightAddButton"))?.AsButton()
+            ?? throw new Xunit.Sdk.XunitException("Highlight add button was not found.");
+        session.WaitUntil(() => add.IsEnabled, TimeSpan.FromSeconds(5), "highlight add button stayed disabled");
+        add.Invoke();
+        string registered = expectedCount + "/8";
+        session.WaitUntil(
+            () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains(registered, StringComparison.Ordinal)),
+            TimeSpan.FromSeconds(5),
+            "bad highlight rule was not registered");
+        var apply = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightApplyButton"))?.AsButton()
+            ?? throw new Xunit.Sdk.XunitException("Highlight apply button was not found.");
+        apply.Invoke();
+        session.Step("applied unpaired-surrogate highlight rule");
+    }
+
+    private static Window OpenHighlightManager(UiSession session)
+    {
         session.FocusWindow();
         var menus = session.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem));
         var analysis = menus.FirstOrDefault(item =>
@@ -310,25 +374,83 @@ public sealed class UiScenarioTests(PublishedApp app)
         FlaUI.Core.Input.Wait.UntilInputIsProcessed();
         Window? foundDialog = null;
         session.WaitUntil(() => (foundDialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(10), "highlight manager did not open");
-        Window dialog = foundDialog ?? throw new Xunit.Sdk.XunitException("Highlight manager did not open.");
-        var box = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightPendingBox"))?.AsTextBox()
-            ?? throw new Xunit.Sdk.XunitException("Highlight phrase box was not found.");
-        const string badPhrase = "broken\uD800";
-        box.Text = badPhrase;
-        session.WaitUntil(() => (box.Text ?? "").Contains('\uD800'), TimeSpan.FromSeconds(5), "bad highlight phrase was not entered");
-        var add = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightAddButton"))?.AsButton()
-            ?? throw new Xunit.Sdk.XunitException("Highlight add button was not found.");
-        session.WaitUntil(() => add.IsEnabled, TimeSpan.FromSeconds(5), "highlight add button stayed disabled");
-        add.Invoke();
-        string registered = expectedCount + "/8";
-        session.WaitUntil(
-            () => dialog.FindAllDescendants().Any(element => (element.Name ?? "").Contains(registered, StringComparison.Ordinal)),
-            TimeSpan.FromSeconds(5),
-            "bad highlight rule was not registered");
-        var apply = dialog.FindFirstDescendant(cf => cf.ByAutomationId("HighlightApplyButton"))?.AsButton()
-            ?? throw new Xunit.Sdk.XunitException("Highlight apply button was not found.");
-        apply.Invoke();
-        session.Step("applied unpaired-surrogate highlight rule");
+        return foundDialog ?? throw new Xunit.Sdk.XunitException("Highlight manager did not open.");
+    }
+
+    private static void PlaceMainWindow(UiSession session)
+    {
+        var hwnd = session.Window.Properties.NativeWindowHandle.Value;
+        var work = UiReviewCapture.WorkArea(hwnd);
+        // The CI desktop is 1024x768 with a taskbar, so the work area is shorter than 768.
+        int width = Math.Min(1024, work.Width);
+        int height = Math.Min(768, work.Height);
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            UiReviewCapture.MoveWindow(hwnd, work.Left, work.Top, width, height);
+            Thread.Sleep(200);
+            var actual = UiReviewCapture.WindowSize(hwnd);
+            if (Math.Abs(actual.Width - width) <= 24 && Math.Abs(actual.Height - height) <= 24)
+                return;
+        }
+        var last = UiReviewCapture.WindowSize(hwnd);
+        throw new Xunit.Sdk.XunitException($"Main window stayed {last.Width}x{last.Height} instead of {width}x{height} inside work area {work.Width}x{work.Height}.");
+    }
+
+    private static void AssertInsideWorkArea(Window window, string label)
+    {
+        var bounds = window.BoundingRectangle;
+        var work = UiReviewCapture.WorkArea(window.Properties.NativeWindowHandle.Value);
+        const int slack = 8;
+        Assert.True(bounds.Width > 1 && bounds.Height > 1, label + " has no size");
+        Assert.True(
+            bounds.Left >= work.Left - slack && bounds.Top >= work.Top - slack &&
+            bounds.Right <= work.Right + slack && bounds.Bottom <= work.Bottom + slack,
+            $"{label} bounds {bounds.Left},{bounds.Top} {bounds.Width}x{bounds.Height} are outside work area {work.Left},{work.Top} {work.Width}x{work.Height}");
+    }
+
+    private static void AssertButtonInside(Window window, string? automationId, string name)
+    {
+        var element = automationId is null
+            ? window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName(name)))
+            : window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+        if (element is null)
+            throw new Xunit.Sdk.XunitException(name + " button was not found.");
+        Assert.False(element.IsOffscreen, name + " is offscreen");
+        var bounds = element.BoundingRectangle;
+        var work = UiReviewCapture.WorkArea(window.Properties.NativeWindowHandle.Value);
+        const int slack = 8;
+        Assert.True(bounds.Width > 1 && bounds.Height > 1, name + " has no size");
+        Assert.True(
+            bounds.Left >= work.Left - slack && bounds.Top >= work.Top - slack &&
+            bounds.Right <= work.Right + slack && bounds.Bottom <= work.Bottom + slack,
+            $"{name} bounds {bounds.Left},{bounds.Top} {bounds.Width}x{bounds.Height} are outside work area {work.Left},{work.Top} {work.Width}x{work.Height}");
+    }
+
+    private static void CloseNamedButton(Window window, string name)
+    {
+        try
+        {
+            window.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName(name)))?.AsButton().Invoke();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+        }
+    }
+
+    private static Window? HelpDialog(UiSession session)
+    {
+        foreach (var window in OwnedWindows(session).Concat(TopLevelWindows(session)))
+        {
+            try
+            {
+                if ((window.Title ?? "").Contains("단축키", StringComparison.Ordinal))
+                    return window;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+            {
+            }
+        }
+        return null;
     }
 
     private static Window? HighlightDialog(UiSession session)

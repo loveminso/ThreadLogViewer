@@ -108,6 +108,31 @@ public sealed class HighlightManagementTests
     });
 
     [Fact]
+    public void NewRuleUsesTheFirstUnusedColor()
+    {
+        Assert.Equal(0, HighlightPrompt.UnusedColorIndex([]));
+        Assert.Equal(1, HighlightPrompt.UnusedColorIndex([0]));
+        Assert.Equal(0, HighlightPrompt.UnusedColorIndex([1, 2, 3, 4, 5]));
+        Assert.Equal(0, HighlightPrompt.UnusedColorIndex([0, 1, 2, 3, 4, 5]));
+        Assert.Equal(1, HighlightPrompt.UnusedColorIndex([0, 1, 2, 3, 4, 5, 0]));
+        Assert.Equal(2, HighlightPrompt.UnusedColorIndex([0, 1]));
+        var editor = new HighlightManagementEditor([new("synthetic", 0)], "");
+        Assert.Equal(1, editor.PendingColorIndex);
+    }
+
+    [Fact]
+    public Task NewRuleComboStartsAtTheUnusedColorAndAdvancesAfterAdd() => InSta(() =>
+    {
+        var editor = new HighlightManagementEditor([new("synthetic first", 0)], "synthetic second");
+        var view = HighlightPrompt.CreateView(editor, _ => { }, () => { });
+        Assert.Equal(1, Named<ComboBox>(view, "HighlightPendingColor").SelectedIndex);
+        Click(view, "HighlightAddButton");
+        Assert.Equal(1, editor.Rules[1].ColorIndex);
+        Assert.Equal(2, Named<ComboBox>(view, "HighlightPendingColor").SelectedIndex);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
     public void RuleValidationRejectsOverCapacityInvalidColorsAndAccepts4096Characters()
     {
         Assert.True(HighlightPrompt.IsValid([new(new string('x', 4096), 5)]));

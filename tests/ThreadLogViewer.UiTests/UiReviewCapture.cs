@@ -188,7 +188,26 @@ internal static class UiReviewCapture
     private struct NativeRect { public int Left, Top, Right, Bottom; }
 
     internal static void MoveWindow(IntPtr hwnd, int width, int height) =>
-        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height, 0x0040 | 0x0004);
+        MoveWindow(hwnd, 0, 0, width, height);
+
+    internal static void MoveWindow(IntPtr hwnd, int x, int y, int width, int height) =>
+        SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, 0x0040 | 0x0004);
+
+    internal static Rectangle WorkArea(IntPtr hwnd)
+    {
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        IntPtr monitor = MonitorFromWindow(hwnd, 2);
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+            return new Rectangle(0, 0, GetSystemMetrics(0), GetSystemMetrics(1));
+        return Rectangle.FromLTRB(info.Work.Left, info.Work.Top, info.Work.Right, info.Work.Bottom);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
+
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Auto)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     internal static (int Width, int Height) WindowSize(IntPtr hwnd)
     {

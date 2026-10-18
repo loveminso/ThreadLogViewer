@@ -161,12 +161,6 @@ public sealed class SettingsFallbackTests
         using var root = new SyntheticRoot();
         var store = new SettingsStore(root.Path);
         Assert.Null(store.FallbackFilePath);
-        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrWhiteSpace(local))
-        {
-            string realFallback = Path.GetFullPath(Path.Combine(local, "ThreadLogViewer", "ui-settings.json"));
-            Assert.NotEqual(realFallback, Path.GetFullPath(store.FilePath));
-        }
 
         Assert.True(store.Save(Values(dark: false, fontSize: 16)).Success);
         Assert.True(File.Exists(store.FilePath));

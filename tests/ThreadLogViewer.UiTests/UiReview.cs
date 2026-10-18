@@ -29,6 +29,7 @@ internal static class UiReview
         var shots = new List<UiReviewShot>();
         var findings = new List<UiReviewFinding>();
         var buckets = new List<UiReviewBucket>();
+        var filtered = new UiReviewFilterCounts(0, 0, 0);
         string folder = Path.Combine(Path.GetTempPath(), "tlv-ui-review-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -48,13 +49,17 @@ internal static class UiReview
                 {
                     findings.AddRange(lint.Findings);
                     buckets.AddRange(lint.Buckets);
+                    filtered = new UiReviewFilterCounts(
+                        filtered.SystemMenuBar + lint.FilterCounts.SystemMenuBar,
+                        filtered.MenuPopup + lint.FilterCounts.MenuPopup,
+                        filtered.MenuHeader + lint.FilterCounts.MenuHeader);
                     lint.DisposeFont();
                 }
             }
         }
         finally
         {
-            UiReviewReport.Write(output, displayNote, shots, findings, buckets);
+            UiReviewReport.Write(output, displayNote, shots, findings, buckets, filtered);
             try
             {
                 if (Directory.Exists(folder))
@@ -64,6 +69,7 @@ internal static class UiReview
             {
             }
         }
+        RejectRunnerPaths(output);
         if (shots.Count != 72)
             throw new InvalidOperationException($"Expected 72 screenshots but wrote {shots.Count}.");
         foreach (var shot in shots)
@@ -73,7 +79,7 @@ internal static class UiReview
                 throw new InvalidOperationException("Screenshot is missing: " + shot.File);
         }
         int dropped = buckets.Sum(bucket => bucket.Dropped);
-        Console.WriteLine($"UI review wrote {shots.Count} screenshots, {findings.Count} stored lint warnings, and {dropped} dropped.");
+        Console.WriteLine($"UI review wrote {shots.Count} screenshots, {findings.Count} stored lint warnings, and {dropped} dropped. Filtered system menu bar {filtered.SystemMenuBar}, menu popup {filtered.MenuPopup}, menu header {filtered.MenuHeader}.");
     }
 
     private static void CaptureTheme(PublishedApp app, string log, string output, int scale, string theme, UiReviewLint lint, List<UiReviewShot> shots)
@@ -191,8 +197,11 @@ internal static class UiReview
                 OpenFileMenu(session);
                 Shoot(session, lint, output, shots, "menus", "파일 메뉴", theme, scale, size.Width, size.Height, null, steady: false);
                 session.Press(VirtualKeyShort.ESCAPE);
+                ParkPointer(session);
                 session.Press(VirtualKeyShort.F1);
                 Window about = WaitForAbout(session);
+                ParkPointer(session);
+                Thread.Sleep(200);
                 Shoot(session, lint, output, shots, "about", "단축키 도움말", theme, scale, size.Width, size.Height, about, steady: false);
                 CloseAbout(about);
                 session.WaitUntil(() => FindAbout(session) is null, TimeSpan.FromSeconds(8), "help dialog stayed open");
@@ -213,6 +222,9 @@ internal static class UiReview
     {
         if (steady)
             Steady(session);
+        ParkPointer(session);
+        if (state == "menus")
+            OpenFileMenu(session);
         Thread.Sleep(250);
         string file = $"{state}__{theme}__{width}x{height}__scale-{scale}.png";
         string path = Path.Combine(output, file);
@@ -236,6 +248,106 @@ internal static class UiReview
         lint.Inspect(session.Automation, roots, tabRoot, state, theme, width + "x" + height, scale);
         shots.Add(new UiReviewShot(file, state, label, theme, width, height, scale, lint.LastTabOrder.ToArray()));
         Console.WriteLine("captured " + file);
+    }
+
+    private static void ParkPointer(UiSession session)
+    {
+        // The caption has no content controls. A leftover hover on FileLabel opens a path tooltip that PrintWindow includes.
+        var bounds = session.Window.BoundingRectangle;
+        var spots = new (int X, int Y)[]
+        {
+            (bounds.Left + bounds.Width / 2, bounds.Top + 8),
+            (bounds.Left + 48, bounds.Top + 8),
+            (bounds.Right - 160, bounds.Top + 8),
+        };
+        for (int attempt = 0; attempt < spots.Length; attempt++)
+        {
+            try { Mouse.MoveTo(spots[attempt].X, spots[attempt].Y); }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+            Thread.Sleep(300);
+            if (!TooltipVisible(session))
+                return;
+        }
+        throw new InvalidOperationException("A tooltip stayed open before the screenshot.");
+    }
+
+    private static bool TooltipVisible(UiSession session)
+    {
+        if (ContainsOpenTooltip(session.Window))
+            return true;
+        AutomationElement[] windows;
+        try { windows = session.Automation.GetDesktop().FindAllChildren(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return false; }
+        int pid = session.App.ProcessId;
+        IntPtr main = session.Window.Properties.NativeWindowHandle.ValueOrDefault;
+        foreach (var window in windows)
+        {
+            try
+            {
+                if (window.Properties.ProcessId.ValueOrDefault != pid)
+                    continue;
+                IntPtr hwnd = window.Properties.NativeWindowHandle.ValueOrDefault;
+                if (hwnd != IntPtr.Zero && hwnd == main)
+                    continue;
+                if (IsOpenTooltip(window) || ContainsOpenTooltip(window))
+                    return true;
+            }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            {
+            }
+        }
+        return false;
+    }
+
+    private static bool ContainsOpenTooltip(AutomationElement root)
+    {
+        try
+        {
+            var tip = root.FindFirstDescendant(condition => condition.ByControlType(ControlType.ToolTip));
+            return tip is not null && IsShown(tip);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsOpenTooltip(AutomationElement element)
+    {
+        try
+        {
+            return element.Properties.ControlType.ValueOrDefault == ControlType.ToolTip && IsShown(element);
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsShown(AutomationElement element)
+    {
+        try
+        {
+            if (element.Properties.IsOffscreen.ValueOrDefault)
+                return false;
+            var bounds = element.BoundingRectangle;
+            return bounds.Width > 1 && bounds.Height > 1;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static void RejectRunnerPaths(string output)
+    {
+        foreach (string name in new[] { "ui-lint.json", "ui-lint.md" })
+        {
+            string text = File.ReadAllText(Path.Combine(output, name));
+            if (text.Contains("runneradmin", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("AppData", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(name + " still contains a runner user path.");
+        }
     }
 
     private static void Resize(UiSession session, int width, int height)

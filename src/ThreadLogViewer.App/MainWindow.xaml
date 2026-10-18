@@ -181,10 +181,10 @@
               <Expander.Header><TextBlock x:Name="ContentFilterHeader" Text="내용 필터" TextWrapping="Wrap" /></Expander.Header>
               <StackPanel x:Name="TextFilterControls" Margin="0,8,0,0" IsEnabled="{Binding CanChangeFilters, RelativeSource={RelativeSource AncestorType=Window}}">
                 <TextBlock Text="보여줄 기록 · 한 줄에 한 문구" FontSize="12" />
-                <TextBox x:Name="IncludeBox" AutomationProperties.AutomationId="IncludeBox" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음" TextChanged="Criteria_Changed" />
+                <TextBox x:Name="IncludeBox" AutomationProperties.AutomationId="IncludeBox" AutomationProperties.Name="보여줄 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음" TextChanged="Criteria_Changed" />
                 <ComboBox x:Name="IncludeModeBox" SelectedIndex="0" Margin="0,6,0,0" SelectionChanged="FilterOption_Changed" AutomationProperties.Name="포함 문구 일치 방식"><ComboBoxItem Content="하나라도 포함된 기록" /><ComboBoxItem Content="모두 포함된 기록" /></ComboBox>
                 <TextBlock Text="숨길 기록 · 한 줄에 한 문구" FontSize="12" Margin="0,10,0,0" />
-                <TextBox x:Name="ExcludeBox" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: heartbeat · 하나라도 포함되면 기록 전체를 숨김" TextChanged="Criteria_Changed" />
+                <TextBox x:Name="ExcludeBox" AutomationProperties.Name="숨길 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: heartbeat · 하나라도 포함되면 기록 전체를 숨김" TextChanged="Criteria_Changed" />
                 <CheckBox x:Name="FilterCaseBox" Content="대소문자 구분" Margin="0,8,0,6" Checked="FilterOption_Changed" Unchecked="FilterOption_Changed" />
                 <StackPanel Orientation="Horizontal">
                   <Button AutomationProperties.AutomationId="ApplyFilterButton" Content="필터 적용" Click="ApplyTextFilter_Click" />
@@ -217,7 +217,7 @@
           </ListBox>
         </DockPanel>
       </Border>
-      <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}" AutomationProperties.AutomationId="PanelSplitter" />
+      <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}" AutomationProperties.AutomationId="PanelSplitter" AutomationProperties.Name="스레드 패널 너비" />
       <Grid x:Name="LogContentGrid" Grid.Column="2">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />

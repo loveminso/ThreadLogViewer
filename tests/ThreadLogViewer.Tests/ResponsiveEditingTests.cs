@@ -115,6 +115,51 @@ public sealed class ResponsiveEditingTests
     });
 
     [Fact]
+    public Task NarrowClientShrinksTheThreadColumnSoTheLogBodyGetsWidth() => InSta(async () =>
+    {
+        using var folder = new Folder();
+        var window = new MainWindow(folder.Path, false);
+        try
+        {
+            await Load(window);
+            await Layout(window, 672, 480, 448);
+            var editor = Control<TextEditor>(window, "Editor");
+            var column = Control<ColumnDefinition>(window, "ThreadColumn");
+            Assert.True(column.ActualWidth <= 200, $"Narrow sidebar width: {column.ActualWidth:0.##}.");
+            Assert.True(editor.ActualWidth >= 430, $"Narrow editor width: {editor.ActualWidth:0.##}.");
+            Assert.Equal(295, column.Width.Value);
+            await Layout(window, 1280, 800, 760);
+            Assert.InRange(column.ActualWidth, 270, 320);
+            Assert.True(editor.ActualWidth > column.ActualWidth);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public Task NarrowWindowKeepsPreferredPanelWidth() => InSta(async () =>
+    {
+        using var folder = new Folder();
+        var store = new SettingsStore(folder.Path);
+        Assert.True(store.Save(new UiSettings { PanelWidth = 450 }).Success);
+        var window = new MainWindow(folder.Path, true);
+        try
+        {
+            await Load(window);
+            var column = Control<ColumnDefinition>(window, "ThreadColumn");
+            Assert.Equal(450, column.Width.Value);
+            Assert.True(column.Width.IsAbsolute);
+            await Layout(window, 672, 480, 448);
+            Assert.True(column.ActualWidth > 0 && column.ActualWidth <= 200, $"Narrow sidebar width: {column.ActualWidth:0.##}.");
+            Assert.Equal(450, column.Width.Value);
+            Invoke(window, "ScheduleSettingsSave");
+            Assert.True(Field<bool>(window, "settingsDirty"));
+            Invoke(window, "SaveSettingsNow");
+            Assert.Equal(450, new SettingsStore(folder.Path).Load().Settings.PanelWidth);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public Task EditingMenuRoutesCanExecuteAndExecutionToLastInputWithoutClipboardAccess() => InSta(async () =>
     {
         using var folder = new Folder(); var window = new MainWindow(folder.Path, false);

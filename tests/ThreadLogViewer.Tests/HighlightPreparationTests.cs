@@ -82,6 +82,12 @@ public sealed class HighlightPreparationTests
         Assert.DoesNotContain("\n", notice, StringComparison.Ordinal);
         Assert.DoesNotContain("\t", notice, StringComparison.Ordinal);
         Assert.DoesNotContain("\uD800", notice, StringComparison.Ordinal);
+        string flattened = KeywordRefreshFailure.SkippedNotice(
+            [new KeywordRefreshFailure.SkippedRule(1, 0, "\t alpha\r\nbeta\rgamma\t ")],
+            highlightedPlaces: 0);
+        Assert.Equal("강조 준비 실패 · 1번 주황 ‘alpha  beta gamma’ · 규칙을 확인한 뒤 다시 시도하세요.", flattened);
+        Assert.Contains("‘alpha  beta gamma’", flattened, StringComparison.Ordinal);
+        Assert.DoesNotContain("\r", flattened, StringComparison.Ordinal);
     }
 
     [Fact]
