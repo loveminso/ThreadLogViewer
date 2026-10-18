@@ -7,8 +7,11 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <PlatformTarget>x64</PlatformTarget>
-    <!-- Kept out of ThreadLogViewer.slnx so `dotnet test ThreadLogViewer.slnx` stays the unit-test run.
-         These tests need the published exe and an interactive desktop, and they run in a later CI step. -->
+    <OutputType>Exe</OutputType>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <StartupObject>ThreadLogViewer.UiTests.Program</StartupObject>
+    <!-- Kept out of ThreadLogViewer.slnx. dotnet test does not call Program.Main.
+         The gallery step runs this exe with the ui-review argument. -->
   </PropertyGroup>
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />

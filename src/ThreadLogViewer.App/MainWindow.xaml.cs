@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     public MainWindow(string? settingsDirectory, bool persistSettings)
     {
         InitializeComponent();
+        UiReviewHarness.Apply(this);
         Editor.TextArea.AllowDrop = true;
         Editor.TextArea.LeftMargins.Add(margin);
         margin.LineClicked += SelectWholeDisplayLine;

@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-test-publish:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
@@ -149,6 +149,85 @@ jobs:
           if ($iterationFailures.Count -gt 0) {
             throw ("UI iterations failed: " + ($iterationFailures -join '; '))
           }
+
+      - name: Capture UI review gallery and lint
+        id: ui-review
+        if: success()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $review = Join-Path (Get-Location) 'tests\ThreadLogViewer.UiTests\bin\Release\net10.0-windows\ThreadLogViewer.UiTests.exe'
+          $viewer = Join-Path (Get-Location) 'artifacts\ThreadLogViewer-win-x64\ThreadLogViewer.exe'
+          $out = Join-Path (Get-Location) 'TestResults\ui-review'
+          if (-not (Test-Path -LiteralPath $review)) { throw "UI review exe was not found: $review" }
+          if (-not (Test-Path -LiteralPath $viewer)) { throw "Published exe was not found: $viewer" }
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $failed = $false
+          $failure = ''
+          try {
+            & $review --ui-review $viewer $out
+            if ($LASTEXITCODE -ne 0) { throw "UI review step failed with exit $LASTEXITCODE." }
+          }
+          catch {
+            $failed = $true
+            $failure = $_.Exception.Message
+          }
+          $lint = Join-Path $out 'ui-lint.json'
+          if (Test-Path -LiteralPath $lint) {
+            $report = Get-Content -LiteralPath $lint -Raw -Encoding utf8 | ConvertFrom-Json
+            $summary = $report.summary
+            $lines = @(
+              ''
+              '## UI review'
+              ''
+              "Screenshots: $($report.screenshotCount)"
+              ''
+              'Lint warnings do not fail this job. A crash of the review step does.'
+              "Finding cap: $($report.findingCap) stored warnings per state, theme, and scale. Category counts are stored warnings. A capped bucket means the real count is higher."
+              ''
+              '| Category | Stored warnings |'
+              '| --- | ---: |'
+              "| truncated-text | $($summary.truncatedText) |"
+              "| outside-bounds | $($summary.outsideBounds) |"
+              "| tab-order | $($summary.tabOrder) |"
+              "| missing-name | $($summary.missingName) |"
+              "| stored | $($summary.stored) |"
+              "| dropped | $($summary.dropped) |"
+              ''
+              '| Scale | Stored | Dropped |'
+              '| --- | ---: | ---: |'
+            )
+            $scaleNotes = @()
+            foreach ($scale in @($report.scales)) {
+              $lines += "| $($scale.scale)% | $($scale.stored) | $($scale.dropped) |"
+              $sentence = "$($scale.scale)%: $($scale.stored)건 저장 / $($scale.dropped)건 생략"
+              if ($scale.capped) { $sentence += ', 실제 개수는 저장분보다 많음' }
+              $scaleNotes += $sentence
+            }
+            $lines += ''
+            foreach ($note in $scaleNotes) { $lines += $note }
+            $lines += ''
+            $lines += '| State | Theme | Scale | Stored | Dropped |'
+            $lines += '| --- | --- | ---: | ---: | ---: |'
+            foreach ($bucket in @($report.buckets)) {
+              $lines += "| $($bucket.state) | $($bucket.theme) | $($bucket.scale)% | $($bucket.stored) | $($bucket.dropped) |"
+            }
+            $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+          elseif (-not $failed) {
+            throw 'ui-lint.json was not written.'
+          }
+          if ($failed) { throw $failure }
+
+      - name: Upload UI review screenshots
+        id: ui-review-screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-review-screenshots
+          path: TestResults/ui-review/**
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload UI screenshots
         id: ui-screenshots
@@ -310,6 +389,7 @@ jobs:
             '## Artifacts'
             '- Test results (14 days): ${{ steps.test-results.outputs.artifact-url }}'
             '- UI screenshots on failure, one folder per iteration (14 days): ${{ steps.ui-screenshots.outputs.artifact-url }}'
+            '- UI review screenshots (14 days): ${{ steps.ui-review-screenshots.outputs.artifact-url }}'
             '- Windows x64 folder (14 days): ${{ steps.package.outputs.artifact-url }}'
             '- Windows x64 ZIP (14 days): ${{ steps.package-zip.outputs.artifact-url }}'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

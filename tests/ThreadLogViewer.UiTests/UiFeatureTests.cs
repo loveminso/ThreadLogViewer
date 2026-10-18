@@ -485,7 +485,7 @@ public sealed class UiFeatureTests(PublishedApp app)
     internal static void AssertRegisteredPhrase(UiSession session, string phrase)
     {
         Window? dialog = null;
-        for (int attempt = 1; dialog is null && attempt <= 2; attempt++)
+        for (int attempt = 1; dialog is null && attempt <= 3; attempt++)
         {
             if (attempt > 1)
             {
@@ -494,12 +494,17 @@ public sealed class UiFeatureTests(PublishedApp app)
                 Wait.UntilInputIsProcessed();
                 Thread.Sleep(200);
             }
-            ClickAnalysisItem(session, "강조 문구 관리");
+            session.WaitUntil(() => !session.IsBusy(), TimeSpan.FromSeconds(10), "viewer stayed busy before the highlight manager");
+            // A missed mouse click leaves the manager closed. Later attempts use the invoke pattern.
+            if (attempt == 1)
+                ClickAnalysisItem(session, "강조 문구 관리");
+            else
+                InvokeAnalysisItem(session, "강조 문구 관리");
             try
             {
                 session.WaitUntil(() => (dialog = HighlightDialog(session)) is not null, TimeSpan.FromSeconds(8), "highlight manager");
             }
-            catch (Xunit.Sdk.XunitException) when (attempt == 1)
+            catch (Xunit.Sdk.XunitException) when (attempt < 3)
             {
             }
         }
@@ -513,12 +518,21 @@ public sealed class UiFeatureTests(PublishedApp app)
         session.WaitUntil(() => HighlightDialog(session) is null, TimeSpan.FromSeconds(10), "highlight manager stayed open");
     }
 
-    private static void ClickAnalysisItem(UiSession session, string header)
+    private static void ClickAnalysisItem(UiSession session, string header) =>
+        ActivateAnalysisItem(session, header, invoke: false);
+
+    private static void InvokeAnalysisItem(UiSession session, string header) =>
+        ActivateAnalysisItem(session, header, invoke: true);
+
+    private static void ActivateAnalysisItem(UiSession session, string header, bool invoke)
     {
         var item = OpenAnalysisItem(session, header);
         if (!item.IsEnabled)
             throw new Xunit.Sdk.XunitException("Analysis item is disabled: " + header + " " + session.Describe());
-        item.Click();
+        if (invoke && item.Patterns.Invoke.TryGetPattern(out var pattern))
+            pattern.Invoke();
+        else
+            item.Click();
         Wait.UntilInputIsProcessed();
     }
 
