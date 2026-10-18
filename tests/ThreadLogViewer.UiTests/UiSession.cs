@@ -17,14 +17,14 @@ internal sealed class UiSession : IDisposable
     private readonly List<string> trace = [];
     private bool disposed;
 
-    public Application App { get; }
+    public FlaUI.Core.Application App { get; }
     public UIA3Automation Automation { get; }
     public Window Window { get; }
     public string ScreenshotDirectory { get; }
     public string Name { get; }
     public string ExePath { get; }
 
-    private UiSession(Application app, UIA3Automation automation, Window window, string screenshotDirectory, string name, string exePath)
+    private UiSession(FlaUI.Core.Application app, UIA3Automation automation, Window window, string screenshotDirectory, string name, string exePath)
     {
         App = app;
         Automation = automation;
@@ -44,10 +44,10 @@ internal sealed class UiSession : IDisposable
         if (!string.IsNullOrEmpty(argument))
             start.ArgumentList.Add(argument);
         var automation = new UIA3Automation();
-        Application? app = null;
+        FlaUI.Core.Application? app = null;
         try
         {
-            app = Application.Launch(start);
+            app = FlaUI.Core.Application.Launch(start);
             var window = app.GetMainWindow(automation, TimeSpan.FromSeconds(45))
                 ?? throw new InvalidOperationException("Main window did not appear.");
             var session = new UiSession(app, automation, window, screenshotDirectory, name, exePath);
