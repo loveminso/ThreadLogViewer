@@ -43,11 +43,10 @@ Windows x64용 읽기 전용 로그 뷰어다. UI는 `src/ThreadLogViewer.App`, 
 - UTF-16 LE/BE BOM이면 그 인코딩으로 디코딩한다.
 - UTF-32 BOM이면 `UTF-32는 지원하지 않습니다.`로 거절한다.
 - BOM이 없으면 엄격한 UTF-8을 먼저 시도한다. 설명은 `UTF-8로 해석 (BOM 없음; 추정)`.
-- BOM 없는 UTF-8이 파일 끝의 1~3바이트 미완성 문자 때문에만 실패하면 그 꼬리만 버리고 `(끝의 미완성 문자 제외)`를 붙인다. 그 외 실패는 엄격한 CP949로 다시 읽는다. 설명은 `CP949로 해석 (UTF-8 실패 후 대체; 추정)`.
-- UTF-8과 CP949가 모두 실패하면 거절한다.
+- 엄격한 디코딩이 스냅샷 끝의 미완성 문자 때문에만 실패하면 그 꼬리만 버리고 `(끝의 미완성 문자 제외)`를 붙인다. UTF-8은 끝의 1~3바이트, UTF-16은 끝의 홀수 바이트와 높은 서로게이트, CP949는 끝의 리드 바이트(`0x81`–`0xFE`)다. BOM은 `DecodeInBlocks`의 시작 위치로 한 번만 건너뛰고, 꼬리 길이는 그 뒤의 바이트 수에서 뺀다. 읽기마다 `GetDecoder`로 디코더를 새로 만든다.
+- BOM 없는 UTF-8의 그 외 실패는 엄격한 CP949로 다시 읽는다. 설명은 `CP949로 해석 (UTF-8 실패 후 대체; 추정)`. CP949도 끝의 미완성 리드 바이트만 같은 방식으로 버린다. 파일 전체가 그 리드 바이트뿐이면 버리지 않고 실패한다.
+- UTF-8과 CP949가 모두 실패하면 거절한다. 인식한 BOM의 잘못된 페이로드는 CP949로 넘어가지 않는다.
 - 메뉴의 수동 선택은 `EncodingMode.Cp949`다. 설명은 `CP949 (사용자 지정; 자동 판별 아님)`.
-
-BOM이 있는 UTF-8은 끝의 미완성 문자를 버리지 않는다. 이 차이는 아래 수정 4다.
 
 ### 줄 색인
 
@@ -55,7 +54,7 @@ BOM이 있는 UTF-8은 끝의 미완성 문자를 버리지 않는다. 이 차�
 
 ### 쓰는 중인 파일과 F5
 
-F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`다 (`src/ThreadLogViewer.App/MainWindow.Refresh.cs`). `CanRefreshCurrentSession`이 참일 때만 동작한다. 경로가 있는 전체 파일 탭이어야 하고, 빈 탭과 범위 분리 탭은 제외한다. 같은 `EncodingMode`로 `LogFileReader.ReadAsync`를 다시 호출한다. 백그라운드에서 `SourceLineRemap.Create`로 이전 줄과 새 줄을 맞춘 뒤, 필터·주변 보기·문서를 다시 만든다. 위치 복원 중에 사용자가 바꾼 검색·선택·위치·필터·강조·시간·문맥·탐색 이력은 `SameRefreshState`로 감지하고, 이미 만든 같은 원문·투영으로 다시 맞춘다. 사라지거나 중복된 위치는 개수를 상태줄에 알린다. 취소·실패 시 이전 세션을 유지하고, 실패 제목은 `파일 새로 고침 실패`다.
+F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`다 (`src/ThreadLogViewer.App/MainWindow.Refresh.cs`). `CanRefreshCurrentSession`이 참일 때만 동작한다. 경로가 있는 전체 파일 탭이어야 하고, 빈 탭과 범위 분리 탭은 제외한다. 같은 `EncodingMode`로 `LogFileReader.ReadAsync`를 다시 호출한다. 잡은 길이가 문자 중간이면 그 미완성 문자만 빠지고 새로 고침은 실패하지 않는다. 문자가 이어지면 다음 F5에 그 줄이 한 번 나타난다. 백그라운드에서 `SourceLineRemap.Create`로 이전 줄과 새 줄을 맞춘 뒤, 필터·주변 보기·문서를 다시 만든다. 위치 복원 중에 사용자가 바꾼 검색·선택·위치·필터·강조·시간·문맥·탐색 이력은 `SameRefreshState`로 감지하고, 이미 만든 같은 원문·투영으로 다시 맞춘다. 사라지거나 중복된 위치는 개수를 상태줄에 알린다. 취소·실패 시 이전 세션을 유지하고, 실패 제목은 `파일 새로 고침 실패`다.
 
 ### 검색
 
@@ -140,7 +139,7 @@ WPF 디스패처가 UI 스레드다. 파일 대화상자, 상태줄, 에디터 �
 
 풀 리퀘스트는 `.github/workflows/pr-ci.yml`의 `build-test-publish`가 처리한다. Release 빌드 다음 순서는 `ThreadLogViewer.slnx` 단위 테스트, `scripts/publish.ps1`, UI 테스트다.
 
-UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다 워크플로가 `TestResults/pr-ci` 아래에 `ui-tests-1.trx`, `ui-tests-2.trx`, `ui-tests-3.trx`와 콘솔 로그를 남긴다. 이 결과 폴더는 실행이 만든 출력이고 저장소에는 없다. 워크플로 환경 변수 `UI_TEST_EXPECTED_PASSED`, `UI_TEST_EXPECTED_SKIPPED`, `UI_TEST_EXPECTED_TOTAL`, `UI_TEST_EXPECTED_FAILED`와 TRX `Counters`를 비교한다. 현재 값은 14, 1, 15, 0이다. 세 회차 모두 같아야 하고, 한 회차라도 다르거나 프로세스가 실패하면 잡이 실패한다. 필수 시나리오 이름은 워크플로의 `$required` 배열에 있다. 워크플로는 `TestResults/ui-screenshots/iteration-N`을 만들고 `UI_SCREENSHOT_DIR`로 넘긴다. 실패한 테스트가 그 폴더에 화면을 저장한다. 잡이 실패하면 그 폴더를 `ui-screenshots` 아티팩트로 올린다. 테스트 결과 TRX는 `pr-test-results`, 게시 폴더는 `ThreadLogViewer-win-x64`, ZIP 아티팩트 이름은 `ThreadLogViewer-win-x64-zip`이다. ZIP 단계는 `scripts/publish.ps1`이 만든 게시 폴더를 올린다. 세 회차 뒤에 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review`로 한 번 실행한다. 이 경로는 xUnit 시나리오가 아니고 `Program.Main`이며, `dotnet test`는 그 진입점을 호출하지 않는다. `UI_TEST_EXPECTED_*`와 `$required`는 바꾸지 않는다. 뷰어 프로세스에만 `THREADLOGVIEWER_UI_REVIEW=1`을 넣고, 150% 촬영에는 `THREADLOGVIEWER_UI_REVIEW_SCALE=150`을 더한다. 그 프로세스는 `src/ThreadLogViewer.App/UiReviewHarness.cs`가 소프트웨어 렌더링과 내용 `LayoutTransform`을 적용하고, 메인 창 배치 코드가 모니터 클램프를 건너뛴다. 강조 문구 관리와 도움말 창은 그 모드에서도 소유 창이 있는 모니터의 작업 영역 안에 둔다. 변수가 없으면 동작은 같다. 세션 DPI는 바꾸지 않는다. 화면은 아티팩트 `ui-review-screenshots`로 올리고, 린트 경고는 그 잡의 실패 조건이 아니다. 경고는 상태·테마·배율마다 400건까지만 저장하고, 넘친 수는 생략으로 적는다. 절차와 한계는 [검증 안내](TESTING.md)에 있다.
+UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다 워크플로가 `TestResults/pr-ci` 아래에 `ui-tests-1.trx`, `ui-tests-2.trx`, `ui-tests-3.trx`와 콘솔 로그를 남긴다. 이 결과 폴더는 실행이 만든 출력이고 저장소에는 없다. 워크플로 환경 변수 `UI_TEST_EXPECTED_PASSED`, `UI_TEST_EXPECTED_SKIPPED`, `UI_TEST_EXPECTED_TOTAL`, `UI_TEST_EXPECTED_FAILED`와 TRX `Counters`를 비교한다. 현재 값은 15, 0, 15, 0이다. 세 회차 모두 같아야 하고, 한 회차라도 다르거나 프로세스가 실패하면 잡이 실패한다. 필수 시나리오 이름은 워크플로의 `$required` 배열에 있다. 워크플로는 `TestResults/ui-screenshots/iteration-N`을 만들고 `UI_SCREENSHOT_DIR`로 넘긴다. 실패한 테스트가 그 폴더에 화면을 저장한다. 잡이 실패하면 그 폴더를 `ui-screenshots` 아티팩트로 올린다. 테스트 결과 TRX는 `pr-test-results`, 게시 폴더는 `ThreadLogViewer-win-x64`, ZIP 아티팩트 이름은 `ThreadLogViewer-win-x64-zip`이다. ZIP 단계는 `scripts/publish.ps1`이 만든 게시 폴더를 올린다. 세 회차 뒤에 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review`로 한 번 실행한다. 이 경로는 xUnit 시나리오가 아니고 `Program.Main`이며, `dotnet test`는 그 진입점을 호출하지 않는다. `UI_TEST_EXPECTED_*`와 `$required`는 바꾸지 않는다. 뷰어 프로세스에만 `THREADLOGVIEWER_UI_REVIEW=1`을 넣고, 150% 촬영에는 `THREADLOGVIEWER_UI_REVIEW_SCALE=150`을 더한다. 그 프로세스는 `src/ThreadLogViewer.App/UiReviewHarness.cs`가 소프트웨어 렌더링과 내용 `LayoutTransform`을 적용하고, 메인 창 배치 코드가 모니터 클램프를 건너뛴다. 강조 문구 관리와 도움말 창은 그 모드에서도 소유 창이 있는 모니터의 작업 영역 안에 둔다. 변수가 없으면 동작은 같다. 세션 DPI는 바꾸지 않는다. 화면은 아티팩트 `ui-review-screenshots`로 올리고, 린트 경고는 그 잡의 실패 조건이 아니다. 경고는 상태·테마·배율마다 400건까지만 저장하고, 넘친 수는 생략으로 적는다. 절차와 한계는 [검증 안내](TESTING.md)에 있다.
 
 `main`에 푸시하거나 `main` ref에서 수동 실행하면 `.github/workflows/windows-release.yml`의 `release` 잡이 돈다. 다른 ref의 수동 실행은 `github.ref`가 `refs/heads/main`이 아니어서 잡이 건너뛰어진다. `Directory.Build.props`의 `Version`으로 `v` 태그를 만들고, 그 태그의 릴리스가 이미 공개됐으면 `publish=false`로 빌드·테스트·ZIP을 건너뛴다. 릴리스가 없거나 아직 초안이면 `publish=true`로 Release 빌드, `ThreadLogViewer.slnx` 테스트, `scripts/publish.ps1`, `scripts/verify-release.ps1`을 진행한다. 이어서 초안에 ZIP을 올리고 자산을 확인한 뒤 `draft=false`로 공개하고, 공개 다운로드 해시를 대조한다. 같은 태그가 다른 커밋을 가리키면 버전 선택 단계에서 실패한다.
 
@@ -148,15 +147,13 @@ UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다
 
 ## 알려진 한계와 열린 수정
 
-아래 번호는 코드와 현재 문서가 아직 남겨 둔 항목이다. 구현된 기능으로 적지 않는다.
+아래 번호는 코드와 현재 문서가 아직 남겨 둔 항목이다. 구현된 기능으로 적지 않는다. 수정 4(쓰는 중인 UTF-8 BOM의 F5)는 반영했다. 동작은 위 인코딩 절과 F5 절을 따른다.
 
 **수정 3. 화면 설정 저장.** 기본 파일은 실행 폴더의 `user-data\ui-settings.json`이고 형식은 `SettingsStore`와 `UiSettings`의 schema 1 그대로다. 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 같은 검사를 거쳐 저장한다. 파일을 옮기거나 형식을 바꾸지 않는다. 성공한 다시 실행은 UI 테스트 `Scenario12_SettingsPersistAfterRestart`가 판정한다 (`tests/ThreadLogViewer.UiTests/UiFeatureTests.cs`). 쓸 수 없는 실행 폴더, 두 위치 모두 실패, 두 파일이 있을 때의 실행 폴더 우선은 `tests/ThreadLogViewer.Tests/SettingsFallbackTests.cs`가 판정한다. 저장이 실패하는 경로의 UI 테스트는 없다. 그 공백은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 높은 우선순위 10번 설명에 있다. `README.md`, `docs/PLAN.md`, `docs/VALIDATION-v0.8.2.md`의 v0.8.2 한계 목록은 기능 10 전체를 UI 자동 테스트가 없다고 적는데, 그 문장은 `Scenario12`보다 이전이다. 현재 자동 판정 범위는 `docs/FEATURE-TEST-GUIDE.md`의 매핑 표를 따른다.
 
-**수정 4. UTF-8 BOM을 쓰는 중의 F5.** `LogFileReader.Decode`는 BOM을 확정 인코딩으로 보고 엄격한 UTF-8로 디코딩한다. 스냅샷이 문자 중간에서 끝나면 `DecoderFallbackException`이 나고 F5는 `파일 새로 고침 실패`로 끝난다. BOM 없는 UTF-8만 끝의 미완성 문자를 버린다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 이 때문에 건너뛴다. 건너뛰는 이유는 `tests/ThreadLogViewer.UiTests/UiScenarioTests.cs`의 `BomTruncationSkip`과 [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md), [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)에 있다. 앱 동작은 이 한계를 유지한다.
-
 **수정 5. 약 1GB 파일의 메모리.** `LogFileReader`는 길이가 `int.MaxValue`를 넘으면 `2GB 이상의 파일을 지원하지 않습니다.`로 거절한다. 읽기 중에는 그 길이의 바이트 배열을 잡지만, 디코딩이 끝나면 그 배열을 비우고 탭에 남기지 않는다. 탭에 남는 것은 디코딩된 `LogData.Text`, 줄 메타데이터, AvalonEdit 문서에 복사된 본문이다. 모든 줄을 보이는 투영의 `LogProjection.Text`는 `LogData.Text`와 같은 문자열이다. 필터나 범위로 일부만 보이면 `LogProjection.Text`는 따로 만든 문자열이다. 2GB 미만이라도 파일 크기에 비례해 메모리가 늘고, 1GB에 가까운 파일은 디코딩 문자열과 문서 복사본 때문에 메모리 한계에 닿을 수 있다. 구간 로딩은 없다. `README.md`의 `구조와 현재 한계`는 탭마다 디코딩 원문·행 정보·표시 문서를 유지하고, 2GB 이상을 막으며, 그 미만도 RAM과 줄 길이에 달렸다고 적는다. [v0.8.0 검증 기록](VALIDATION-v0.8.0.md)은 합성 100 MiB 측정이고, 구간 로딩과 전체 메모리 상한을 넣지 않았다고 적는다. 1GB 파일을 연 실측은 그 문서에 없다. [v0.6.3 UX 검토](UX-REVIEW-v0.6.3.md)는 100 MiB 콘솔 측정과 원본 바이트·문자열·투영·문서 유지를 적는다. [계획](PLAN.md)의 대용량 최적화 후보는 메모리 매핑·구간 로딩·투영 증분 처리다.
 
-**CP949를 쓰는 중의 F5는 그 순간이 검증되지 않았다.** BOM 없는 UTF-8과 CP949의 F5 20회는 `Scenario05_RefreshWhileAppendingKorean`이 실행한다. CP949는 2바이트 문자가 읽기 길이에 걸리면 실패할 수 있어, 도우미는 F5 사이에만 완전한 줄을 추가하고 F5를 누르는 순간에는 쓰지 않는다. 이 한계는 [검증 안내](TESTING.md), `README.md`, `docs/PLAN.md`, [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)에 있다.
+**CP949 UI 시나리오는 F5를 누르는 순간 쓰지 않는다.** `Scenario05_RefreshWhileAppendingKorean`의 CP949는 도우미가 F5 사이에만 완전한 줄을 추가하고, F5를 누르는 동안에는 멈춘다. 문자 중간에서 끊긴 UTF-8·UTF-16·CP949 스냅샷은 `tests/ThreadLogViewer.Tests/AppendingEncodingTests.cs`가 판정한다. 읽기는 그 미완성 문자만 버린다. `README.md`, `docs/PLAN.md`, [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)의 v0.8.2 한계 목록은 그 이전 동작이다.
 
 **실제 Explorer 끌어 놓기는 자동화하지 않는다.** CI는 테스트 프로세스가 OLE 드래그 소스가 되어 창에 놓는다. 절차는 [검증 안내](TESTING.md)의 Windows UI 자동화 절이다. 실제 Explorer 창에서 끌어 오는 경우는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)과 `docs/PLAN.md`가 알려진 한계로 적는다.
 
@@ -172,4 +169,4 @@ UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다
 - [검증 안내](TESTING.md)의 판정 범위와 회차 건수.
 - 이 문서에서 경로, 형식 이름, 데이터 흐름이 바뀐 절.
 
-UI 건수는 `.github/workflows/pr-ci.yml` 환경 변수 네 개다. `Assert-UiTrxCounts`가 회차마다 TRX의 passed, skipped, total, failed를 그 변수와 비교한다. skipped는 `Read-UiTrxStats`가 `notExecuted`로 읽고, 그 값이 비었거나 0이고, `executed > 0`이며 `total > executed`이면 skipped는 total − executed다. 하나라도 다르면 세 회차를 모두 돈 뒤 UI 테스트 단계가 실패하고 잡이 실패한다. `dotnet test` 종료 코드가 0이어도 같다. 시나리오를 추가하면 `$required`에 메서드 이름을 넣고 `UI_TEST_EXPECTED_TOTAL`과 passed 또는 skipped를 같이 올린다. `--ui-review` 갤러리 실행은 시나리오가 아니므로 그 건수에 넣지 않는다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 다시 실행하면 skipped는 0, passed는 15, total은 15, failed는 0이어야 한다. 변수, `$required`, [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 표를 같은 변경에서 맞춘다.
+UI 건수는 `.github/workflows/pr-ci.yml` 환경 변수 네 개다. `Assert-UiTrxCounts`가 회차마다 TRX의 passed, skipped, total, failed를 그 변수와 비교한다. skipped는 `Read-UiTrxStats`가 `notExecuted`로 읽고, 그 값이 비었거나 0이고, `executed > 0`이며 `total > executed`이면 skipped는 total − executed다. 하나라도 다르면 세 회차를 모두 돈 뒤 UI 테스트 단계가 실패하고 잡이 실패한다. `dotnet test` 종료 코드가 0이어도 같다. 시나리오를 추가하면 `$required`에 메서드 이름을 넣고 `UI_TEST_EXPECTED_TOTAL`과 passed 또는 skipped를 같이 올린다. `--ui-review` 갤러리 실행은 시나리오가 아니므로 그 건수에 넣지 않는다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 실행 중이고 skipped는 0, passed는 15, total은 15, failed는 0이다. 변수, `$required`, [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 표를 같은 변경에서 맞춘다.

@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-[기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정한다. 수동 확인은 SmartScreen만 해당한다. 실제 Explorer 끌어 놓기는 알려진 한계다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)을 따른다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 수정 4 때문에 건너뛴다.
+[기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정한다. 수동 확인은 SmartScreen만 해당한다. 실제 Explorer 끌어 놓기는 알려진 한계다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)을 따른다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그에서 F5를 20회 실행한다.
 
 ## 자동 회귀
 
@@ -29,7 +29,7 @@ CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행�
 
 ## UI 리뷰 갤러리와 린트
 
-UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 14, 건너뜀 1, 전체 15, 실패 0과 `$required`는 그대로다. 건너뛰는 테스트는 계속 `Scenario05_Utf8Bom_RefreshWhileAppending`뿐이다.
+UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 15, 건너뜀 0, 전체 15, 실패 0과 `$required`는 그대로다. 건너뛰는 UI 테스트는 없다.
 
 갤러리는 임시 폴더의 합성 로그만 연다. 상태는 빈 시작, 연 로그, 검색 결과, 적용된 필터, 주변 로그, 강조 문구 관리, 강조 준비 실패 안내, 파일 메뉴, 단축키 도움말이다. 각 상태를 1024×768과 1920×1080, 배율 100%와 150%, 다크와 라이트로 찍는다. 앱에 두 테마가 이미 있으므로 테마를 추가하지 않는다. 기대 파일 수는 9×2×2×2인 72다.
 
@@ -47,11 +47,11 @@ CI는 Windows 세션 DPI를 바꾸지 않는다. 150%는 뷰어 프로세스에�
 - 메뉴 팝업의 `outside-bounds`: 종류가 `Menu` 또는 `MenuItem`이고, 그 요소의 최상위 창이 메인 창이 아닐 때만 창 밖과 부모 밖 검사를 뺀다. 열린 팝업이 여기 해당한다. 메인 창의 메뉴 막대와 그 항목은 범위 검사에 남으므로, 150%에서 메뉴 막대가 넘치면 경고로 남는다. 뺀 경고는 `menuPopup`으로 센다.
 - 메뉴 머리글의 말줄임: 부모가 `MenuItem`인 텍스트를 통째로 빼지 않는다. 이름에서 `(_X)`와 `_`를 지운 뒤 같은 잘림 검사를 다시 한다. 지운 뒤에도 잘리거나 말줄임이면 경고로 남긴다. 지우기 전에는 경고였고 지운 뒤에는 아니면 `menuHeader`로 센다. 내용 필터 머리글과 검색 결과의 말줄임은 부모가 메뉴 항목이 아니므로 접근 키를 지우지 않고 그대로 검사한다.
 
-`Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning`은 합성 로그를 연 뒤 올바른 문구를 강조하고, ‘강조 문구 관리’에서 깨진 UTF-16 강조 문구(짝 없는 서로게이트)를 하나 더 적용한다. 준비 단계가 그 규칙만 건너뛰면 상태 막대에 실패한 규칙을 가리키는 `강조 준비 실패`가 보이고, 올바른 문구는 계속 강조되며, 메인 창은 열린 채로 남는다. 일반 문구와 올바른 서로게이트 쌍은 그대로 준비된다. UTF-8 BOM의 잘린 마지막 문자는 아직 실패한다(fix 4). `LogFileReader.Decode`는 BOM을 확정 인코딩으로 보고 엄격한 UTF-8로 디코딩하며, BOM 없는 UTF-8만 끝의 미완성 문자를 버린다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 그래서 건너뛰고 앱 동작은 바꾸지 않는다. BOM 없는 UTF-8과 CP949는 F5 20회를 실행한다. CP949는 2바이트 문자가 읽기 길이에 걸리면 실패할 수 있어, 도우미가 파일을 연 채 F5 사이에만 완전한 줄을 추가하고 F5 순간에는 쓰지 않는다.
+`Scenario04_BadHighlightRuleShowsPrepareFailureAndKeepsRunning`은 합성 로그를 연 뒤 올바른 문구를 강조하고, ‘강조 문구 관리’에서 깨진 UTF-16 강조 문구(짝 없는 서로게이트)를 하나 더 적용한다. 준비 단계가 그 규칙만 건너뛰면 상태 막대에 실패한 규칙을 가리키는 `강조 준비 실패`가 보이고, 올바른 문구는 계속 강조되며, 메인 창은 열린 채로 남는다. 일반 문구와 올바른 서로게이트 쌍은 그대로 준비된다. 스냅샷이 문자 중간에서 끝나면 `LogFileReader.Decode`가 그 미완성 문자만 버리고 이미 쓰인 줄을 읽는다. UTF-8(BOM 있음·없음), UTF-16, CP949가 같다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 UTF-8 BOM에서 F5 20회를 실행한다. BOM 없는 UTF-8과 CP949도 F5 20회를 실행한다. CP949 도우미는 F5 사이에만 완전한 줄을 추가하고 F5 순간에는 쓰지 않는다. 문자 중간에서 끊긴 읽기는 단위 테스트가 판정한다.
 
 ## 실제 화면과 성능
 
-`Scenario01`~`Scenario14`가 기능 표의 GUI와 작은 화면의 강조·도움말 창을 판정한다. 세 회차 모두 통과 14, 건너뜀 1, 전체 15, 실패 0이다. `Scenario14_HighlightAndHelpWindowsFitWorkArea`는 메인 창을 1024×768과 그 모니터 작업 영역 중 더 작은 쪽에 둔 뒤 강조 문구 관리와 단축키 도움말이 작업 영역 안에 있고, `적용`·`취소`·`확인`이 화면 안에 있으며 오프스크린이 아닌지 본다. 건너뛰는 테스트는 `Scenario05_Utf8Bom_RefreshWhileAppending`이며 이유는 수정 4다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
+`Scenario01`~`Scenario14`가 기능 표의 GUI와 작은 화면의 강조·도움말 창을 판정한다. 세 회차 모두 통과 15, 건너뜀 0, 전체 15, 실패 0이다. `Scenario14_HighlightAndHelpWindowsFitWorkArea`는 메인 창을 1024×768과 그 모니터 작업 영역 중 더 작은 쪽에 둔 뒤 강조 문구 관리와 단축키 도움말이 작업 영역 안에 있고, `적용`·`취소`·`확인`이 화면 안에 있으며 오프스크린이 아닌지 본다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그의 F5를 판정한다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
 

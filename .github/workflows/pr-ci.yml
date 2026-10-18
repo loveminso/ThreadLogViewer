@@ -21,8 +21,8 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
       DOTNET_NOLOGO: '1'
       # Expected per-iteration UI test TRX counters (update when scenarios are added or un-skipped).
-      UI_TEST_EXPECTED_PASSED: '14'
-      UI_TEST_EXPECTED_SKIPPED: '1'
+      UI_TEST_EXPECTED_PASSED: '15'
+      UI_TEST_EXPECTED_SKIPPED: '0'
       UI_TEST_EXPECTED_TOTAL: '15'
       UI_TEST_EXPECTED_FAILED: '0'
     defaults:
