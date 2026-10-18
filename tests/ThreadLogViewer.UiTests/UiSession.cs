@@ -480,7 +480,7 @@ internal sealed class UiSession : IDisposable
         save.AsButton().Invoke();
     }
 
-    private string Describe()
+    internal string Describe()
     {
         string status = Safe(() => Status());
         string file = Safe(() => Text("FileLabel"));
