@@ -30,9 +30,9 @@ public sealed class AppendingEncodingTests
         Assert.Contains(sample.DescriptionPart, opened.EncodingDescription);
         Assert.DoesNotContain("미완성", opened.EncodingDescription);
 
-        byte[] before = await File.ReadAllBytesAsync(path);
+        byte[] before = await ReadShared(path);
         await Write(writer, sample.Encoding.GetBytes(Added));
-        byte[] after = await File.ReadAllBytesAsync(path);
+        byte[] after = await ReadShared(path);
         var refreshed = await LogFileReader.ReadAsync(path, sample.Mode);
 
         AssertLines(refreshed.Text, Seed, Added);
@@ -42,7 +42,7 @@ public sealed class AppendingEncodingTests
             Assert.Contains("CP949", refreshed.EncodingDescription, StringComparison.Ordinal);
         else
             Assert.DoesNotContain("CP949", refreshed.EncodingDescription, StringComparison.Ordinal);
-        Assert.Equal(after, await File.ReadAllBytesAsync(path));
+        Assert.Equal(after, await ReadShared(path));
         Assert.Equal(after, before.Concat(sample.Encoding.GetBytes(Added)).ToArray());
     }
 
@@ -68,19 +68,19 @@ public sealed class AppendingEncodingTests
         await Write(writer, Frame(sample, Seed));
         await Write(writer, partial);
 
-        byte[] during = await File.ReadAllBytesAsync(path);
+        byte[] during = await ReadShared(path);
         var truncated = await LogFileReader.ReadAsync(path, sample.Mode);
         AssertLines(truncated.Text, Seed);
         Assert.Contains("끝의 미완성 문자 제외", truncated.EncodingDescription);
         Assert.Contains(sample.DescriptionPart, truncated.EncodingDescription);
-        Assert.Equal(during, await File.ReadAllBytesAsync(path));
+        Assert.Equal(during, await ReadShared(path));
 
         await Write(writer, rest);
-        byte[] finished = await File.ReadAllBytesAsync(path);
+        byte[] finished = await ReadShared(path);
         var refreshed = await LogFileReader.ReadAsync(path, sample.Mode);
         AssertLines(refreshed.Text, Seed, completed);
         Assert.DoesNotContain("미완성", refreshed.EncodingDescription);
-        Assert.Equal(finished, await File.ReadAllBytesAsync(path));
+        Assert.Equal(finished, await ReadShared(path));
         Assert.Equal(1, Count(refreshed.Text, "가나다 이어서"));
         Assert.Equal(1, Count(refreshed.Text, "합성원문"));
     }
@@ -128,7 +128,7 @@ public sealed class AppendingEncodingTests
         Assert.Equal("UTF-8 (BOM 확인)", first.EncodingDescription);
         Assert.DoesNotContain('\uFEFF', first.Text);
         Assert.DoesNotContain('\uFFFD', first.Text);
-        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, await File.ReadAllBytesAsync(path));
+        Assert.Equal(new byte[] { 0xEF, 0xBB, 0xBF }, await ReadShared(path));
 
         var utf8 = new UTF8Encoding(false, true);
         await Write(writer, utf8.GetBytes(Seed + Added));
@@ -158,6 +158,22 @@ public sealed class AppendingEncodingTests
             index += value.Length;
         }
         return count;
+    }
+
+    private static async Task<byte[]> ReadShared(string path)
+    {
+        // File.ReadAllBytes opens with FileShare.Read, which Windows rejects while this test
+        // still holds the file for append. The viewer uses ReadWrite | Delete; match that.
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var bytes = new byte[checked((int)stream.Length)];
+        int offset = 0;
+        while (offset < bytes.Length)
+        {
+            int count = await stream.ReadAsync(bytes.AsMemory(offset));
+            if (count == 0) throw new EndOfStreamException(path);
+            offset += count;
+        }
+        return bytes;
     }
 
     private static async Task Write(FileStream writer, byte[] bytes)

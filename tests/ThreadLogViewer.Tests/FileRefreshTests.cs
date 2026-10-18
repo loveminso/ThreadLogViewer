@@ -243,7 +243,7 @@ public sealed class FileRefreshTests
             byte[] addition = utf8.GetBytes(added);
             await writer.WriteAsync(addition);
             await writer.FlushAsync();
-            byte[] beforeRefresh = await File.ReadAllBytesAsync(path);
+            byte[] beforeRefresh = await ReadShared(path);
             await Refresh(window);
             var source = Field<LogData>(window, "data");
             Assert.Equal(seed + added, source.Text);
@@ -252,7 +252,7 @@ public sealed class FileRefreshTests
             Assert.DoesNotContain("파일 새로 고침 실패", Control<TextBlock>(window, "OperationStatus").Text);
             Assert.DoesNotContain('\uFFFD', source.Text);
             Assert.DoesNotContain('\uFEFF', source.Text);
-            Assert.Equal(beforeRefresh, await File.ReadAllBytesAsync(path));
+            Assert.Equal(beforeRefresh, await ReadShared(path));
 
             await writer.WriteAsync(character.AsMemory(0, character.Length - 1));
             await writer.FlushAsync();
@@ -267,7 +267,7 @@ public sealed class FileRefreshTests
             await writer.WriteAsync(character.AsMemory(character.Length - 1, 1));
             await writer.WriteAsync(utf8.GetBytes("나다 이어서\n"));
             await writer.FlushAsync();
-            byte[] finalBytes = await File.ReadAllBytesAsync(path);
+            byte[] finalBytes = await ReadShared(path);
             await Refresh(window);
             source = Field<LogData>(window, "data");
             Assert.Equal(seed + added + finished, source.Text);
@@ -279,7 +279,7 @@ public sealed class FileRefreshTests
             Assert.Equal(1, source.Text.Split("합성원문").Length - 1);
             Assert.Equal(1, source.Text.Split("똠방각하").Length - 1);
             Assert.Equal(1, source.Text.Split("가나다 이어서").Length - 1);
-            Assert.Equal(finalBytes, await File.ReadAllBytesAsync(path));
+            Assert.Equal(finalBytes, await ReadShared(path));
         }
         finally { window.Close(); }
     });
@@ -308,6 +308,20 @@ public sealed class FileRefreshTests
         }
         finally { window.Close(); }
     });
+
+    private static async Task<byte[]> ReadShared(string path)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var bytes = new byte[checked((int)stream.Length)];
+        int offset = 0;
+        while (offset < bytes.Length)
+        {
+            int count = await stream.ReadAsync(bytes.AsMemory(offset));
+            if (count == 0) throw new EndOfStreamException(path);
+            offset += count;
+        }
+        return bytes;
+    }
 
     private static Task Refresh(MainWindow window) => (Task)Invoke(window, "RefreshCurrentSessionAsync")!;
     private static Task<bool> Open(MainWindow window, string path, EncodingMode mode = EncodingMode.Auto) => (Task<bool>)Invoke(window, "OpenAsync", path, mode)!;
