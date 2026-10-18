@@ -21,6 +21,7 @@ public sealed class SettingsStore
     public const int SchemaVersion = 1;
     private const int MaximumBytes = 64 * 1024;
     private const string SaveFailedMessage = "설정을 저장하지 못했습니다. 현재 화면 설정은 유지됩니다.";
+    private const string LoadFailedMessage = "설정을 읽지 못했습니다. 기존 파일을 보존합니다.";
     private const string SavedMessage = "표시 설정을 저장했습니다.";
     private readonly string applicationDirectory;
     private readonly string? fallbackRoot;
@@ -32,6 +33,7 @@ public sealed class SettingsStore
     {
         this.applicationDirectory = Path.GetFullPath(applicationDirectory);
         FilePath = Path.Combine(this.applicationDirectory, "user-data", "ui-settings.json");
+        // A missing fallback root disables the second location. Production passes LocalApplicationData explicitly.
         this.fallbackRoot = ResolveFallbackRoot(fallbackRoot);
         FallbackFilePath = this.fallbackRoot is null
             ? null
@@ -50,7 +52,7 @@ public sealed class SettingsStore
             }
             catch (Exception ex) when (IsExpectedFailure(ex))
             {
-                return new(UiSettings.Default, false, $"설정을 읽지 못했습니다. 기존 파일을 보존합니다: {ex.Message}", false);
+                return new(UiSettings.Default, false, LoadFailedMessage, false);
             }
         }
     }
@@ -159,9 +161,8 @@ public sealed class SettingsStore
 
     private static string? ResolveFallbackRoot(string? fallbackRoot)
     {
-        string root = fallbackRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(root)) return null;
-        string full = Path.GetFullPath(root);
+        if (string.IsNullOrWhiteSpace(fallbackRoot)) return null;
+        string full = Path.GetFullPath(fallbackRoot);
         string file = Path.GetFullPath(Path.Combine(full, "ThreadLogViewer", "ui-settings.json"));
         string prefix = full.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         return file.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? full : null;

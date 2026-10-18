@@ -14,7 +14,7 @@
 - 코드를 바꾸기 전에 `docs/DESIGN.md`를 읽고, 구조가 바뀌면 그 문서도 함께 갱신한다.
 - 개발 언어는 C#이며, .NET 10 + WPF + AvalonEdit를 사용한다. 기존 기술 스택과 디자인을 따른다.
 - UI는 `src/ThreadLogViewer.App/`, UI와 독립적인 핵심 로직은 `src/ThreadLogViewer.Core/`, 자동 테스트는 `tests/ThreadLogViewer.Tests/`에 있다.
-- 화면 설정 저장은 현재 `src/ThreadLogViewer.App/SettingsStore.cs`와 `UiSettings.cs`가 담당한다. 기본 위치는 실행 폴더의 `user-data\ui-settings.json`이고, 그 위치에 쓸 수 없을 때만 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 저장한다. 저장 로직이라는 이유로 파일을 옮기거나 형식을 변경하지 않는다. 현재 DB는 사용하지 않으며 위의 DB 금지 지침을 유지한다.
+- 화면 설정 저장은 현재 `src/ThreadLogViewer.App/SettingsStore.cs`와 `UiSettings.cs`가 담당한다. 기본 위치는 실행 폴더의 `user-data\ui-settings.json`이고, 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없을 때만 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 저장한다. 저장 로직이라는 이유로 파일을 옮기거나 형식을 변경하지 않는다. 현재 DB는 사용하지 않으며 위의 DB 금지 지침을 유지한다.
 - 사용자 정의 하위 에이전트는 `.codex/agents/desktop_ui.toml`, `.codex/agents/core_logic.toml`, `.codex/agents/reviewer.toml`에 정의한다. 모델과 추론 수준은 지정하지 않고 부모 설정을 상속한다.
 
 ## 총괄 운영 규칙

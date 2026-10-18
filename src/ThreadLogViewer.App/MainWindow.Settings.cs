@@ -17,7 +17,9 @@ public partial class MainWindow
     private void InitializeFeatures(string? directory, bool persist)
     {
         saveSettings = persist;
-        settingsStore = new SettingsStore(directory ?? AppContext.BaseDirectory);
+        settingsStore = directory is null
+            ? new SettingsStore(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))
+            : new SettingsStore(directory);
         var loaded = settingsStore.Load();
         saveSettings &= loaded.CanSave;
         var settings = loaded.Settings.Normalize();

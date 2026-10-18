@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Security.Principal;
+using System.Windows.Controls;
+using System.Windows.Threading;
 using ThreadLogViewer.App;
 using Xunit;
 
@@ -121,6 +124,174 @@ public sealed class SettingsFallbackTests
         Assert.False(File.Exists(store.FallbackFilePath));
         Assert.Equal(Values(dark: true, fontSize: 14), new SettingsStore(exe, fallbackRoot).Load().Settings);
     }
+
+    [Fact]
+    public void ReadFailureOnEitherFileReturnsAPathFreeMessage()
+    {
+        using var root = new SyntheticRoot();
+        string exe = Directory.CreateDirectory(Path.Combine(root.Path, "exe")).FullName;
+        string fallbackRoot = Directory.CreateDirectory(Path.Combine(root.Path, "fallback")).FullName;
+        var primary = new SettingsStore(exe, fallbackRoot);
+        Assert.True(primary.Save(Values(dark: false, fontSize: 18)).Success);
+        using (var locked = new FileStream(primary.FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var loaded = primary.Load();
+            Assert.False(loaded.Success);
+            Assert.False(loaded.CanSave);
+            AssertNoPath(loaded.Message, root.Path);
+        }
+
+        string emptyExe = Directory.CreateDirectory(Path.Combine(root.Path, "empty-exe")).FullName;
+        var fallback = new SettingsStore(emptyExe, fallbackRoot);
+        Assert.NotNull(fallback.FallbackFilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fallback.FallbackFilePath)!);
+        File.Copy(primary.FilePath, fallback.FallbackFilePath, overwrite: true);
+        using (var locked = new FileStream(fallback.FallbackFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var loaded = fallback.Load();
+            Assert.False(loaded.Success);
+            Assert.False(loaded.CanSave);
+            AssertNoPath(loaded.Message, root.Path);
+        }
+    }
+
+    [Fact]
+    public void ExplicitSettingsFolderDoesNotUseLocalApplicationData()
+    {
+        using var root = new SyntheticRoot();
+        var store = new SettingsStore(root.Path);
+        Assert.Null(store.FallbackFilePath);
+        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(local))
+        {
+            string realFallback = Path.GetFullPath(Path.Combine(local, "ThreadLogViewer", "ui-settings.json"));
+            Assert.NotEqual(realFallback, Path.GetFullPath(store.FilePath));
+        }
+
+        Assert.True(store.Save(Values(dark: false, fontSize: 16)).Success);
+        Assert.True(File.Exists(store.FilePath));
+        Assert.Equal(Values(dark: false, fontSize: 16), store.Load().Settings);
+    }
+
+    [Fact]
+    public void ReadOnlyExeFileFailsWithoutCreatingTheFallback()
+    {
+        using var root = new SyntheticRoot();
+        string exe = Directory.CreateDirectory(Path.Combine(root.Path, "exe")).FullName;
+        string fallbackRoot = Directory.CreateDirectory(Path.Combine(root.Path, "fallback")).FullName;
+        var store = new SettingsStore(exe, fallbackRoot);
+        Assert.True(store.Save(Values(dark: true, fontSize: 14)).Success);
+        byte[] original = File.ReadAllBytes(store.FilePath);
+        File.SetAttributes(store.FilePath, File.GetAttributes(store.FilePath) | FileAttributes.ReadOnly);
+        try
+        {
+            var saved = store.Save(Values(dark: false, fontSize: 20));
+            Assert.False(saved.Success);
+            Assert.Equal("설정을 저장하지 못했습니다. 현재 화면 설정은 유지됩니다.", saved.Message);
+            Assert.DoesNotContain("\\", saved.Message);
+            Assert.DoesNotContain(":\\", saved.Message);
+            Assert.DoesNotContain("AppData", saved.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("user-data", saved.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(root.Path, saved.Message, StringComparison.OrdinalIgnoreCase);
+            string user = Environment.UserName;
+            if (!string.IsNullOrWhiteSpace(user)) Assert.DoesNotContain(user, saved.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(original, File.ReadAllBytes(store.FilePath));
+            Assert.NotNull(store.FallbackFilePath);
+            Assert.False(File.Exists(store.FallbackFilePath));
+            Assert.False(Directory.Exists(Path.GetDirectoryName(store.FallbackFilePath)));
+        }
+        finally
+        {
+            File.SetAttributes(store.FilePath, File.GetAttributes(store.FilePath) & ~FileAttributes.ReadOnly);
+        }
+    }
+
+    [Fact]
+    public void CorruptedFallbackFileSetsCanSaveFalse()
+    {
+        using var root = new SyntheticRoot();
+        string exe = Directory.CreateDirectory(Path.Combine(root.Path, "exe")).FullName;
+        string fallbackRoot = Directory.CreateDirectory(Path.Combine(root.Path, "fallback")).FullName;
+        var store = new SettingsStore(exe, fallbackRoot);
+        Assert.NotNull(store.FallbackFilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(store.FallbackFilePath)!);
+        File.WriteAllText(store.FallbackFilePath, "{broken synthetic JSON");
+        var loaded = store.Load();
+        Assert.False(loaded.Success);
+        Assert.False(loaded.CanSave);
+        AssertNoPath(loaded.Message, root.Path);
+        Assert.Equal("{broken synthetic JSON", File.ReadAllText(store.FallbackFilePath));
+        Assert.False(File.Exists(store.FilePath));
+    }
+
+    [Fact]
+    public Task ThreeFailedRetriesStopSchedulingAnotherSave() => InSta(() =>
+    {
+        using var root = new SyntheticRoot();
+        var store = new SettingsStore(root.Path);
+        Assert.Null(store.FallbackFilePath);
+        Assert.True(store.Save(UiSettings.Default).Success);
+        var window = new MainWindow(root.Path, true);
+        try
+        {
+            Assert.Null(Field<SettingsStore>(window, "settingsStore").FallbackFilePath);
+            File.SetAttributes(store.FilePath, File.GetAttributes(store.FilePath) | FileAttributes.ReadOnly);
+            Invoke(window, "ScheduleSettingsSave");
+            var timer = Field<DispatcherTimer>(window, "settingsTimer");
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                Invoke(window, "SaveSettingsNow");
+                Assert.Equal(attempt, Field<int>(window, "settingsSaveFailures"));
+                Assert.True(Field<bool>(window, "settingsDirty"));
+                Assert.True(timer.IsEnabled);
+                Assert.Equal(TimeSpan.FromSeconds(Math.Min(8, Math.Pow(2, attempt))), timer.Interval);
+                Assert.Contains("저장 안 됨", Control<TextBlock>(window, "OperationStatus").Text);
+                Assert.DoesNotContain("\\", Control<TextBlock>(window, "OperationStatus").Text);
+                Assert.DoesNotContain(root.Path, Control<TextBlock>(window, "OperationStatus").Text, StringComparison.OrdinalIgnoreCase);
+            }
+
+            Invoke(window, "SaveSettingsNow");
+            Assert.Equal(4, Field<int>(window, "settingsSaveFailures"));
+            Assert.False(timer.IsEnabled);
+            Assert.True(Field<bool>(window, "settingsDirty"));
+        }
+        finally
+        {
+            try
+            {
+                File.SetAttributes(store.FilePath, File.GetAttributes(store.FilePath) & ~FileAttributes.ReadOnly);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+            window.Close();
+        }
+
+        return Task.CompletedTask;
+    });
+
+    private static void AssertNoPath(string message, string folder)
+    {
+        Assert.Equal("설정을 읽지 못했습니다. 기존 파일을 보존합니다.", message);
+        Assert.DoesNotContain("\\", message);
+        Assert.DoesNotContain(":\\", message);
+        Assert.DoesNotContain("AppData", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("user-data", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(folder, message, StringComparison.OrdinalIgnoreCase);
+        string user = Environment.UserName;
+        if (!string.IsNullOrWhiteSpace(user)) Assert.DoesNotContain(user, message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Task InSta(Func<Task> action) =>
+        (Task)typeof(WindowFeatureTests).GetMethod("InSta", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [action])!;
+
+    private static T Field<T>(MainWindow window, string name) =>
+        (T)typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+
+    private static object? Invoke(MainWindow window, string name, params object?[] args) =>
+        typeof(MainWindow).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, args);
+
+    private static T Control<T>(MainWindow window, string name) where T : class => (T)window.FindName(name);
 
     private static UiSettings Values(bool dark, double fontSize) => new()
     {
