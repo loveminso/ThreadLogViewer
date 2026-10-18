@@ -5,27 +5,38 @@ namespace ThreadLogViewer.UiTests;
 
 /// <summary>
 /// Separate PowerShell process that holds the log open for append and writes complete lines.
+/// Pause, idle, stop, and ready are named manual-reset events created by that process.
 /// The viewer never sees this process's handle; both sides use read/write sharing.
 /// </summary>
 internal sealed class LogAppender : IDisposable
 {
     private readonly string path;
-    private readonly string readyFile;
-    private readonly string stopFile;
-    private readonly string pauseFile;
-    private readonly string idleFile;
     private readonly Process process;
-    private readonly object outputGate = new();
-    private readonly StringBuilder output = new();
+    private readonly EventWaitHandle readyEvent;
+    private readonly EventWaitHandle stopEvent;
+    private readonly EventWaitHandle pauseEvent;
+    private readonly EventWaitHandle idleEvent;
+    private readonly object outputGate;
+    private readonly StringBuilder output;
 
-    private LogAppender(string path, string readyFile, string stopFile, string pauseFile, string idleFile, Process process)
+    private LogAppender(
+        string path,
+        Process process,
+        EventWaitHandle readyEvent,
+        EventWaitHandle stopEvent,
+        EventWaitHandle pauseEvent,
+        EventWaitHandle idleEvent,
+        object outputGate,
+        StringBuilder output)
     {
         this.path = path;
-        this.readyFile = readyFile;
-        this.stopFile = stopFile;
-        this.pauseFile = pauseFile;
-        this.idleFile = idleFile;
         this.process = process;
+        this.readyEvent = readyEvent;
+        this.stopEvent = stopEvent;
+        this.pauseEvent = pauseEvent;
+        this.idleEvent = idleEvent;
+        this.outputGate = outputGate;
+        this.output = output;
     }
 
     public static LogAppender Start(string logPath, LogEncodingKind kind, bool startPaused)
@@ -33,13 +44,11 @@ internal sealed class LogAppender : IDisposable
         string script = Path.Combine(AppContext.BaseDirectory, "AppendHelper.ps1");
         if (!File.Exists(script))
             throw new FileNotFoundException("Append helper script was not copied to the test output.", script);
-        string token = "tlv-append-" + Guid.NewGuid().ToString("N");
-        string ready = Path.Combine(Path.GetTempPath(), token + ".ready");
-        string stop = Path.Combine(Path.GetTempPath(), token + ".stop");
-        string pause = Path.Combine(Path.GetTempPath(), token + ".pause");
-        string idle = Path.Combine(Path.GetTempPath(), token + ".idle");
-        if (startPaused)
-            File.WriteAllText(pause, "pause");
+        string token = @"Local\tlv-append-" + Guid.NewGuid().ToString("N");
+        string readyName = token + "-ready";
+        string stopName = token + "-stop";
+        string pauseName = token + "-pause";
+        string idleName = token + "-idle";
         var encoding = SyntheticLog.EncodingOf(kind);
         string prefix = Convert.ToBase64String(encoding.GetBytes("[000:00:04.000] [T 1] " + SyntheticLog.AppendMarker));
         string suffix = Convert.ToBase64String(encoding.GetBytes($" 가나다{SyntheticLog.Distinctive} (synthetic.cpp:40)\n"));
@@ -58,28 +67,60 @@ internal sealed class LogAppender : IDisposable
         start.ArgumentList.Add(script);
         start.ArgumentList.Add("-Path");
         start.ArgumentList.Add(logPath);
-        start.ArgumentList.Add("-ReadyFile");
-        start.ArgumentList.Add(ready);
-        start.ArgumentList.Add("-StopFile");
-        start.ArgumentList.Add(stop);
-        start.ArgumentList.Add("-PauseFile");
-        start.ArgumentList.Add(pause);
-        start.ArgumentList.Add("-IdleFile");
-        start.ArgumentList.Add(idle);
+        start.ArgumentList.Add("-ReadyName");
+        start.ArgumentList.Add(readyName);
+        start.ArgumentList.Add("-StopName");
+        start.ArgumentList.Add(stopName);
+        start.ArgumentList.Add("-PauseName");
+        start.ArgumentList.Add(pauseName);
+        start.ArgumentList.Add("-IdleName");
+        start.ArgumentList.Add(idleName);
         start.ArgumentList.Add("-PrefixB64");
         start.ArgumentList.Add(prefix);
         start.ArgumentList.Add("-SuffixB64");
         start.ArgumentList.Add(suffix);
+        if (startPaused)
+            start.ArgumentList.Add("-StartPaused");
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
-        var appender = new LogAppender(logPath, ready, stop, pause, idle, process);
-        process.OutputDataReceived += (_, e) => appender.AppendOutput(e.Data);
-        process.ErrorDataReceived += (_, e) => appender.AppendOutput(e.Data);
-        if (!process.Start())
-            throw new InvalidOperationException("Could not start the append helper.");
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        appender.WaitForReady();
-        return appender;
+        var gate = new object();
+        var captured = new StringBuilder();
+        EventWaitHandle? ready = null;
+        EventWaitHandle? stop = null;
+        EventWaitHandle? pause = null;
+        EventWaitHandle? idle = null;
+        try
+        {
+            process.OutputDataReceived += (_, e) => AppendCaptured(gate, captured, e.Data);
+            process.ErrorDataReceived += (_, e) => AppendCaptured(gate, captured, e.Data);
+            if (!process.Start())
+                throw new InvalidOperationException("Could not start the append helper.");
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            ready = OpenSignal(readyName, process, gate, captured, TimeSpan.FromSeconds(15));
+            stop = OpenSignal(stopName, process, gate, captured, TimeSpan.FromSeconds(15));
+            pause = OpenSignal(pauseName, process, gate, captured, TimeSpan.FromSeconds(15));
+            idle = OpenSignal(idleName, process, gate, captured, TimeSpan.FromSeconds(15));
+            var appender = new LogAppender(logPath, process, ready, stop, pause, idle, gate, captured);
+            appender.WaitUntilSignaled(ready, TimeSpan.FromSeconds(15), "Append helper did not open the log.");
+            return appender;
+        }
+        catch
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            ready?.Dispose();
+            stop?.Dispose();
+            pause?.Dispose();
+            idle?.Dispose();
+            process.Dispose();
+            throw;
+        }
     }
 
     public long Length => new FileInfo(path).Length;
@@ -95,16 +136,16 @@ internal sealed class LogAppender : IDisposable
 
     public void Pause()
     {
-        File.WriteAllText(pauseFile, "pause");
-        WaitUntilIdle();
+        // Drop a stale idle signal so this wait means the helper observed this pause.
+        idleEvent.Reset();
+        pauseEvent.Set();
+        WaitUntilSignaled(idleEvent, TimeSpan.FromSeconds(10), "Append helper did not become idle.");
     }
 
     public void Resume()
     {
-        if (File.Exists(pauseFile))
-            File.Delete(pauseFile);
-        if (File.Exists(idleFile))
-            File.Delete(idleFile);
+        pauseEvent.Reset();
+        idleEvent.Reset();
     }
 
     public void WaitForGrowth(long previousLength, TimeSpan timeout)
@@ -125,8 +166,8 @@ internal sealed class LogAppender : IDisposable
     {
         try
         {
-            File.WriteAllText(stopFile, "stop");
-            Resume();
+            stopEvent.Set();
+            pauseEvent.Reset();
             if (!process.WaitForExit(10_000))
                 process.Kill(entireProcessTree: true);
         }
@@ -136,53 +177,53 @@ internal sealed class LogAppender : IDisposable
         finally
         {
             process.Dispose();
-            foreach (string file in new[] { readyFile, stopFile, pauseFile, idleFile })
-            {
-                try { if (File.Exists(file)) File.Delete(file); }
-                catch (IOException) { }
-            }
+            readyEvent.Dispose();
+            stopEvent.Dispose();
+            pauseEvent.Dispose();
+            idleEvent.Dispose();
         }
     }
 
-    private void WaitForReady()
+    private void WaitUntilSignaled(EventWaitHandle handle, TimeSpan timeout, string message)
     {
         var watch = Stopwatch.StartNew();
-        while (watch.Elapsed < TimeSpan.FromSeconds(15))
+        while (watch.Elapsed < timeout)
         {
-            if (File.Exists(readyFile))
+            if (handle.WaitOne(50))
                 return;
             if (process.HasExited)
-                throw new InvalidOperationException("Append helper exited before it was ready. " + OutputText());
-            Thread.Sleep(30);
+                throw new InvalidOperationException(message + " " + OutputText());
         }
-        throw new TimeoutException("Append helper did not open the log. " + OutputText());
+        throw new TimeoutException(message + " " + OutputText());
     }
 
-    private void WaitUntilIdle()
+    private static EventWaitHandle OpenSignal(string name, Process process, object gate, StringBuilder captured, TimeSpan timeout)
     {
         var watch = Stopwatch.StartNew();
-        while (watch.Elapsed < TimeSpan.FromSeconds(10))
+        while (watch.Elapsed < timeout)
         {
-            if (File.Exists(idleFile))
-                return;
+            if (EventWaitHandle.TryOpenExisting(name, out EventWaitHandle? opened) && opened is not null)
+                return opened;
             if (process.HasExited)
-                throw new InvalidOperationException("Append helper exited while pausing. " + OutputText());
+                throw new InvalidOperationException("Append helper exited before signal " + name + ". " + ReadCaptured(gate, captured));
             Thread.Sleep(30);
         }
-        throw new TimeoutException("Append helper did not become idle. " + OutputText());
+        throw new TimeoutException("Append helper did not create signal " + name + ". " + ReadCaptured(gate, captured));
     }
 
-    private void AppendOutput(string? line)
+    private static void AppendCaptured(object gate, StringBuilder captured, string? line)
     {
         if (line is null)
             return;
-        lock (outputGate)
-            output.AppendLine(line);
+        lock (gate)
+            captured.AppendLine(line);
     }
 
-    private string OutputText()
+    private string OutputText() => ReadCaptured(outputGate, output);
+
+    private static string ReadCaptured(object gate, StringBuilder captured)
     {
-        lock (outputGate)
-            return output.ToString();
+        lock (gate)
+            return captured.ToString();
     }
 }
