@@ -9,30 +9,30 @@ namespace ThreadLogViewer.App;
 
 public partial class MainWindow
 {
-    private async void SaveAnalysis_Click(object sender, RoutedEventArgs e)
+    private void SaveAnalysis_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (busy || data is null || IsBlankSession) return;
         var dialog = new SaveFileDialog { Title = "분석 상태 저장 — 새 파일만", Filter = "ThreadLog 분석 상태 (*.tlv-analysis.json)|*.tlv-analysis.json", FileName = "analysis.tlv-analysis.json", OverwritePrompt = false };
         if (dialog.ShowDialog(this) == true) await SaveAnalysisFileAsync(dialog.FileName);
-    }
-    private async void LoadAnalysis_Click(object sender, RoutedEventArgs e)
+    });
+    private void LoadAnalysis_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (busy) return;
         var dialog = new OpenFileDialog { Title = "분석 상태 불러오기", Filter = "ThreadLog 분석 상태 (*.tlv-analysis.json)|*.tlv-analysis.json", CheckFileExists = true };
         if (dialog.ShowDialog(this) == true) await LoadAnalysisFileAsync(dialog.FileName);
-    }
-    private async void SavePreset_Click(object sender, RoutedEventArgs e)
+    });
+    private void SavePreset_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (busy || data is null || IsBlankSession) return;
         var dialog = new SaveFileDialog { Title = "현재 적용된 필터·강조 프리셋 저장 — 새 파일만", Filter = "ThreadLog 프리셋 (*.tlv-preset.json)|*.tlv-preset.json", FileName = "preset.tlv-preset.json", OverwritePrompt = false };
         if (dialog.ShowDialog(this) == true) await SavePresetFileAsync(dialog.FileName);
-    }
-    private async void LoadPreset_Click(object sender, RoutedEventArgs e)
+    });
+    private void LoadPreset_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (busy || data is null || IsBlankSession) return;
         var dialog = new OpenFileDialog { Title = "필터·강조 프리셋 불러오기", Filter = "ThreadLog 프리셋 (*.tlv-preset.json)|*.tlv-preset.json", CheckFileExists = true };
         if (dialog.ShowDialog(this) == true) await LoadPresetFileAsync(dialog.FileName);
-    }
+    });
 
     private static SavedPosition? SavePosition(PositionAnchor? point) => point is null ? null :
         new(point.SourceLine, point.Column, point.TopSourceLine, point.TopDelta, point.Horizontal);

@@ -41,7 +41,7 @@ public partial class MainWindow
         }
     }
 
-    private async void ResetAllFilters_Click(object sender, RoutedEventArgs e) => await ResetAllFiltersAsync();
+    private void ResetAllFilters_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(ResetAllFiltersAsync);
     private async Task ResetAllFiltersAsync()
     {
         if (busy || data is null || IsBlankSession) return;

@@ -65,8 +65,8 @@ public partial class MainWindow
         $"{name} 원본 {point.SourceLineIndex + 1:N0}줄 · 헤더 {point.HeaderLineIndex + 1:N0}줄 · {point.TimestampText} · {(data?.Entries[point.EntryIndex].ThreadId is { } id ? "스레드 " + id : "미분류")}{(projection?.FindDisplayLine(point.SourceLineIndex + 1) is null ? " · 숨김 (문맥에서 열기)" : "")}";
     private void SwapTime_Click(object sender, RoutedEventArgs e) { if (timeA is null || timeB is null) return; (timeA, timeB) = (timeB, timeA); UpdateTime(); }
     private void ClearTime_Click(object sender, RoutedEventArgs e) { timeA = timeB = null; UpdateTime(); }
-    private async void GoTimeA_Click(object sender, RoutedEventArgs e) { if (timeA is not null) await NavigateOriginalAsync(timeA.SourceLineIndex); }
-    private async void GoTimeB_Click(object sender, RoutedEventArgs e) { if (timeB is not null) await NavigateOriginalAsync(timeB.SourceLineIndex); }
+    private void GoTimeA_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () => { if (timeA is not null) await NavigateOriginalAsync(timeA.SourceLineIndex); });
+    private void GoTimeB_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () => { if (timeB is not null) await NavigateOriginalAsync(timeB.SourceLineIndex); });
     private void CopyTime_Click(object sender, RoutedEventArgs e)
     {
         if (timeA is null || timeB is null) return;
@@ -107,7 +107,7 @@ public partial class MainWindow
         var rules = keywordRules.Where(r => r.Enabled).Select(r => (r.Keyword, r.ColorIndex)).ToArray();
         var scope = ActiveScope;
         IReadOnlyList<SourceTextRange>? ranges = scope is null ? null : [LogSlice.GetTextRange(captured.Source, scope)];
-        KeywordStatus.Text = "강조 준비 중…";
+        KeywordStatus.Text = KeywordRefreshFailure.Preparing;
         try
         {
             var result = await Task.Run(() =>
@@ -137,7 +137,12 @@ public partial class MainWindow
             if (result.Limited) OperationStatus.Text = "문구 강조 제한 · 첫 100,000곳만 표시합니다. 강조 문구나 필터 범위를 좁혀 주세요.";
             Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
         }
-        catch (OperationCanceledException) { }
-        catch (OutOfMemoryException) { if (highlightWork.IsCurrent(op.Version)) KeywordStatus.Text = OperationStatus.Text = "강조 메모리 부족 · 규칙을 줄여 주세요."; }
+        catch (Exception ex)
+        {
+            if (!highlightWork.IsCurrent(op.Version)) return;
+            var next = KeywordRefreshFailure.Apply(new(KeywordStatus.Text ?? "", OperationStatus.Text ?? ""), ex);
+            KeywordStatus.Text = next.KeywordStatus;
+            OperationStatus.Text = next.OperationStatus;
+        }
     }
 }

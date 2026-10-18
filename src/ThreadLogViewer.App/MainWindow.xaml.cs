@@ -59,24 +59,22 @@ public partial class MainWindow : Window
         UpdateMenus();
         SourceInitialized += (_, _) => theme.ApplyTitleBar(this);
         Closed += (_, _) => { fileBatchVersion++; viewReady = false; DisposeFeatures(); DisposePerformance(); work.Dispose(); searchWork.Dispose(); DisposeSessions(); };
-        Loaded += async (_, _) =>
-        {
-            string[] paths = Environment.GetCommandLineArgs().Skip(1).ToArray();
-            if (paths.Length > 0) await OpenFilesAsync(paths);
-        };
+        Loaded += (_, _) => AsyncEvent.Run(OpenCommandLineLogsAsync);
     }
 
-    private async void Open_Click(object sender, RoutedEventArgs e)
+    private async Task OpenCommandLineLogsAsync()
+    {
+        string[] paths = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (paths.Length > 0) await OpenFilesAsync(paths);
+    }
+    private void Open_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         var dialog = new OpenFileDialog { Title = "로그 파일 열기 — 여러 파일 선택 가능", Filter = "로그 파일 (*.log;*.txt)|*.log;*.txt|모든 파일 (*.*)|*.*", CheckFileExists = true, Multiselect = true };
         if (dialog.ShowDialog(this) == true) await OpenFilesAsync(dialog.FileNames);
-    }
-    private async void Reload_Click(object sender, RoutedEventArgs e)
-    {
-        await ReloadCurrentAsync(EncodingMode.Cp949);
-    }
-    private async void Paste_Click(object sender, RoutedEventArgs e) => await PasteAsync();
-    private async void PasteLog_Click(object sender, RoutedEventArgs e) => await PasteAsync();
+    });
+    private void Reload_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => ReloadCurrentAsync(EncodingMode.Cp949));
+    private void Paste_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(PasteAsync);
+    private void PasteLog_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(PasteAsync);
     private Task PasteAsync() => PasteFromDataObjectAsync(Clipboard.GetDataObject);
     private void Copy_Click(object sender, RoutedEventArgs e) => Editor.Copy();
     private void SelectText_Click(object sender, RoutedEventArgs e) { Editor.Focus(); Editor.SelectAll(); }
@@ -91,7 +89,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is ExternalException or ArgumentException or IOException or InvalidDataException or OutOfMemoryException) { }
     }
-    private async void Window_Drop(object sender, DragEventArgs e)
+    private void Window_Drop(object sender, DragEventArgs e) => AsyncEvent.Run(async () =>
     {
         e.Handled = true;
         e.Effects = DragDropEffects.None;
@@ -104,7 +102,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is ExternalException or IOException or InvalidDataException or ArgumentException or OutOfMemoryException)
         { ShowError("끌어 놓은 파일을 열 수 없습니다", ex); }
-    }
+    });
     private (long Version, CancellationToken Token, IProgress<WorkProgress> Progress) BeginWork(string label, bool lockFilters)
     {
         var operation = work.Begin();
@@ -235,10 +233,8 @@ public partial class MainWindow : Window
         foreach (var item in threadItems) item.IsSelected = selected.Contains(item.Id);
         suppressFilters = false;
     }
-    private async void Thread_Changed(object? sender, PropertyChangedEventArgs e)
-    {
-        if (!suppressFilters && e.PropertyName == nameof(ThreadItem.IsSelected)) await FilterAsync();
-    }
+    private void Thread_Changed(object? sender, PropertyChangedEventArgs e) =>
+        AsyncEvent.Run(async () => { if (!suppressFilters && e.PropertyName == nameof(ThreadItem.IsSelected)) await FilterAsync(); });
     private async Task FilterAsync(EntryFilter? requestedFilter = null, PositionAnchor? returnAnchor = null)
     {
         if (data is null || IsBlankSession) return;
@@ -282,14 +278,14 @@ public partial class MainWindow : Window
         suppressFilters = false;
         await FilterAsync();
     }
-    private async void SelectAll_Click(object sender, RoutedEventArgs e) => await SetThreadsAsync(_ => true);
-    private async void SelectNone_Click(object sender, RoutedEventArgs e) => await SetThreadsAsync(_ => false);
-    private async void Only_Click(object sender, RoutedEventArgs e)
+    private void SelectAll_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => SetThreadsAsync(_ => true));
+    private void SelectNone_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => SetThreadsAsync(_ => false));
+    private void Only_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if ((sender as Button)?.Tag is ThreadItem item) await SetThreadsAsync(t => t.Id == item.Id);
-    }
+    });
     private void Cancel_Click(object sender, RoutedEventArgs e) { MarkFileBatchCancellation(); fileBatchVersion++; work.Cancel(); searchWork.Cancel(); OperationStatus.Text = "취소 요청됨 · 현재 처리 단계가 끝나면 중단합니다."; }
-    private async void Export_Click(object sender, RoutedEventArgs e)
+    private void Export_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (projection is null || busy || IsBlankSession) return;
         var captured = projection;
@@ -307,7 +303,7 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or EncoderFallbackException)
         { if (work.IsCurrent(op.Version)) ShowError("내보내기 실패", ex); }
         finally { FinishWork(op.Version); }
-    }
+    });
     private void ShowError(string title, Exception ex)
     {
         string action = ex switch

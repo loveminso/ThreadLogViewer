@@ -40,17 +40,17 @@ public partial class MainWindow
         searchRenderer.Index = HighlightIndex.Empty;
         Editor.TextArea.TextView.InvalidateLayer(KnownLayer.Background); Editor.Focus();
     }
-    private async void Search_Changed(object sender, TextChangedEventArgs e) { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } }
-    private async void SearchOption_Changed(object sender, RoutedEventArgs e) { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } }
-    private async void SearchScope_Changed(object sender, SelectionChangedEventArgs e) { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } }
-    private async void CaptureSearchSelection_Click(object sender, RoutedEventArgs e)
+    private void Search_Changed(object sender, TextChangedEventArgs e) => AsyncEvent.Run(async () => { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } });
+    private void SearchOption_Changed(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () => { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } });
+    private void SearchScope_Changed(object sender, SelectionChangedEventArgs e) => AsyncEvent.Run(async () => { if (viewReady) { lastSearchLocation = null; await SearchAsync(); } });
+    private void CaptureSearchSelection_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (projection is null) return;
         var spans = Editor.TextArea.Selection.Segments.Select(s => new SelectionSpan(s.StartOffset, s.Length));
         fixedSearchRanges = SelectionSourceRanges.Map(projection, spans);
         SearchScopeBox.SelectedIndex = 2;
         await SearchAsync();
-    }
+    });
     private async Task SearchAsync()
     {
         if (!viewReady || SearchBox is null || SearchStatus is null) return;
@@ -129,13 +129,13 @@ public partial class MainWindow
         // A context change starts a fresh search. Only update this batch's counter while it is current.
         if (hits == searchHits) SearchStatus.Text = $"{index + 1:N0} / {hits.Length:N0}{(searchLimited ? " (첫 100,000개)" : "")}";
     }
-    private async void Result_Selected(object sender, SelectionChangedEventArgs e)
+    private void Result_Selected(object sender, SelectionChangedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (selectingResult || ResultsList.SelectedItem is not ResultRow row || row.Source != data) return;
         searchIndex = ResultsList.SelectedIndex;
         lastSearchLocation = row.Hit;
         await NavigateHitAsync(row.Hit);
-    }
+    });
     private async Task NavigateHitAsync(LocatedSearchHit hit)
     {
         if (ActiveScope is { } scope && !scope.Contains(hit.SourceLineIndex)) return;
@@ -154,10 +154,10 @@ public partial class MainWindow
         var location = Editor.Document.GetLocation(offset);
         Editor.ScrollTo(location.Line, location.Column); Editor.Focus();
     }
-    private async void Previous_Click(object sender, RoutedEventArgs e) => await NavigateSearchAsync(true);
-    private async void Next_Click(object sender, RoutedEventArgs e) => await NavigateSearchAsync(false);
-    private async void Search_KeyDown(object sender, KeyEventArgs e)
-    { if (e.Key == Key.Enter) { e.Handled = true; await NavigateSearchAsync(Keyboard.Modifiers == ModifierKeys.Shift); } }
+    private void Previous_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateSearchAsync(true));
+    private void Next_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateSearchAsync(false));
+    private void Search_KeyDown(object sender, KeyEventArgs e) => AsyncEvent.Run(async () =>
+    { if (e.Key == Key.Enter) { e.Handled = true; await NavigateSearchAsync(Keyboard.Modifiers == ModifierKeys.Shift); } });
     private static bool TryHandleSearchNavigationShortcut(KeyEventArgs e, ModifierKeys modifiers, out bool backwards)
     {
         backwards = false;
@@ -169,7 +169,8 @@ public partial class MainWindow
         e.Handled = true;
         return true;
     }
-    private async void Window_KeyDown(object sender, KeyEventArgs e)
+    private void Window_KeyDown(object sender, KeyEventArgs e) => AsyncEvent.Run(() => WindowKeyDownAsync(e));
+    private async Task WindowKeyDownAsync(KeyEventArgs e)
     {
         if (TryCancelResultsResize(e)) return;
         ReleaseUnusedLineActionCaptureForKeyboard(Mouse.RightButton == MouseButtonState.Released);
