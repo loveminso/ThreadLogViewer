@@ -5,7 +5,7 @@
 ## 변경 요약
 
 - **공유 읽기**([PR #2](https://github.com/loveminso/ThreadLogViewer/pull/2)): 다른 프로그램이 읽기 공유를 허용한 채 열거나 쓰고 있는 로그도 열 수 있습니다(FileShare.ReadWrite·Delete). 다른 프로그램이 파일을 독점으로 열었으면 열 수 없습니다.
-- **전역 예외 처리**([PR #3](https://github.com/loveminso/ThreadLogViewer/pull/3)): UI 작업과 비동기 작업에서 난 예외는 한국어 경고 창을 띄운 뒤 앱을 계속 실행합니다. 메모리 부족 같은 치명적 오류와 백그라운드 스레드 예외는 경고 후 종료됩니다. 예외 시각·종류·발생 경로만 `%LOCALAPPDATA%\ThreadLogViewer\unhandled-exceptions.log`에 남기고, 로그 내용과 파일 경로는 기록하지 않습니다. 잘못된 강조 규칙은 상태줄에 `강조 준비 실패`를 표시합니다.
+- **전역 예외 처리**([PR #3](https://github.com/loveminso/ThreadLogViewer/pull/3)): 화면 작업과 비동기 이벤트 처리 중 난 예외는 한국어 경고 창을 띄운 뒤 앱을 계속 실행합니다. 화면 작업 중 메모리 부족·접근 위반 같은 치명적 오류는 경고 후 종료됩니다. Task가 아닌 별도 스레드에서 처리되지 않은 예외는 앱을 종료하며, 이때 경고 창이 보이지 않을 수 있지만 예외 기록은 남습니다. 예외 시각·종류·발생 경로만 `%LOCALAPPDATA%\ThreadLogViewer\unhandled-exceptions.log`에 남기고, 로그 내용과 파일 경로는 기록하지 않습니다. 잘못된 강조 규칙은 상태줄에 `강조 준비 실패`를 표시합니다.
 - **UI 자동화**([PR #4](https://github.com/loveminso/ThreadLogViewer/pull/4), [PR #5](https://github.com/loveminso/ThreadLogViewer/pull/5)): `tests/ThreadLogViewer.UiTests`의 FlaUI 시나리오를 Windows CI에서 게시한 `ThreadLogViewer.exe`로 한 잡당 **3회** 연속 실행한다.
 
 ## 알려진 한계
@@ -13,7 +13,7 @@
 - 다른 프로세스가 **쓰는 UTF-8 BOM** 로그에서 F5 새로 고침이 `파일 새로 고침 실패`로 끝날 수 있다. CI의 `Scenario05_Utf8Bom_RefreshWhileAppending`은 이 한계 때문에 건너뛴다. 수정은 후속 작업이다.
 - CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.
 - 강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다.
-- 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끄는 경우는 검증하지 않습니다.
+- 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
 - 원본 줄 이동, 위치·선택 정보, 주변 로그, 필터 후 위치 유지, 설정 저장, 두 기록 시간 차이(기능 1·2·8·9·10·11)는 UI 자동 테스트가 없습니다.
 
 ## Windows CI (병합 직전 PR #5)
