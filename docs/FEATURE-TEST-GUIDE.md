@@ -1,10 +1,10 @@
 # ThreadLog Viewer 기능 테스트 방법
 
-수정일: 2026-10-07 · 기준 버전: v0.8.1
+수정일: 2026-10-18 · 기준 버전: v0.8.2
 
 높음 후보 중 북마크를 제외한 10개가 구현되었다. 아래 절차는 조작 방법과 기대 결과를 정리한다. FlaUI UI 테스트(`Scenario01`~`Scenario06`)가 판정하는 열기·끌어 놓기·내용 포함 필터·검색·보내기·강조 준비 실패·새로 고침은 [TESTING](TESTING.md)의 Windows UI 자동화를 따르고, 나머지는 UI 테스트가 없는 후속 작업이다. 수동 확인은 SmartScreen만 남긴다. [기본 단축키 표](SHORTCUTS.md)와 함께 사용한다. 사용자 지정 단축키는 후속 범위다.
 
-이번 수정의 빌드·자동 테스트·GUI·성능 여부는 [v0.8.1 검증 기록](VALIDATION-v0.8.1.md), 자동 검증 명령은 [TESTING](TESTING.md)에 기록한다. 이전 여러 줄 선택·즉시 강조는 [v0.6.2](VALIDATION-v0.6.2.md), 줄 선택은 [v0.6.1](VALIDATION-v0.6.1.md), 줄 우클릭·범위 탭·강조 창은 [v0.6.0](VALIDATION-v0.6.0.md), 메뉴·탭은 [v0.5.0](VALIDATION-v0.5.0.md), 분석 화면은 [v0.4.1](VALIDATION-v0.4.1.md), 합성 성능은 [v0.4](VALIDATION-v0.4.md)에 보존한다. 자동 WPF 테스트와 합성 콘텐츠 렌더링은 FlaUI UI 테스트·SmartScreen 수동 확인과 구분한다.
+이번 수정의 빌드·자동 테스트·GUI·성능 여부는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md), 자동 검증 명령은 [TESTING](TESTING.md)에 기록한다. 이전 여러 줄 선택·즉시 강조는 [v0.6.2](VALIDATION-v0.6.2.md), 줄 선택은 [v0.6.1](VALIDATION-v0.6.1.md), 줄 우클릭·범위 탭·강조 창은 [v0.6.0](VALIDATION-v0.6.0.md), 메뉴·탭은 [v0.5.0](VALIDATION-v0.5.0.md), 분석 화면은 [v0.4.1](VALIDATION-v0.4.1.md), 합성 성능은 [v0.4](VALIDATION-v0.4.md)에 보존한다. 자동 WPF 테스트와 합성 콘텐츠 렌더링은 FlaUI UI 테스트·SmartScreen 수동 확인과 구분한다.
 
 ## 북마크 제거 확인
 
@@ -65,7 +65,7 @@ v0.7.0의 결과 안내·복구·새로 고침·탐색·배경색 확인 절차�
 .\run.cmd
 ```
 
-이번 배포 실행 파일은 `artifacts/ThreadLogViewer-v0.8.1-win-x64/ThreadLogViewer.exe`다. 기존 배포 폴더들은 보존한다. 새 경로의 EXE를 실행하고 제목에 v0.8.1이 표시되는지 확인한다. 배포 생성 여부는 검증 기록을 따른다. 아래는 사용자가 직접 확인할 절차이며 이번 작업에서 앱을 자동 실행하거나 제어하지 않았다.
+공개 실행본은 Releases의 `ThreadLogViewer-win-x64.zip`을 압축 해제한 `ThreadLogViewer.exe`다. 제목에 v0.8.2가 표시되는지 확인한다. 이전 `artifacts/ThreadLogViewer-v0.8.x-win-x64` 로컬 폴더는 보존한다. 배포 생성 여부는 검증 기록을 따른다. 아래 절차의 판정 범위는 이 문서 앞부분의 FlaUI UI 테스트 설명을 따르며, 수동 확인은 SmartScreen만 남긴다.
 
 ## + / Ctrl+N 새 빈 탭 확인
 
