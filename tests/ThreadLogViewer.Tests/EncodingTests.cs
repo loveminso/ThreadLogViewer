@@ -148,6 +148,14 @@ public sealed class EncodingTests
     [Theory]
     [InlineData(new byte[] { 0x41, 0xFF })]
     [InlineData(new byte[] { 0x41, 0x80 })]
+    public void InvalidLeadAtEofStillFallsBackToCp949(byte[] bytes)
+    {
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal(StrictCp949().GetString(bytes), decoded.Text);
+        Assert.Equal("CP949로 해석 (UTF-8 실패 후 대체; 추정)", decoded.Description);
+    }
+
+    [Theory]
     [InlineData(new byte[] { 0x41, 0xE0, 0x80 })]
     [InlineData(new byte[] { 0x41, 0xED, 0xA0 })]
     [InlineData(new byte[] { 0x41, 0xC0, 0x80, 0xEA })]
