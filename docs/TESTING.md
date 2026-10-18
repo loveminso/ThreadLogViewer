@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-현재 기능의 수동 확인 절차는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md), 키 조작은 [단축키 표](SHORTCUTS.md), 실제 빌드·회귀·배포 결과는 [v0.8.1 검증 기록](VALIDATION-v0.8.1.md)을 따른다. 기대 결과와 실제 통과 기록을 구분한다.
+Windows CI의 FlaUI UI 테스트가 다루는 GUI는 아래 **Windows UI 자동화** 절과 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)에 맞춰 판정한다. UI 테스트가 없는 항목은 후속 UI 테스트 대상이며, 절차·기대 결과는 같은 가이드에 남긴다. 수동 확인은 SmartScreen만 해당한다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.1 검증 기록](VALIDATION-v0.8.1.md)을 따른다.
 
 ## 자동 회귀
 
