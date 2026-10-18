@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using ThreadLogViewer.Core;
 using Xunit;
