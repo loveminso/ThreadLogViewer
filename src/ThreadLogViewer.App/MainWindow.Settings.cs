@@ -68,7 +68,8 @@ public partial class MainWindow
         {
             Dark = ThemeBox.SelectedIndex != 1, Compact = DensityBox.SelectedIndex == 1,
             WordWrap = WrapBox.IsChecked == true, FontSize = Editor.FontSize,
-            PanelWidth = ThreadColumn.ActualWidth > 0 ? ThreadColumn.ActualWidth : ThreadColumn.Width.Value,
+            // A narrow window only clamps the column. The absolute GridLength is the preference.
+            PanelWidth = ThreadColumn.Width.IsAbsolute ? ThreadColumn.Width.Value : ThreadColumn.ActualWidth,
             ResultsHeight = preferredResultsHeight, ResultsCollapsed = resultsCollapsed,
             ThreadBackgrounds = threadRenderer.Enabled, LargeLinePreview = largeLineGenerator.Enabled
         };

@@ -129,11 +129,11 @@ WPF 디스패처가 UI 스레드다. 파일 대화상자, 상태줄, 에디터 �
 | `src/ThreadLogViewer.App/MainWindow.Menus.cs` | 메뉴 활성·체크, 글자 크기 단축키. 그 외 창 단축키는 `src/ThreadLogViewer.App/MainWindow.Search.cs`의 `WindowKeyDownAsync` |
 | `src/ThreadLogViewer.App/MainWindow.Feedback.cs` | 결과 0건 안내, 필터 해제 |
 | `src/ThreadLogViewer.App/MainWindow.ThreadSearch.cs` | 스레드 목록 검색. 본문 필터는 바꾸지 않음 |
-| `src/ThreadLogViewer.App/MainWindow.Settings.cs` | `UiSettings` 읽기·저장, 도움말 창 열기 |
+| `src/ThreadLogViewer.App/MainWindow.Settings.cs` | `UiSettings` 읽기·저장, 도움말 창 열기. 스레드 패널 폭은 좁아진 실제 폭이 아니라 선호 폭을 저장한다 |
 | `src/ThreadLogViewer.App/MainWindow.ResultsLayout.cs` | 검색 결과 높이와 접기 |
-| `src/ThreadLogViewer.App/MainWindow.WindowLayout.cs` | 작업 영역·DPI에 맞춘 창 크기. 계산은 `WindowLayoutPolicy`. `THREADLOGVIEWER_UI_REVIEW=1`인 갤러리 프로세스만 메인 창의 모니터 작업 영역 클램프를 건너뛴다. 작업 폭이 900 DIP보다 좁으면 왼쪽 스레드 열의 최대 폭을 200 DIP 이하로 줄이고, 그 폭이 120 DIP보다 작으면 열을 접어 로그 본문 폭을 남긴다. 선호 폭 값은 바꾸지 않는다 |
+| `src/ThreadLogViewer.App/MainWindow.WindowLayout.cs` | 작업 영역·DPI에 맞춘 창 크기. 계산은 `WindowLayoutPolicy`. `THREADLOGVIEWER_UI_REVIEW=1`인 갤러리 프로세스만 메인 창의 모니터 작업 영역 클램프를 건너뛴다. 작업 폭이 900 DIP보다 좁으면 왼쪽 스레드 열의 최대 폭을 200 DIP 이하로 줄이고, 그 폭이 120 DIP보다 작으면 열을 접어 로그 본문 폭을 남긴다. 선호 폭 값은 바꾸지 않는다. 그 값은 `ColumnDefinition.Width`의 절대 폭이고, 저장도 이 값을 쓴다. 좁은 배치의 실제 폭으로 바꾸지 않는다 |
 | `src/ThreadLogViewer.App/OwnedDialogPlacement.cs` | 강조 문구 관리와 도움말을 소유 창 HWND 가운데에 두고, 그 모니터 작업 영역에 크기와 위치를 맞춘다. 리뷰 모드에서도 이 맞춤은 유지한다 |
-| `src/ThreadLogViewer.App/HelpWindow.cs` | 단축키 도움말. 스크롤되는 창이며 `확인`으로 닫는다 |
+| `src/ThreadLogViewer.App/HelpWindow.cs` | 단축키 도움말. 본문은 같은 문구의 읽기 전용 텍스트 상자라 선택할 수 있고, 스크롤되는 창이며 `확인`으로 닫는다 |
 | `src/ThreadLogViewer.App/MainWindow.Performance.cs` | 긴 줄 구간 표시. 생성기는 `LargeLineElementGenerator` |
 
 ## 테스트와 CI

@@ -29,6 +29,7 @@ internal static class UiReview
         var shots = new List<UiReviewShot>();
         var findings = new List<UiReviewFinding>();
         var buckets = new List<UiReviewBucket>();
+        var filtered = new UiReviewFilterCounts(0, 0, 0);
         string folder = Path.Combine(Path.GetTempPath(), "tlv-ui-review-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -48,13 +49,17 @@ internal static class UiReview
                 {
                     findings.AddRange(lint.Findings);
                     buckets.AddRange(lint.Buckets);
+                    filtered = new UiReviewFilterCounts(
+                        filtered.SystemMenuBar + lint.FilterCounts.SystemMenuBar,
+                        filtered.MenuPopup + lint.FilterCounts.MenuPopup,
+                        filtered.MenuHeader + lint.FilterCounts.MenuHeader);
                     lint.DisposeFont();
                 }
             }
         }
         finally
         {
-            UiReviewReport.Write(output, displayNote, shots, findings, buckets);
+            UiReviewReport.Write(output, displayNote, shots, findings, buckets, filtered);
             try
             {
                 if (Directory.Exists(folder))
@@ -73,7 +78,7 @@ internal static class UiReview
                 throw new InvalidOperationException("Screenshot is missing: " + shot.File);
         }
         int dropped = buckets.Sum(bucket => bucket.Dropped);
-        Console.WriteLine($"UI review wrote {shots.Count} screenshots, {findings.Count} stored lint warnings, and {dropped} dropped.");
+        Console.WriteLine($"UI review wrote {shots.Count} screenshots, {findings.Count} stored lint warnings, and {dropped} dropped. Filtered system menu bar {filtered.SystemMenuBar}, menu popup {filtered.MenuPopup}, menu header {filtered.MenuHeader}.");
     }
 
     private static void CaptureTheme(PublishedApp app, string log, string output, int scale, string theme, UiReviewLint lint, List<UiReviewShot> shots)

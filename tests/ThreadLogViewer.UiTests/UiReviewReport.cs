@@ -14,7 +14,7 @@ internal static class UiReviewReport
         "That process applies a 1.5 LayoutTransform to the window content, skips the monitor work-area clamp, and uses software rendering so PrintWindow is not black. " +
         "The outer window stays the requested pixel size, so layout DIPs are about that size divided by 1.5. " +
         "This matches a fixed-pixel window on a 150% monitor. It does not exercise Per-Monitor V2 font hinting, and the native title bar stays at the session DPI. " +
-        "Menu popups, the highlight-manager window, and the help MessageBox are separate windows and are not enlarged by the content transform. " +
+        "Menu popups, the highlight-manager window, and the help window are separate windows and are not enlarged by the content transform. " +
         "When the variables are unset, layout, render mode, and the monitor clamp are unchanged.";
 
     internal const string ThemeNote =
@@ -24,7 +24,7 @@ internal static class UiReviewReport
         "The failure notice is the status-bar text that starts with 강조 준비 실패 after one broken highlight rule. " +
         "The modal exception MessageBox is shown only for an unhandled UI exception. The review does not inject one.";
 
-    internal static void Write(string directory, string displayNote, IReadOnlyList<UiReviewShot> shots, IReadOnlyList<UiReviewFinding> findings, IReadOnlyList<UiReviewBucket> buckets)
+    internal static void Write(string directory, string displayNote, IReadOnlyList<UiReviewShot> shots, IReadOnlyList<UiReviewFinding> findings, IReadOnlyList<UiReviewBucket> buckets, UiReviewFilterCounts filtered)
     {
         Directory.CreateDirectory(directory);
         int truncated = findings.Count(item => item.Category == UiReviewLint.TruncatedText);
@@ -52,7 +52,14 @@ internal static class UiReviewReport
             missingName = missing,
             stored,
             dropped,
-            total = stored
+            total = stored,
+            filtered = new
+            {
+                systemMenuBar = filtered.SystemMenuBar,
+                menuPopup = filtered.MenuPopup,
+                menuHeader = filtered.MenuHeader,
+                total = filtered.Total
+            }
         };
         var payload = new
         {
@@ -100,7 +107,7 @@ internal static class UiReviewReport
         File.WriteAllText(Path.Combine(directory, "ui-lint.json"), JsonSerializer.Serialize(payload, jsonOptions), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         File.WriteAllText(Path.Combine(directory, "index.md"), IndexMarkdown(displayNote, shots), new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(directory, "index.html"), IndexHtml(shots), new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(directory, "ui-lint.md"), LintMarkdown(truncated, outside, tab, missing, stored, dropped, capped, scales.Select(item => (item.scale, item.stored, item.dropped, item.capped)).ToArray(), buckets, findings), new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(directory, "ui-lint.md"), LintMarkdown(truncated, outside, tab, missing, stored, dropped, capped, filtered, scales.Select(item => (item.scale, item.stored, item.dropped, item.capped)).ToArray(), buckets, findings), new UTF8Encoding(false));
     }
 
     private static string IndexMarkdown(string displayNote, IReadOnlyList<UiReviewShot> shots)
@@ -149,14 +156,14 @@ internal static class UiReviewReport
         return builder.ToString();
     }
 
-    private static string LintMarkdown(int truncated, int outside, int tab, int missing, int stored, int dropped, bool capped, (int Scale, int Stored, int Dropped, bool Capped)[] scales, IReadOnlyList<UiReviewBucket> buckets, IReadOnlyList<UiReviewFinding> findings)
+    private static string LintMarkdown(int truncated, int outside, int tab, int missing, int stored, int dropped, bool capped, UiReviewFilterCounts filtered, (int Scale, int Stored, int Dropped, bool Capped)[] scales, IReadOnlyList<UiReviewBucket> buckets, IReadOnlyList<UiReviewFinding> findings)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# UI lint");
         builder.AppendLine();
         builder.AppendLine("These are warnings. They do not fail the build. Only a crash of the review step fails the job.");
         builder.AppendLine();
-        builder.AppendLine("Truncation is estimated from the UIA tree. UIA does not expose WPF DesiredSize. A single-line text element is reported when its name, measured with Segoe UI at the window font size times the review scale, is wider than its bounding width and the element is stretched to its parent or the excess is large. An ellipsis in the accessible name is also reported. Three false positives are omitted: the System menu bar, outside-bounds on Menu and MenuItem popups, and truncation of text whose parent is a MenuItem (access-key suffix and menu-header ellipsis). Other ellipsis, including filter headers and search results, stays. Menu items are omitted from the unreachable-Tab check because they open with Alt and arrows. List items are omitted because the list is one tab stop.");
+        builder.AppendLine("Truncation is estimated from the UIA tree. UIA does not expose WPF DesiredSize. A single-line text element is reported when its name, measured with Segoe UI at the window font size times the review scale, is wider than its bounding width and the element is stretched to its parent or the excess is large. An ellipsis in the accessible name is also reported. A filter is counted only when it suppresses a finding that would otherwise be stored. The System menu bar is omitted from outside-bounds. Menu and MenuItem elements are omitted from outside-bounds only when their top-level window is not the main window, which is a popup. The main window menu bar stays in that check. Text whose parent is a MenuItem is measured again after `(_X)` and `_` are removed, and a real overflow is still stored. Other ellipsis, including filter headers and search results, stays. Menu items are omitted from the unreachable-Tab check because they open with Alt and arrows. List items are omitted because the list is one tab stop.");
         builder.AppendLine();
         builder.AppendLine($"Each state, theme, and scale stores at most {UiReviewLint.FindingCap} warnings. Both window sizes share that bucket. Category counts below are stored warnings only.");
         builder.AppendLine();
@@ -170,6 +177,15 @@ internal static class UiReviewReport
         builder.AppendLine($"| missing-name | {missing} |");
         builder.AppendLine($"| stored | {stored} |");
         builder.AppendLine($"| dropped | {dropped} |");
+        builder.AppendLine();
+        builder.AppendLine("Filtered counts are findings a filter suppressed instead of storing.");
+        builder.AppendLine();
+        builder.AppendLine("| Filter | Suppressed |");
+        builder.AppendLine("| --- | ---: |");
+        builder.AppendLine($"| system menu bar | {filtered.SystemMenuBar} |");
+        builder.AppendLine($"| menu popup | {filtered.MenuPopup} |");
+        builder.AppendLine($"| menu header | {filtered.MenuHeader} |");
+        builder.AppendLine($"| filtered total | {filtered.Total} |");
         builder.AppendLine();
         builder.AppendLine("| Scale | Stored | Dropped |");
         builder.AppendLine("| --- | ---: | ---: |");

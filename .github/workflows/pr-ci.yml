@@ -184,7 +184,7 @@ jobs:
               "Screenshots: $($report.screenshotCount)"
               ''
               'Lint warnings do not fail this job. A crash of the review step does.'
-              "Finding cap: $($report.findingCap) stored warnings per state, theme, and scale. Category counts are stored warnings. A capped bucket means the real count is higher."
+              "Finding cap: $($report.findingCap) stored warnings per state, theme, and scale. Category counts are stored warnings. A capped bucket means the real count is higher. Filtered counts are findings a filter suppressed instead of storing."
               ''
               '| Category | Stored warnings |'
               '| --- | ---: |'
@@ -194,6 +194,13 @@ jobs:
               "| missing-name | $($summary.missingName) |"
               "| stored | $($summary.stored) |"
               "| dropped | $($summary.dropped) |"
+              ''
+              '| Filter | Suppressed |'
+              '| --- | ---: |'
+              "| system menu bar | $($summary.filtered.systemMenuBar) |"
+              "| menu popup | $($summary.filtered.menuPopup) |"
+              "| menu header | $($summary.filtered.menuHeader) |"
+              "| filtered total | $($summary.filtered.total) |"
               ''
               '| Scale | Stored | Dropped |'
               '| --- | ---: | ---: |'
