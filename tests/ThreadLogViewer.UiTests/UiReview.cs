@@ -163,12 +163,13 @@ internal static class UiReview
                     Resize(session, size.Width, size.Height);
                     Shoot(session, lint, output, shots, "highlight-manager", "강조 문구 관리", theme, scale, size.Width, size.Height, highlight, steady: false);
                 }
+                AddBadRule(session, highlight);
             }
             finally
             {
-                CloseHighlight(highlight);
+                if (IsAlive(highlight))
+                    CloseHighlight(highlight);
             }
-            AddBadRule(session);
             session.WaitUntil(() =>
             {
                 string status = session.Status();
@@ -432,9 +433,8 @@ internal static class UiReview
         }
     }
 
-    private static void AddBadRule(UiSession session)
+    private static void AddBadRule(UiSession session, Window dialog)
     {
-        Window dialog = OpenHighlight(session);
         var box = dialog.FindFirstDescendant(condition => condition.ByAutomationId("HighlightPendingBox"))?.AsTextBox()
             ?? throw new InvalidOperationException("Highlight phrase box was not found. " + session.Describe());
         box.Text = "broken\uD800";
