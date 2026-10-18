@@ -26,7 +26,7 @@
 
 | 검증 | 결과 | 기록 |
 |---|---|---|
-| PR CI (PR #14) | 성공 | [run 39176274294](https://github.com/loveminso/ThreadLogViewer/actions/runs/39176274294) |
+| PR CI (PR #14) | 성공 | [run 39177519660](https://github.com/loveminso/ThreadLogViewer/actions/runs/39177519660) |
 | Release 빌드 | 경고 0/오류 0 | 동일 run |
 | 단위 테스트 | 381/381 통과, 실패 0, 건너뜀 0 | `tests.trx` (동일 run job summary) |
 | UI iteration 1 | 14 통과 / 1 건너뜀 / 0 실패 / 15 합계 | `ui-tests-1.trx` |
