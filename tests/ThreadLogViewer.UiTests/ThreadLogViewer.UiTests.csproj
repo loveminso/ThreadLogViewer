@@ -10,9 +10,8 @@
     <OutputType>Exe</OutputType>
     <GenerateProgramFile>false</GenerateProgramFile>
     <StartupObject>ThreadLogViewer.UiTests.Program</StartupObject>
-    <!-- Kept out of ThreadLogViewer.slnx so `dotnet test ThreadLogViewer.slnx` stays the unit-test run.
-         These tests need the published exe and an interactive desktop, and they run in a later CI step.
-         `dotnet test` does not call Program.Main. The gallery step runs the exe with --ui-review. -->
+    <!-- Kept out of ThreadLogViewer.slnx. dotnet test does not call Program.Main.
+         The gallery step runs this exe with the ui-review argument. -->
   </PropertyGroup>
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />
