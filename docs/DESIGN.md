@@ -10,7 +10,7 @@ Windows x64용 읽기 전용 로그 뷰어다. UI는 `src/ThreadLogViewer.App`, 
 
 원본 로그는 읽기 전용으로 연다. `LogFileReader.ReadSnapshotAsync`가 `FileAccess.Read`와 `FileShare.ReadWrite | FileShare.Delete`로 연다 (`src/ThreadLogViewer.Core/LogFileReader.cs`). 같은 공유로 로그를 연 다른 프로그램이 이어서 쓰거나, 회전을 위해 이름을 바꾸거나 지워도 열기 자체가 공유 위반으로 막히지 않는다. 다른 프로그램이 파일을 독점으로 열면 열 수 없다. 길이는 연 직후 한 번만 잡고, 그 길이만 읽는다. 그 다음 늘어난 바이트는 이번 읽기에 넣지 않는다. 읽기 도중 짧아져 그 길이를 채우지 못하면 `읽는 도중 파일 길이가 변경되었습니다. 다시 열어 주세요.`로 실패한다.
 
-내보내기는 새 파일만 만든다. `LogExporter.ValidateDestination`은 원본과 같은 경로와 이미 있는 파일을 거절한다 (`src/ThreadLogViewer.Core/LogExporter.cs`). 화면 설정은 `SettingsStore`가 실행 폴더 아래에 만드는 설정 파일에만 쓴다. 처리되지 않은 예외 기록은 `LocalExceptionLog`가 사용자 로컬 앱 데이터 아래 `ThreadLogViewer` 폴더의 `unhandled-exceptions.log`에만 쓴다. 둘 다 열린 로그 파일에는 쓰지 않는다.
+내보내기는 새 파일만 만든다. `LogExporter.ValidateDestination`은 원본과 같은 경로와 이미 있는 파일을 거절한다 (`src/ThreadLogViewer.Core/LogExporter.cs`). 화면 설정은 `SettingsStore`가 실행 폴더의 `user-data\ui-settings.json`에 쓰고, 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없을 때만 사용자 로컬 앱 데이터 아래 `ThreadLogViewer\ui-settings.json`에 쓴다. 처리되지 않은 예외 기록은 `LocalExceptionLog`가 사용자 로컬 앱 데이터 아래 `ThreadLogViewer` 폴더의 `unhandled-exceptions.log`에만 쓴다. 둘 다 열린 로그 파일에는 쓰지 않는다.
 
 ## 프로젝트 배치
 
@@ -81,7 +81,7 @@ F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`�
 
 ### 화면 설정
 
-`SettingsStore`가 실행 폴더의 `user-data` 디렉터리에 `ui-settings.json`을 읽고 쓴다 (`src/ThreadLogViewer.App/SettingsStore.cs`). 내용 형식은 `UiSettings`다. 테마, 간격, 줄바꿈, 글자 크기, 스레드 패널 폭, 검색 결과 높이·접힘, 스레드 배경, 긴 줄 구간 표시만 들어 있다 (`src/ThreadLogViewer.App/UiSettings.cs`). 로그 본문, 경로, 검색어는 넣지 않는다. 저장 파일에는 `OwnerMarker`(`ThreadLogViewer.UiSettings`)와 `SchemaVersion` 1이 있다. 다른 소유자, 다른 스키마, 손상된 JSON, 링크·reparse point는 그대로 두고 기본 화면으로 연다. 갱신은 같은 폴더의 임시 파일에 쓴 뒤 `File.Replace` 또는 `File.Move`로 바꾼다. 창에서는 `src/ThreadLogViewer.App/MainWindow.Settings.cs`가 마지막 변경 500ms 뒤에 저장한다. 실패하면 횟수를 올리고, 창이 열려 있고 횟수가 3 이하일 때만 2초·4초·8초 뒤에 다시 시도한다. 네 번째 실패부터는 창을 연 동안 다시 예약하지 않는다. 종료 때는 `viewReady`를 끈 뒤 `SaveSettingsNow`를 한 번 더 호출하고 타이머를 멈춘다. 위치와 형식은 옮기지 않는다. 이 내용은 `AGENTS.md`와 아래 수정 3에 있다.
+`SettingsStore`가 실행 폴더의 `user-data` 디렉터리에 `ui-settings.json`을 읽고 쓴다 (`src/ThreadLogViewer.App/SettingsStore.cs`). 그 폴더를 만들 수 없거나, 접근이 거부되거나, 폴더가 읽기 전용이거나, 설정 파일이 아직 없을 때 쓰기 또는 바꾸기가 실패하면 같은 형식의 파일을 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 저장한다. 대체 루트는 `SettingsStore` 생성자의 두 번째 인자로만 켠다. 생략하면 대체 위치는 없다. 앱의 기본 생성자는 `Environment.SpecialFolder.LocalApplicationData`를 넘긴다. 읽을 때는 실행 폴더에 파일이 있으면 그 파일을 쓰고, 없을 때만 대체 파일을 읽는다. 두 파일을 복사하거나 옮기지 않는다. 실행 폴더에 설정 파일이 이미 있으면, 실패 원인이 잠금·읽기 전용 속성·권한·디스크 중 무엇이든 대체 위치에 쓰지 않고 실패로 돌린다. 다음 읽기가 그 파일을 고르기 때문이다. 그 파일이 계속 쓸 수 없는 상태면 변경은 저장되지 않고 상태 줄에 안내만 남는다. 내용 형식은 `UiSettings`다. 테마, 간격, 줄바꿈, 글자 크기, 스레드 패널 폭, 검색 결과 높이·접힘, 스레드 배경, 긴 줄 구간 표시만 들어 있다 (`src/ThreadLogViewer.App/UiSettings.cs`). 로그 본문, 경로, 검색어는 넣지 않는다. 두 위치 모두 `OwnerMarker`(`ThreadLogViewer.UiSettings`)와 `SchemaVersion` 1을 확인하고, 64KB를 넘는 파일, 다른 소유자, 다른 스키마, 손상된 JSON, 링크·reparse point는 그대로 두고 기본 화면으로 연다. 갱신은 같은 폴더의 임시 파일에 쓴 뒤 `File.Replace` 또는 `File.Move`로 바꾼다. 창에서는 `src/ThreadLogViewer.App/MainWindow.Settings.cs`가 마지막 변경 500ms 뒤에 저장한다. 대체 위치 저장이 성공하면 오류를 보이지 않는다. 두 위치가 모두 실패하면 상태줄에 경로가 없는 짧은 안내를 남기고 예외로 앱을 닫지 않는다. 실패하면 횟수를 올리고, 창이 열려 있고 횟수가 3 이하일 때만 2초·4초·8초 뒤에 다시 시도한다. 네 번째 실패부터는 창을 연 동안 다시 예약하지 않는다. 종료 때는 `viewReady`를 끈 뒤 `SaveSettingsNow`를 한 번 더 호출하고 타이머를 멈춘다. 파일 위치와 형식은 옮기지 않는다. 이 내용은 `AGENTS.md`와 아래 수정 3에 있다.
 
 분석 상태와 필터·강조 프리셋은 별도 JSON이다. `AnalysisFiles`가 새 파일만 만들고 8 MiB를 넘기면 거절한다 (`src/ThreadLogViewer.Core/AnalysisFiles.cs`). 시작 시 작업 공간을 자동으로 복원하지 않는다.
 
@@ -150,7 +150,7 @@ UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다
 
 아래 번호는 코드와 현재 문서가 아직 남겨 둔 항목이다. 구현된 기능으로 적지 않는다.
 
-**수정 3. 화면 설정 저장.** 저장 위치와 형식은 `SettingsStore`와 `UiSettings`에 고정한다. `AGENTS.md`가 그 파일을 옮기거나 형식을 바꾸지 말라고 적는다. 성공한 다시 실행은 UI 테스트 `Scenario12_SettingsPersistAfterRestart`가 판정한다 (`tests/ThreadLogViewer.UiTests/UiFeatureTests.cs`). 저장이 실패하는 경로는 UI 테스트가 없다. 그 공백은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 높은 우선순위 10번 설명에 있다. `README.md`, `docs/PLAN.md`, `docs/VALIDATION-v0.8.2.md`의 v0.8.2 한계 목록은 기능 10 전체를 UI 자동 테스트가 없다고 적는데, 그 문장은 `Scenario12`보다 이전이다. 현재 자동 판정 범위는 `docs/FEATURE-TEST-GUIDE.md`의 매핑 표를 따른다.
+**수정 3. 화면 설정 저장.** 기본 파일은 실행 폴더의 `user-data\ui-settings.json`이고 형식은 `SettingsStore`와 `UiSettings`의 schema 1 그대로다. 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 같은 검사를 거쳐 저장한다. 파일을 옮기거나 형식을 바꾸지 않는다. 성공한 다시 실행은 UI 테스트 `Scenario12_SettingsPersistAfterRestart`가 판정한다 (`tests/ThreadLogViewer.UiTests/UiFeatureTests.cs`). 쓸 수 없는 실행 폴더, 두 위치 모두 실패, 두 파일이 있을 때의 실행 폴더 우선은 `tests/ThreadLogViewer.Tests/SettingsFallbackTests.cs`가 판정한다. 저장이 실패하는 경로의 UI 테스트는 없다. 그 공백은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 높은 우선순위 10번 설명에 있다. `README.md`, `docs/PLAN.md`, `docs/VALIDATION-v0.8.2.md`의 v0.8.2 한계 목록은 기능 10 전체를 UI 자동 테스트가 없다고 적는데, 그 문장은 `Scenario12`보다 이전이다. 현재 자동 판정 범위는 `docs/FEATURE-TEST-GUIDE.md`의 매핑 표를 따른다.
 
 **수정 4. UTF-8 BOM을 쓰는 중의 F5.** `LogFileReader.Decode`는 BOM을 확정 인코딩으로 보고 엄격한 UTF-8로 디코딩한다. 스냅샷이 문자 중간에서 끝나면 `DecoderFallbackException`이 나고 F5는 `파일 새로 고침 실패`로 끝난다. BOM 없는 UTF-8만 끝의 미완성 문자를 버린다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 이 때문에 건너뛴다. 건너뛰는 이유는 `tests/ThreadLogViewer.UiTests/UiScenarioTests.cs`의 `BomTruncationSkip`과 [검증 안내](TESTING.md), [기능 테스트 방법](FEATURE-TEST-GUIDE.md), [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)에 있다. 앱 동작은 이 한계를 유지한다.
 

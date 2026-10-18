@@ -17,7 +17,9 @@ public partial class MainWindow
     private void InitializeFeatures(string? directory, bool persist)
     {
         saveSettings = persist;
-        settingsStore = new SettingsStore(directory ?? AppContext.BaseDirectory);
+        settingsStore = directory is null
+            ? new SettingsStore(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))
+            : new SettingsStore(directory);
         var loaded = settingsStore.Load();
         saveSettings &= loaded.CanSave;
         var settings = loaded.Settings.Normalize();
@@ -70,12 +72,17 @@ public partial class MainWindow
             ResultsHeight = preferredResultsHeight, ResultsCollapsed = resultsCollapsed,
             ThreadBackgrounds = threadRenderer.Enabled, LargeLinePreview = largeLineGenerator.Enabled
         };
-        var result = settingsStore.Save(settings.Normalize(), data?.SourcePath);
+        SettingsSaveResult result;
+        try { result = settingsStore.Save(settings.Normalize(), data?.SourcePath); }
+        catch (Exception) { result = new(false, "설정을 저장하지 못했습니다. 현재 화면 설정은 유지됩니다."); }
         if (result.Success)
         { settingsDirty = false; settingsSaveFailures = 0; settingsTimer.Interval = TimeSpan.FromMilliseconds(500); }
         else
         {
-            OperationStatus.Text = "화면 설정 저장 안 됨 · " + result.Message + " · 파일 잠금과 폴더 권한을 확인하세요. 종료 시 다시 시도합니다.";
+            string detail = result.Message.Contains('\\') || result.Message.Contains('/')
+                ? "설정을 저장하지 못했습니다. 현재 화면 설정은 유지됩니다."
+                : result.Message;
+            OperationStatus.Text = "화면 설정 저장 안 됨 · " + detail + " · 파일 잠금과 폴더 권한을 확인하세요. 종료 시 다시 시도합니다.";
             settingsSaveFailures++;
             if (viewReady && settingsSaveFailures <= 3)
             { settingsTimer.Interval = TimeSpan.FromSeconds(Math.Min(8, Math.Pow(2, settingsSaveFailures))); settingsTimer.Start(); }

@@ -37,7 +37,7 @@ GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogVie
 
 아래 버전별 항목은 당시의 구현·검증 기록입니다. 과거 항목에 남아 있는 북마크와 로컬 배포 경로는 현재 기능·최신 다운로드를 뜻하지 않습니다.
 
-**main(미출시)**: 기능 1·2·6·8·9·10·11의 FlaUI UI 테스트(`Scenario07`~`Scenario13`)를 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다. 깨진 강조 규칙 하나는 건너뛰고, 나머지 올바른 규칙은 계속 강조합니다.
+**main(미출시)**: 기능 1·2·6·8·9·10·11의 FlaUI UI 테스트(`Scenario07`~`Scenario13`)를 추가했습니다. 회차마다 13 통과 / 1 건너뜀 / 14 합계입니다. 기능 4·7은 일부만 UI 테스트가 있습니다. 깨진 강조 규칙 하나는 건너뛰고, 나머지 올바른 규칙은 계속 강조합니다. 화면 설정은 실행 폴더에 쓰고, 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 같은 형식으로 저장합니다.
 
 ## v0.8.2 — 공유 읽기·예외 안정화·UI 자동화
 
@@ -163,7 +163,7 @@ v0.4.1 로컬 배포도 보존합니다: `artifacts/ThreadLogViewer-v0.4.1-win-x
 - 최대 8개 키워드 강조색, 기록 전체에 적용하는 포함 OR/AND·제외 필터.
 - 전체 스레드 앞뒤 문맥 보기와 필터 복귀, 필터 변경 시 원본 위치 유지.
 - 소유 헤더 기준 A/B 시간 차이·교환·이동·복사. 날짜 없는 자정은 자동 보정하지 않습니다.
-- 실행 폴더의 `user-data/ui-settings.json`에 화면 설정만 저장합니다. 로그·경로·북마크·검색어는 저장하지 않습니다.
+- 실행 폴더의 `user-data/ui-settings.json`에 화면 설정만 저장합니다. 그 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 같은 화면 설정만 저장합니다. 로그·경로·북마크·검색어는 저장하지 않습니다.
 - [단축키 표](docs/SHORTCUTS.md), [기능 테스트 방법](docs/FEATURE-TEST-GUIDE.md), [v0.4 검증 기록](docs/VALIDATION-v0.4.md).
 
 v0.4.0 당시 로컬 배포 폴더와 검증 기록을 보존합니다. 최신 공개 실행본은 위의 다운로드 링크를 따릅니다.
@@ -341,6 +341,7 @@ dotnet run --project tests\ThreadLogViewer.Tests -c Release -- --benchmark TestR
 - `src/ThreadLogViewer.Core`: UI와 독립적인 읽기, 인코딩, 파싱, 줄 매핑, 필터, 검색, 원본 보호 내보내기.
 - `src/ThreadLogViewer.App`: WPF 화면과 AvalonEdit 렌더링. 화면에 보이는 줄만 그립니다.
 - `tests/ThreadLogViewer.Tests`: xUnit 자동 테스트와 재현 가능한 벤치마크.
+- 화면 설정은 실행 폴더의 `user-data/ui-settings.json`에 저장합니다. 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`을 쓰고, 실행 폴더에 파일이 있으면 그 파일을 먼저 읽습니다. 파일을 옮기거나 형식을 바꾸지 않습니다.
 - 열린 탭마다 메모리에 디코딩 원문·행 정보·표시 문서를 유지합니다. 탭을 많이 열면 메모리 사용량이 늘어납니다. 2GB 이상 파일은 차단하며 그 미만도 RAM과 줄 길이에 따라 한계가 있습니다. 극단적으로 긴 한 줄은 표시가 느려질 수 있습니다.
 - 읽기·디코딩·문서 생성은 구간마다 취소를 확인합니다. 초기 문서 게시·배치와 내부 처리에는 지연이 남을 수 있으며 모든 단계의 즉시 취소를 보장하지 않습니다.
 - 검색은 첫 100,000개까지 강조·이동하며 초과 여부를 표시합니다. 닫기로 검색을 취소할 수 있습니다. 필터 변경은 검색을 다시 수행합니다.
