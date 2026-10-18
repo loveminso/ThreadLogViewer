@@ -48,7 +48,8 @@ public partial class MainWindow
         Editor.ScrollToVerticalOffset(Editor.TextArea.TextView.GetVisualTopByDocumentLine(top) + anchor.TopDelta);
         Editor.ScrollToHorizontalOffset(anchor.Horizontal);
     }
-    private async void UpdatePosition()
+    private void UpdatePosition() => AsyncEvent.Run(UpdatePositionAsync);
+    private async Task UpdatePositionAsync()
     {
         if (!viewReady || restoringPosition || projection is null) return;
         UpdateAnalysisInputState();
@@ -96,7 +97,7 @@ public partial class MainWindow
         HiddenContextButton.Visibility = Visibility.Collapsed;
     }
     private int? hiddenTargetLine;
-    private async void HiddenContext_Click(object sender, RoutedEventArgs e) { if (hiddenTargetLine is { } line) await ShowContextAsync(line); }
+    private void HiddenContext_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () => { if (hiddenTargetLine is { } line) await ShowContextAsync(line); });
     private bool NavigateVisible(int sourceLineIndex, int column = 1, int length = 0)
     {
         int? line = projection?.FindDisplayLine(sourceLineIndex + 1);
@@ -118,18 +119,18 @@ public partial class MainWindow
     }
     private EntryFilter ReadDraftFilter() => new(Conditions(IncludeBox.Text), Conditions(ExcludeBox.Text),
         IncludeModeBox.SelectedIndex == 1, FilterCaseBox.IsChecked == true);
-    private async void ApplyTextFilter_Click(object sender, RoutedEventArgs e)
+    private void ApplyTextFilter_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (data is null) { FilterDirtyStatus.Text = "로그를 연 뒤 필터를 적용하세요."; return; }
         await FilterAsync(ReadDraftFilter());
-    }
+    });
     private static string[] Conditions(string text) => text.Split(["\r\n", "\n", "\r"], StringSplitOptions.None).Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-    private async void ResetTextFilter_Click(object sender, RoutedEventArgs e)
+    private void ResetTextFilter_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         IncludeBox.Clear(); ExcludeBox.Clear(); IncludeModeBox.SelectedIndex = 0; FilterCaseBox.IsChecked = false;
         await FilterAsync(EntryFilter.Empty);
         UpdateFilterDraftStatus();
-    }
+    });
     private void Criteria_Changed(object sender, TextChangedEventArgs e) => UpdateFilterDraftStatus();
     private void FilterOption_Changed(object sender, RoutedEventArgs e) => UpdateFilterDraftStatus();
     private void UpdateFilterDraftStatus()
@@ -153,18 +154,18 @@ public partial class MainWindow
         UpdateFilterDraftStatus();
         UpdateEmptyResultState();
     }
-    private async void Context_Click(object sender, RoutedEventArgs e)
+    private void Context_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (LineActionSourceLine() is { } line) await ShowContextAsync(line);
         else ContextInputStatus.Text = "로그를 연 뒤 본문에서 기준 기록을 선택하세요.";
-    }
-    private async void ContextRadius_Click(object sender, RoutedEventArgs e)
+    });
+    private void ContextRadius_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (sender is not MenuItem { Tag: string value } || !int.TryParse(value, out int radius)) return;
         ContextRadiusBox.Text = radius.ToString();
         if (LineActionSourceLine() is { } line) await ShowContextAsync(line);
-    }
-    private async void ContextRadiusCustom_Click(object sender, RoutedEventArgs e)
+    });
+    private void ContextRadiusCustom_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         if (!IsVisible || busy || LineActionSourceLine() is not { } line) return;
         var session = activeSession;
@@ -174,7 +175,7 @@ public partial class MainWindow
         { ShowError("앞뒤 기록 수를 확인하세요", new ArgumentException("0~10,000 사이의 정수를 입력하세요.")); return; }
         ContextRadiusBox.Text = radius.ToString();
         await ShowContextAsync(line);
-    }
+    });
     private async Task<bool> ShowContextAsync(int sourceLine)
     {
         if (data is null || sourceLine < 0 || sourceLine >= data.Lines.Count) return false;
@@ -216,9 +217,9 @@ public partial class MainWindow
         catch (Exception ex) when (ex is ArgumentException or OutOfMemoryException) { if (work.IsCurrent(op.Version)) ShowError("주변 로그 보기 실패", ex); return false; }
         finally { FinishWork(op.Version); }
     }
-    private async void ReturnContext_Click(object sender, RoutedEventArgs e)
+    private void ReturnContext_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
         await FilterAsync(returnAnchor: normalAnchor);
         if (!contextActive) { margin.ContextLineIndex = null; UpdateExportLabel(false); margin.InvalidateVisual(); }
-    }
+    });
 }

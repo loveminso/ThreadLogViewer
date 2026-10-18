@@ -9,7 +9,7 @@ public partial class MainWindow
 {
     // Synthetic tests can pause this second background phase without relying on timing or large data.
     private Func<CancellationToken, Task>? refreshMapCheckpoint = null;
-    private async void RefreshSession_Click(object sender, RoutedEventArgs e) => await RefreshCurrentSessionAsync();
+    private void RefreshSession_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(RefreshCurrentSessionAsync);
 
     private Task RefreshCurrentSessionAsync()
     {

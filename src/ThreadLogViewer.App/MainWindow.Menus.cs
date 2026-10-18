@@ -118,7 +118,7 @@ public partial class MainWindow
         return true;
     }
 
-    private async void ReloadAuto_Click(object sender, RoutedEventArgs e) => await ReloadCurrentAsync(EncodingMode.Auto);
+    private void ReloadAuto_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => ReloadCurrentAsync(EncodingMode.Auto));
     private void MenuAnalysis_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: string tag } && int.TryParse(tag, out int tool)) ShowAnalysisTool(tool);

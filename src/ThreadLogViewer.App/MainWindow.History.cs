@@ -60,8 +60,8 @@ public partial class MainWindow
         stack.Add(point);
         if (stack.Count > MaximumNavigationHistory) stack.RemoveAt(0);
     }
-    private async void BackNavigation_Click(object sender, RoutedEventArgs e) => await NavigateHistoryAsync(false);
-    private async void ForwardNavigation_Click(object sender, RoutedEventArgs e) => await NavigateHistoryAsync(true);
+    private void BackNavigation_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateHistoryAsync(false));
+    private void ForwardNavigation_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateHistoryAsync(true));
     private async Task NavigateHistoryAsync(bool forward)
     {
         if (busy || activeSession is not { } session || session.History.Replaying || data is null) return;

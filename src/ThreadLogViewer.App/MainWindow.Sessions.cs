@@ -181,7 +181,7 @@ public partial class MainWindow
         }
         finally { selectingSession = false; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdatePosition(); UpdateTime(); UpdateSplitStatus(); UpdateFilterSummary();
-        _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus(); CaptureActiveSession();
+        AsyncEvent.Run(SearchAsync); AsyncEvent.Run(RefreshKeywordsAsync); UpdateMenus(); CaptureActiveSession();
         return TrimClosedSessions();
     }
 
@@ -230,7 +230,7 @@ public partial class MainWindow
         finally { selectingSession = wasSelectingSession; restoringPosition = false; viewReady = true; }
         UpdateSourceHeader(); UpdateExportLabel(contextActive); UpdateFilterSummary();
         UpdatePosition(); UpdateTime(); UpdateSplitStatus(); UpdateAnalysisInputState();
-        _ = SearchAsync(); _ = RefreshKeywordsAsync(); UpdateMenus();
+        AsyncEvent.Run(SearchAsync); AsyncEvent.Run(RefreshKeywordsAsync); UpdateMenus();
         OperationStatus.Text = $"{session.DisplayTitle} · 탭 전환 완료";
     }
 
@@ -452,7 +452,7 @@ public partial class MainWindow
             EmptyDetail.Text = "+ 버튼 / Ctrl+N 새 탭 · Ctrl+O 파일 열기 · Ctrl+V 로그 붙여넣기";
         }
         finally { restoringPosition = false; viewReady = true; }
-        UpdateSourceHeader(); UpdateAnalysisInputState(); UpdateFilterSummary(); _ = RefreshKeywordsAsync();
+        UpdateSourceHeader(); UpdateAnalysisInputState(); UpdateFilterSummary(); AsyncEvent.Run(RefreshKeywordsAsync);
     }
     private void NextSession_Click(object sender, RoutedEventArgs e) => CycleSession(false);
     private void PreviousSession_Click(object sender, RoutedEventArgs e) => CycleSession(true);
