@@ -29,6 +29,7 @@ public sealed class UiScenarioTests(PublishedApp app)
             Assert.EndsWith("ThreadLogViewer.exe", module, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(Path.GetFullPath(session.ExePath), Path.GetFullPath(module), ignoreCase: true);
             session.WaitUntil(() => session.Status().Length > 0, TimeSpan.FromSeconds(10), "status bar did not appear");
+            Assert.Fail("Temporary CI probe: verify ui-screenshots artifact upload (revert this commit).");
         });
 
     [Fact]
