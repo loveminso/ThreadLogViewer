@@ -96,12 +96,12 @@ internal sealed class LogAppender : IDisposable
                 throw new InvalidOperationException("Could not start the append helper.");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            ready = OpenSignal(readyName, process, gate, captured, TimeSpan.FromSeconds(15));
-            stop = OpenSignal(stopName, process, gate, captured, TimeSpan.FromSeconds(15));
-            pause = OpenSignal(pauseName, process, gate, captured, TimeSpan.FromSeconds(15));
-            idle = OpenSignal(idleName, process, gate, captured, TimeSpan.FromSeconds(15));
+            ready = OpenSignal(readyName, process, gate, captured, TimeSpan.FromSeconds(45));
+            stop = OpenSignal(stopName, process, gate, captured, TimeSpan.FromSeconds(45));
+            pause = OpenSignal(pauseName, process, gate, captured, TimeSpan.FromSeconds(45));
+            idle = OpenSignal(idleName, process, gate, captured, TimeSpan.FromSeconds(45));
             var appender = new LogAppender(logPath, process, ready, stop, pause, idle, gate, captured);
-            appender.WaitUntilSignaled(ready, TimeSpan.FromSeconds(15), "Append helper did not open the log.");
+            appender.WaitUntilSignaled(ready, TimeSpan.FromSeconds(45), "Append helper did not open the log.");
             return appender;
         }
         catch
