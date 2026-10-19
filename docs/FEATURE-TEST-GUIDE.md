@@ -237,7 +237,7 @@ CRLF/LF/CR 혼합 선택, 가상 행 거절, 여백 좌표와 실제 선택 이�
 | 11 | 두 기록 시간 차이 | `Scenario13_TimeDifferenceBetweenRecords` |
 | — | 작은 화면의 강조·도움말 창 | `Scenario14_HighlightAndHelpWindowsFitWorkArea` |
 
-창 실행은 `Scenario01_SelfContainedExeShowsMainWindow`, 추가 중 새로 고침은 `Scenario05_RefreshWhileAppendingKorean`과 `Scenario05_Utf8Bom_RefreshWhileAppending`, 1024×768에서 강조 문구 관리와 도움말 창이 작업 영역 안에 있는지는 `Scenario14_HighlightAndHelpWindowsFitWorkArea`가 판정한다. 수동 확인은 SmartScreen만 남는다. 실제 Explorer 끌어 놓기와 위에 적은 UI 테스트 없는 항목은 알려진 한계다.
+창 실행은 `Scenario01_SelfContainedExeShowsMainWindow`가 판정하고, 이때 제목은 `ThreadLog Viewer v0.8.3`이다. 파일을 연 제목 `opened-first.log — ThreadLog Viewer v0.8.3`과 끌어 놓은 뒤의 `dropped-beta.log — ThreadLog Viewer v0.8.3`은 `Scenario02_OpenDropFilterAndExport`가 판정한다. 추가 중 새로 고침은 `Scenario05_RefreshWhileAppendingKorean`과 `Scenario05_Utf8Bom_RefreshWhileAppending`, 1024×768에서 강조 문구 관리와 도움말 창이 작업 영역 안에 있는지는 `Scenario14_HighlightAndHelpWindowsFitWorkArea`가 판정한다. 수동 확인은 SmartScreen만 남는다. 실제 Explorer 끌어 놓기와 위에 적은 UI 테스트 없는 항목은 알려진 한계다.
 
 숨긴 검색 결과·시간 위치는 숨김 표시가 있다. 해당 항목을 선택하면 주변 로그가 열리고, 복귀 버튼으로 기존 조건과 위치를 복원한다. 기본 주변 범위는 앞뒤 20기록이며 우클릭 메뉴에서 5/20/100기록 또는 ‘직접 지정…’의 0~10,000기록을 정한다. 분리 탭의 주변 보기·검색·내보내기는 지정 원본 범위로 잘리며 범위 밖 줄은 포함하지 않는다. 본문 우클릭의 시간 결과·텍스트 동작은 하위 메뉴에 있으며 원본 줄 이동은 바로 실행하는 항목이다.
 

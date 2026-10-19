@@ -269,7 +269,7 @@ public partial class MainWindow
         ThreadScopeTitle.Text = IsBlankSession ? "스레드 · 입력 대기" : ActiveScope is null ? "스레드 · 전체 파일" : "스레드 · 분리 세션";
         ThreadScopeHint.Text = IsBlankSession ? "파일을 열거나 로그를 붙여넣으면 스레드를 표시합니다." : ActiveScope is { } scope ? $"원본 {scope.FirstLineIndex + 1:N0}~{scope.LastLineIndex + 1:N0}줄 기준입니다." : "건수와 시간은 전체 파일 기준입니다.";
         ((ComboBoxItem)SearchScopeBox.Items[1]).Content = ActiveScope is null ? "전체 원본" : "전체 세션";
-        Title = activeSession is null ? AppTitle : $"{FileLabel.Text} — {AppTitle}";
+        Title = activeSession is null ? AppTitle : WindowTitle.WithSession(FileLabel.Text, AppTitle);
         ThreadCount.Text = $"{threadItems.Count:N0}개";
         EncodingStatus.Text = data?.EncodingDescription ?? "인코딩: 파일 없음";
         ParseStatus.Text = IsBlankSession ? "파싱: 입력 대기" : data is null ? "파싱: 대기" : $"{(ActiveScope is null ? "기록" : "원본 전체 파싱")}: 완전 {data.CompleteCount:N0} · 부분 {data.PartialCount:N0} · 미인식 {data.UnrecognizedCount:N0}";

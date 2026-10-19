@@ -52,6 +52,9 @@ jobs:
       - name: Publish portable Windows x64 package
         run: ./scripts/publish.ps1
 
+      - name: Verify release package
+        run: ./scripts/verify-release.ps1 -ResultsDirectory TestResults/pr-ci -Package artifacts/ThreadLogViewer-win-x64.zip
+
       - name: Run UI tests
         id: ui-tests
         run: |

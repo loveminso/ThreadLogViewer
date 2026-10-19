@@ -32,12 +32,13 @@ public partial class MainWindow : Window
     private bool searchLimited;
     private bool viewReady;
     private WorkbenchTheme theme = new(true);
-    private const string AppTitle = "ThreadLog Viewer v0.8.3";
+    private static readonly string AppTitle = WindowTitle.From(typeof(MainWindow).Assembly);
 
     public MainWindow() : this(null, true) { }
     public MainWindow(string? settingsDirectory, bool persistSettings)
     {
         InitializeComponent();
+        Title = AppTitle;
         AutomationProperties.SetName(Editor.TextArea, "로그 본문");
         UiReviewHarness.Apply(this);
         Editor.TextArea.AllowDrop = true;

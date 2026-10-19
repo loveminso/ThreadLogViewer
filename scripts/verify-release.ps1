@@ -46,6 +46,39 @@ foreach ($name in @('ThreadLogViewer.exe', 'ThreadLogViewer.dll')) {
     $actual = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $publishRoot $name)).FileVersion
     if ($actual -ne $expectedVersion) { throw "Wrong $name version: $actual, expected $expectedVersion" }
 }
+# The window title is built at run time from AssemblyName.Version (major.minor.build).
+# That value comes from Directory.Build.props Version. Revision and an InformationalVersion +sha are not shown,
+# so the full "ThreadLog Viewer v$version" literal is not required in the DLL. A leftover hardcoded UTF-16 title must still match.
+# User strings can start on either byte alignment, so both offsets are decoded.
+$dllPath = Join-Path $publishRoot 'ThreadLogViewer.dll'
+$assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($dllPath).Version
+if ($null -eq $assemblyVersion -or $assemblyVersion.Build -lt 0) {
+    throw "ThreadLogViewer.dll assembly version cannot build the window title: $assemblyVersion"
+}
+$titleVersion = '{0}.{1}.{2}' -f $assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build
+$expectedLiteral = "ThreadLog Viewer v$version"
+if ($titleVersion -ne $version) {
+    throw "Window title would show v$titleVersion from assembly $assemblyVersion, but Directory.Build.props Version is $version."
+}
+$productVersion = [string][Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath).ProductVersion
+$productCore = ($productVersion -split '\+', 2)[0]
+if ($productCore -ne $version -and $productCore -ne $expectedVersion) {
+    throw "ThreadLogViewer.dll informational version '$productVersion' does not match Directory.Build.props $version."
+}
+$dllBytes = [IO.File]::ReadAllBytes($dllPath)
+$embeddedTitleCount = 0
+foreach ($offset in 0, 1) {
+    $length = $dllBytes.Length - $offset
+    if ($length -lt 2) { continue }
+    if (($length % 2) -eq 1) { $length-- }
+    $decoded = [Text.Encoding]::Unicode.GetString($dllBytes, $offset, $length)
+    foreach ($match in [regex]::Matches($decoded, 'ThreadLog Viewer v\d+\.\d+\.\d+')) {
+        if ($match.Value -ne $expectedLiteral) {
+            throw "Embedded window title '$($match.Value)' does not match '$expectedLiteral'."
+        }
+        $embeddedTitleCount++
+    }
+}
 $exe = [IO.File]::ReadAllBytes((Join-Path $publishRoot 'ThreadLogViewer.exe'))
 $pe = [BitConverter]::ToInt32($exe, 0x3c)
 if ([BitConverter]::ToUInt16($exe, $pe + 4) -ne 0x8664) { throw 'The executable must be Windows x64.' }
@@ -85,10 +118,13 @@ $report = [ordered]@{
     packageBytes = (Get-Item -LiteralPath $packagePath).Length
     packageFiles = $files.Count
     sha256 = $hash
+    windowTitle = $expectedLiteral
+    windowTitleAssemblyVersion = $assemblyVersion.ToString()
+    windowTitleEmbeddedLiterals = $embeddedTitleCount
     scope = 'Windows Release build, automated tests and package integrity. No manual GUI, monitor DPI or new performance measurement.'
 }
 $report | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath 'artifacts/release-verification.json' -Encoding utf8NoBOM
-Write-Host "Verified v$version, $passed/$total tests, $($files.Count) package files, SHA256 $hash"
+Write-Host "Verified v$version, $passed/$total tests, $($files.Count) package files, SHA256 $hash, window title $expectedLiteral from assembly $assemblyVersion ($embeddedTitleCount embedded literals)"
 if ($env:GITHUB_OUTPUT) {
     "version=$version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
     "passed=$passed" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
