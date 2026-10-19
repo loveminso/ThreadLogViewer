@@ -20,11 +20,11 @@
 
 ## Windows CI (v0.8.3 릴리스 준비 PR #14)
 
-`main` 병합 전 v0.8.3 릴리스 준비는 [PR #14](https://github.com/loveminso/ThreadLogViewer/pull/14)의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)로 검증한다.
+`main` 병합 전 v0.8.3 릴리스 준비는 [PR #14](https://github.com/loveminso/ThreadLogViewer/pull/14)의 [PR CI](https://github.com/loveminso/ThreadLogViewer/actions/workflows/pr-ci.yml)로 검증한다. 기준 커밋은 `8d53d7e17296418167b017e21465b7c75bed058e`(릴리스 노트 QA 수정)이다.
 
 | 검증 | 결과 | 기록 |
 |---|---|---|
-| PR CI (PR #14) | 성공 | [run 39177519660](https://github.com/loveminso/ThreadLogViewer/actions/runs/39177519660) |
+| PR CI (PR #14) | 성공 | [run 39181768689](https://github.com/loveminso/ThreadLogViewer/actions/runs/39181768689) |
 | Release 빌드 | 경고 0/오류 0 | 동일 run |
 | 단위 테스트 | 381/381 통과, 실패 0, 건너뜀 0 | `tests.trx` (동일 run job summary) |
 | UI iteration 1 | 14 통과 / 1 건너뜀 / 0 실패 / 15 합계 | `ui-tests-1.trx` |
@@ -41,3 +41,5 @@
 ## 이전 버전
 
 v0.8.2 공유 읽기·예외·UI 자동화 검증은 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)에 보존한다.
+
+이 파일의 Windows CI 표는 위 커밋·run을 가리키도록 마지막에 한 번 더 갱신했다. 그 커밋은 이 검증 기록 파일만 바꾼다.
