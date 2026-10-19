@@ -43,13 +43,13 @@ public sealed class UiKeyboardTests
         try
         {
             await Load(window, Log);
-            Control<Border>(window, "SearchBar").Visibility = Visibility.Visible;
-            Control<TextBox>(window, "SearchBox").Text = "target";
+            Named<Border>(window, "SearchBar").Visibility = Visibility.Visible;
+            Named<TextBox>(window, "SearchBox").Text = "target";
             await (Task)Invoke(window, "SearchAsync")!;
             var hits = Field<LocatedSearchHit[]>(window, "searchHits");
             Assert.Equal(2, hits.Length);
-            var list = Control<ListBox>(window, "ResultsList");
-            var editor = Control<TextEditor>(window, "Editor");
+            var list = Named<ListBox>(window, "ResultsList");
+            var editor = Named<TextEditor>(window, "Editor");
             Assert.Equal(0, FocusRequests(window));
 
             list.SelectedIndex = 0;
@@ -82,7 +82,7 @@ public sealed class UiKeyboardTests
             await (Task)Invoke(window, "NavigateSearchAsync", false)!;
             Assert.Equal(3, FocusRequests(window));
             var searchEnter = new KeyEventArgs(Keyboard.PrimaryDevice, keys, 0, Key.Enter) { RoutedEvent = UIElement.KeyDownEvent };
-            Invoke(window, "Search_KeyDown", Control<TextBox>(window, "SearchBox"), searchEnter);
+            Invoke(window, "Search_KeyDown", Named<TextBox>(window, "SearchBox"), searchEnter);
             await Until(() => FocusRequests(window) >= 4);
             Assert.True(searchEnter.Handled);
         }
@@ -98,7 +98,7 @@ public sealed class UiKeyboardTests
         {
             await Load(window, Log);
             await Layout(window);
-            var editor = Control<TextEditor>(window, "Editor");
+            var editor = Named<TextEditor>(window, "Editor");
             string original = editor.Text;
             int reads = 0;
             var data = new DataObject();
@@ -112,7 +112,7 @@ public sealed class UiKeyboardTests
             }));
             RaiseFocus(editor.TextArea, editor.TextArea);
             Invoke(window, "UpdateEditingMenus");
-            var paste = Control<MenuItem>(window, "FocusPasteMenu");
+            var paste = Named<MenuItem>(window, "FocusPasteMenu");
             Assert.True(paste.IsEnabled);
             string tip = paste.ToolTip as string ?? "";
             Assert.Contains("클립보드 로그", tip, StringComparison.Ordinal);
@@ -121,7 +121,7 @@ public sealed class UiKeyboardTests
             await Until(() => SessionCount(window) == 2 && editor.Text.Contains("synthetic menu paste line", StringComparison.Ordinal));
             Assert.Equal(1, reads);
             Assert.DoesNotContain(ApplicationCommands.Paste, executed);
-            Control<ListBox>(window, "SessionTabs").SelectedIndex = 0;
+            Named<ListBox>(window, "SessionTabs").SelectedIndex = 0;
             await Until(() => editor.Text == original);
             Assert.Equal(original, editor.Text);
         }
@@ -137,7 +137,7 @@ public sealed class UiKeyboardTests
         {
             await Load(window, Log);
             await Layout(window);
-            Control<Expander>(window, "ContentFilterExpander").IsExpanded = true;
+            Named<Expander>(window, "ContentFilterExpander").IsExpanded = true;
             int reads = 0;
             Set(window, "readClipboard", (Func<IDataObject?>)(() => { reads++; return null; }));
             var executed = new List<(ICommand Command, object Source)>();
@@ -145,11 +145,11 @@ public sealed class UiKeyboardTests
             { e.CanExecute = true; e.Handled = true; }));
             window.AddHandler(CommandManager.PreviewExecutedEvent, new ExecutedRoutedEventHandler((_, e) =>
             { executed.Add((e.Command, e.OriginalSource)); e.Handled = true; }));
-            var input = Control<TextBox>(window, "IncludeBox");
+            var input = Named<TextBox>(window, "IncludeBox");
             RaiseFocus(input, input);
             Invoke(window, "UpdateEditingMenus");
-            Assert.True(Control<MenuItem>(window, "FocusPasteMenu").IsEnabled);
-            Control<MenuItem>(window, "FocusPasteMenu").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.True(Named<MenuItem>(window, "FocusPasteMenu").IsEnabled);
+            Named<MenuItem>(window, "FocusPasteMenu").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(ApplicationCommands.Paste, Assert.Single(executed).Command);
             Assert.Same(input, executed[0].Source);
             Assert.Equal(0, reads);
@@ -166,8 +166,8 @@ public sealed class UiKeyboardTests
         try
         {
             await Load(window, Log);
-            var include = Control<TextBox>(window, "IncludeBox");
-            var exclude = Control<TextBox>(window, "ExcludeBox");
+            var include = Named<TextBox>(window, "IncludeBox");
+            var exclude = Named<TextBox>(window, "ExcludeBox");
             Assert.True(include.AcceptsReturn);
             Assert.True(exclude.AcceptsReturn);
             include.Text = "target";
@@ -176,10 +176,10 @@ public sealed class UiKeyboardTests
             Assert.False((bool)Invoke(window, "TryApplyFilterShortcut", Key.Enter, ModifierKeys.Control | ModifierKeys.Shift)!);
             Assert.Equal("target", include.Text);
             Assert.Empty(Field<EntryFilter>(window, "appliedFilter").Includes);
-            Assert.DoesNotContain("필터 적용 완료", Control<TextBlock>(window, "OperationStatus").Text, StringComparison.Ordinal);
+            Assert.DoesNotContain("필터 적용 완료", Named<TextBlock>(window, "OperationStatus").Text, StringComparison.Ordinal);
             Assert.True((bool)Invoke(window, "TryApplyFilterShortcut", Key.Enter, ModifierKeys.Control)!);
             Assert.True((bool)Invoke(window, "TryApplyFilterShortcut", Key.Return, ModifierKeys.Control)!);
-            await Until(() => Control<TextBlock>(window, "OperationStatus").Text.Contains("필터 적용 완료", StringComparison.Ordinal));
+            await Until(() => Named<TextBlock>(window, "OperationStatus").Text.Contains("필터 적용 완료", StringComparison.Ordinal));
             Assert.Contains("target", Field<EntryFilter>(window, "appliedFilter").Includes);
             Assert.Equal("target", include.Text);
             Assert.Contains("target", editorText(window), StringComparison.Ordinal);
@@ -203,9 +203,9 @@ public sealed class UiKeyboardTests
         var legacy = new MainWindow(folder.Path, true);
         try
         {
-            Assert.False(Control<Expander>(legacy, "ContentFilterExpander").IsExpanded);
-            Assert.Equal(18, Control<TextEditor>(legacy, "Editor").FontSize);
-            Assert.Equal(1, Control<ComboBox>(legacy, "ThemeBox").SelectedIndex);
+            Assert.False(Named<Expander>(legacy, "ContentFilterExpander").IsExpanded);
+            Assert.Equal(18, Named<TextEditor>(legacy, "Editor").FontSize);
+            Assert.Equal(1, Named<ComboBox>(legacy, "ThemeBox").SelectedIndex);
             Assert.False(Field<bool>(legacy, "contentFilterExpandedPreference"));
         }
         finally { legacy.Close(); }
@@ -213,7 +213,7 @@ public sealed class UiKeyboardTests
         var chosen = new MainWindow(folder.Path, true);
         try
         {
-            var expander = Control<Expander>(chosen, "ContentFilterExpander");
+            var expander = Named<Expander>(chosen, "ContentFilterExpander");
             expander.IsExpanded = true;
             Assert.True(Field<bool>(chosen, "contentFilterExpandedPreference"));
             Invoke(chosen, "SaveSettingsNow");
@@ -226,7 +226,7 @@ public sealed class UiKeyboardTests
         var restarted = new MainWindow(folder.Path, true);
         try
         {
-            Assert.True(Control<Expander>(restarted, "ContentFilterExpander").IsExpanded);
+            Assert.True(Named<Expander>(restarted, "ContentFilterExpander").IsExpanded);
             Assert.True(Field<bool>(restarted, "contentFilterExpandedPreference"));
         }
         finally { restarted.Close(); }
@@ -240,7 +240,7 @@ public sealed class UiKeyboardTests
         var window = new MainWindow(folder.Path, true);
         try
         {
-            var expander = Control<Expander>(window, "ContentFilterExpander");
+            var expander = Named<Expander>(window, "ContentFilterExpander");
             expander.IsExpanded = true;
             await Load(window, Log);
             Assert.True(expander.IsExpanded);
@@ -249,7 +249,7 @@ public sealed class UiKeyboardTests
             expander.IsExpanded = false;
             Assert.False(Field<bool>(window, "contentFilterExpandedPreference"));
             Invoke(window, "SaveSettingsNow");
-            var tabs = Control<ListBox>(window, "SessionTabs");
+            var tabs = Named<ListBox>(window, "SessionTabs");
             tabs.SelectedIndex = 0;
             Assert.True(expander.IsExpanded);
             Assert.False(Field<bool>(window, "contentFilterExpandedPreference"));
@@ -264,11 +264,11 @@ public sealed class UiKeyboardTests
         finally { window.Close(); }
 
         var restarted = new MainWindow(folder.Path, true);
-        try { Assert.False(Control<Expander>(restarted, "ContentFilterExpander").IsExpanded); }
+        try { Assert.False(Named<Expander>(restarted, "ContentFilterExpander").IsExpanded); }
         finally { restarted.Close(); }
     });
 
-    private static string editorText(MainWindow window) => Control<TextEditor>(window, "Editor").Text;
+    private static string editorText(MainWindow window) => Named<TextEditor>(window, "Editor").Text;
     private static int FocusRequests(MainWindow window) => Field<int>(window, "editorFocusRequests");
     private static int? SourceLine(MainWindow window) => (int?)Invoke(window, "CurrentSourceLine");
     private static int SessionCount(MainWindow window) =>
@@ -309,7 +309,7 @@ public sealed class UiKeyboardTests
     }
     private static void RaiseFocus(UIElement source, IInputElement target) => source.RaiseEvent(
         new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, null, target) { RoutedEvent = Keyboard.GotKeyboardFocusEvent });
-    private static T Control<T>(MainWindow window, string name) where T : class => (T)window.FindName(name);
+    private static T Named<T>(MainWindow window, string name) where T : class => (T)window.FindName(name);
     private static T Field<T>(MainWindow window, string name) => (T)typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
     private static void Set(MainWindow window, string name, object? value) =>
         typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, value);
