@@ -11,8 +11,8 @@ namespace ThreadLogViewer.UiTests;
 [Collection(UiCollection.Name)]
 public sealed class UiScenarioTests(PublishedApp app)
 {
-    private const string EmptyTitlePattern = "^ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
-    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+    private const string EmptyTitlePattern = "^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
+    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
 
     [Fact]
     public void Scenario01_SelfContainedExeShowsMainWindow() =>

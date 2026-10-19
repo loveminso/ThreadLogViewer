@@ -8,8 +8,20 @@ namespace ThreadLogViewer.Tests;
 
 public sealed class WindowTitleTests
 {
-    private const string EmptyTitlePattern = "^ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
-    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+    private const string EmptyTitlePattern = "^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
+    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
+
+    [Fact]
+    public void TitlePatternsUseAsciiDigitsAndTheAbsoluteEnd()
+    {
+        Assert.Equal("^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", EmptyTitlePattern);
+        Assert.Equal("^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", OpenTitlePattern);
+        Assert.Matches(EmptyTitlePattern, "ThreadLog Viewer v0.8.3");
+        Assert.DoesNotMatch(EmptyTitlePattern, "ThreadLog Viewer v0.8.3\n");
+        Assert.DoesNotMatch(EmptyTitlePattern, "ThreadLog Viewer v\u0660.8.3");
+        Assert.Matches(OpenTitlePattern, "opened-first.log \u2014 ThreadLog Viewer v0.8.3");
+        Assert.DoesNotMatch(OpenTitlePattern, "opened-first.log \u2014 ThreadLog Viewer v0.8.3\n");
+    }
 
     [Fact]
     public void FormatUsesMajorMinorBuildAndDropsRevision()
