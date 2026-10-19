@@ -14,7 +14,7 @@ public sealed class UiScenarioTests(PublishedApp app)
     public void Scenario01_SelfContainedExeShowsMainWindow() =>
         Run(null, TimeSpan.FromMinutes(2), session =>
         {
-            Assert.Contains("ThreadLog Viewer", session.Window.Title, StringComparison.Ordinal);
+            Assert.Equal("ThreadLog Viewer v0.8.3", session.Window.Title);
             Assert.False(session.App.HasExited);
             string exeDirectory = Path.GetDirectoryName(session.ExePath)!;
             Assert.True(File.Exists(Path.Combine(exeDirectory, "coreclr.dll")), "Self-contained publish is missing coreclr.dll.");
@@ -47,6 +47,7 @@ public sealed class UiScenarioTests(PublishedApp app)
         Run(opened, TimeSpan.FromMinutes(3), session =>
         {
             session.WaitForOpen("opened-first.log");
+            Assert.Equal("opened-first.log \u2014 ThreadLog Viewer v0.8.3", session.Window.Title);
             session.DropFile(dropped);
             session.WaitUntil(
                 () => session.Text("FileLabel").Contains("dropped-beta.log", StringComparison.Ordinal) &&
@@ -56,6 +57,7 @@ public sealed class UiScenarioTests(PublishedApp app)
                 "dropped log did not become the active tab");
             Assert.True(session.Window.FindFirstDescendant(cf => cf.ByName("opened-first.log")) is not null,
                 "the command-line log tab is gone after the drop");
+            Assert.Equal("dropped-beta.log \u2014 ThreadLog Viewer v0.8.3", session.Window.Title);
             session.ApplyIncludeFilter(SyntheticLog.KeepToken);
             Assert.Contains("1/", session.Text("CountStatus"), StringComparison.Ordinal);
             session.ExportTo(destination);

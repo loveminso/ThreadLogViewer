@@ -21,7 +21,7 @@ Windows x64용 읽기 전용 로그 뷰어다. UI는 `src/ThreadLogViewer.App`, 
 | `tests/ThreadLogViewer.Tests/` | xUnit 단위 테스트. `ThreadLogViewer.slnx`에 포함 |
 | `tests/ThreadLogViewer.UiTests/` | 게시한 `ThreadLogViewer.exe`를 FlaUI UIA3로 조작. 패키지 참조는 `tests/ThreadLogViewer.UiTests/ThreadLogViewer.UiTests.csproj`. 솔루션에는 넣지 않음 |
 | `scripts/publish.ps1` | `win-x64` self-contained 폴더와 그 폴더를 묶은 ZIP |
-| `scripts/verify-release.ps1` | 릴리스 전에 테스트 통과, 런타임, 버전, ZIP 항목을 검사 |
+| `scripts/verify-release.ps1` | 릴리스 전에 테스트 통과, 런타임, 버전, 창 제목 버전, ZIP 항목을 검사 |
 
 `ThreadLogViewer.slnx`를 대상으로 한 `dotnet test`는 단위 테스트만 실행한다. UI 테스트는 게시 뒤에 `tests/ThreadLogViewer.UiTests/ThreadLogViewer.UiTests.csproj`를 대상으로 따로 실행한다. 절차와 시나리오 표는 [검증 안내](TESTING.md), 기능별 조작과 매핑은 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)을 따른다.
 
@@ -107,6 +107,8 @@ WPF 디스패처가 UI 스레드다. 파일 대화상자, 상태줄, 에디터 �
 ## 메인 창 partial
 
 `MainWindow`는 `partial class`다. 선언은 `src/ThreadLogViewer.App/MainWindow.xaml.cs`에 있고, 레이아웃은 `src/ThreadLogViewer.App/MainWindow.xaml`에 있다.
+
+창 제목은 `src/ThreadLogViewer.App/WindowTitle.cs`가 만든다. 값은 실행 어셈블리 `AssemblyName.Version`의 major.minor.build다. 그 버전은 `Directory.Build.props`의 `Version`에서 오고, 리비전과 InformationalVersion의 `+sha`는 제목에 넣지 않는다. 탭이 없으면 `ThreadLog Viewer v{major}.{minor}.{build}`다. 탭이 있으면 `UpdateSourceHeader`(`src/ThreadLogViewer.App/MainWindow.Sessions.cs`)가 `{표시 이름} — {그 제목}`으로 둔다. 구분 문자는 U+2014다. XAML과 코드에 버전 숫자를 적지 않는다. 생성자가 창을 보이기 전에 같은 제목을 넣는다.
 
 | 파일 | 담당 |
 |---|---|
