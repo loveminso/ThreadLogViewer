@@ -16,7 +16,7 @@
 
 GC는 `GC.Collect`, `WaitForPendingFinalizers`, `GC.Collect`를 스레드 풀에서 실행한 뒤 `GC.GetTotalMemory(false)`와 `GC.GetGCMemoryInfo`를 읽는다. 커밋은 `TotalCommittedBytes`, 조각화는 `FragmentedBytes`, LOH는 `GenerationInfo` 인덱스 3의 `SizeAfterBytes`다. 작업 집합과 최대 작업 집합은 그 직후의 프로세스 값이다. private bytes는 `PrivateMemorySize64`가 되면 적고, 아니면 없다고 적는다. 최대 작업 집합은 프로세스 누적 `PeakWorkingSet64`라서 단계마다 초기화되지 않는다.
 
-10/100/500 MiB는 F5 10회다. 1024 MiB는 한 번만 돌리고 F5는 3회다. 1 MiB는 1,048,576바이트다. 합성 파일은 CI의 임시 폴더에 만들고 그 크기가 끝나면 지운다. 원본 로그 자리에는 쓰지 않는다.
+10/100/500 MiB는 매 PR의 `build-test-publish`에서 F5 10회다. 1024 MiB는 그 잡에 넣지 않는다. 최대 작업 집합이 16 GB 러너에서 약 14 GB까지 올라 메모리 부족이 날 수 있어서다. 1024 MiB는 같은 워크플로 파일의 `measure-one-gigabyte` 잡이고, `workflow_dispatch`로 그 ref를 지정했을 때만 돈다. F5는 3회다. 1 MiB는 1,048,576바이트다. 합성 파일은 CI의 임시 폴더에 만들고 그 크기가 끝나면 지운다. 원본 로그 자리에는 쓰지 않는다.
 
 ## 증가 확인
 
@@ -28,7 +28,7 @@ F5 표본만 기울기에 넣는다. 열기 표본과 필터 표본은 표에 �
 
 숫자는 PR CI 실행 [39208016760](https://github.com/loveminso/ThreadLogViewer/actions/runs/39208016760)에서 왔다. 그 실행의 head는 `3487b8dbbf286c79b29ac48508482788dec12d0c`다. `memory-results.json`의 `GithubSha`는 `d7c403b4cc8794e21fffe4121fcc397a6343e42d`이고, 이것은 그 head를 `f86af78da6ca16523a5c83889bd8af1e87e4c43c`에 합친 pull_request 병합 커밋이다. 아티팩트 `memory-results`는 [12166294655](https://github.com/loveminso/ThreadLogViewer/actions/runs/39208016760/artifacts/12166294655)이다.
 
-환경은 Windows NT 10.0.26100.0, .NET 10.0.13, 논리 프로세서 4개다. private bytes는 네 크기 모두 `PrivateMemorySize64`로 읽혔다. 1024 MiB는 같은 PR CI 단계 안에서 돌았고, 따로 둔 `workflow_dispatch` 잡은 없다. 단계가 러너 메모리 안에서 끝났다.
+환경은 Windows NT 10.0.26100.0, .NET 10.0.13, 논리 프로세서 4개다. private bytes는 네 크기 모두 `PrivateMemorySize64`로 읽혔다. 이 표의 1024 MiB는 그 실행에서 같은 PR CI 단계 안이었다. 그 뒤 1024 MiB는 매 PR에서 빼서 `workflow_dispatch` 잡으로 옮겼다. 옮긴 뒤의 숫자는 그 실행이 끝나면 이 절을 그 run id로 바꾼다.
 
 `Measure memory on synthetic logs`는 2026-10-19T06:23:10Z에 시작해 2026-10-19T06:26:35Z에 끝났다. 스크립트가 기록한 `StepElapsedMs`는 202735이다. 같은 잡 `build-test-publish`는 2026-10-19T06:06:33Z부터 2026-10-19T06:26:43Z까지다.
 
