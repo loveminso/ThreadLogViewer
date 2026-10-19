@@ -339,16 +339,7 @@ internal static class UiReview
         }
     }
 
-    private static void RejectRunnerPaths(string output)
-    {
-        foreach (string name in new[] { "ui-lint.json", "ui-lint.md" })
-        {
-            string text = File.ReadAllText(Path.Combine(output, name));
-            if (text.Contains("runneradmin", StringComparison.OrdinalIgnoreCase) ||
-                text.Contains("AppData", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException(name + " still contains a runner user path.");
-        }
-    }
+    private static void RejectRunnerPaths(string output) => UiReviewPaths.RejectRunnerPaths(output);
 
     private static void Resize(UiSession session, int width, int height)
     {

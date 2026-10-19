@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
@@ -25,21 +24,7 @@ internal sealed class UiReviewLint
 {
     internal const int FindingCap = 400;
 
-    private static readonly Regex ReviewFolderPrefix = new(
-        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData[\\/]+Local[\\/]+Temp[\\/]+tlv-ui-review-[0-9a-f]+",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    private static readonly Regex UserAppDataPrefix = new(
-        @"(?i)[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s""]+[\\/]+AppData\b",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
-    internal static string RedactReviewPaths(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return value;
-        string text = ReviewFolderPrefix.Replace(value, "<temp>");
-        return UserAppDataPrefix.Replace(text, "<temp>");
-    }
+    internal static string RedactReviewPaths(string value) => UiReviewPaths.RedactReviewPaths(value);
 
     internal const string TruncatedText = "truncated-text";
     internal const string OutsideBounds = "outside-bounds";
@@ -66,6 +51,8 @@ internal sealed class UiReviewLint
     private readonly Dictionary<BucketKey, BucketCount> buckets = [];
     private readonly Font measureFont;
     private int filteredSystemMenuBar, filteredMenuPopup, filteredMenuHeader;
+    private AutomationElement? mainMenuBar;
+    private bool mainMenuBarResolved;
 
     internal UiReviewLint(double contentScale)
     {
@@ -88,6 +75,8 @@ internal sealed class UiReviewLint
     internal void Inspect(UIA3Automation automation, IEnumerable<AutomationElement> roots, AutomationElement tabRoot, string state, string theme, string size, int scale)
     {
         LastTabOrder.Clear();
+        mainMenuBar = null;
+        mainMenuBarResolved = false;
         AutomationElement? mainWindow = null;
         foreach (var root in roots)
         {
@@ -372,71 +361,65 @@ internal sealed class UiReviewLint
         return TypeOf(element) == ControlType.MenuBar && name.Equals("System", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsMenuPopup(AutomationElement element, AutomationElement mainWindow)
+    private bool IsMenuPopup(AutomationElement element, AutomationElement mainWindow)
     {
         var type = TypeOf(element);
         if (type != ControlType.Menu && type != ControlType.MenuItem)
             return false;
-        // WPF popup items stay under the main window in the UIA tree and often report its HWND.
-        // The window actually under the item is the popup. The menu bar stays on the main window.
-        IntPtr mainRoot = TopLevelHwnd(mainWindow);
-        IntPtr atPoint = WindowRootAt(SafeBounds(element));
-        if (atPoint != IntPtr.Zero && mainRoot != IntPtr.Zero)
-            return atPoint != mainRoot;
-        IntPtr elementRoot = TopLevelHwnd(element);
-        if (elementRoot != IntPtr.Zero && mainRoot != IntPtr.Zero)
-            return elementRoot != mainRoot;
-        AutomationElement? elementWindow = NearestWindow(element);
-        AutomationElement main = NearestWindow(mainWindow) ?? mainWindow;
-        return elementWindow is not null && !SameRuntimeId(elementWindow, main);
+        AutomationElement? bar = MainMenuBar(mainWindow);
+        if (bar is null)
+            return false;
+        // The bar and its top-level items stay in the bounds check.
+        // WPF parents an open popup under that top-level item, so the popup is still
+        // a descendant of the bar in the UIA tree. Only the bar itself and a direct
+        // child of the bar count as the menu bar. Anything else is the popup.
+        if (SameRuntimeId(element, bar))
+            return false;
+        AutomationElement? parent = SafeParent(element);
+        if (parent is null)
+            return false;
+        return !SameRuntimeId(parent, bar);
     }
 
-    private static IntPtr WindowRootAt(Rectangle bounds)
+    private AutomationElement? MainMenuBar(AutomationElement mainWindow)
     {
-        if (bounds.Width <= 1 || bounds.Height <= 1)
-            return IntPtr.Zero;
-        var point = new WinPoint { X = bounds.Left + bounds.Width / 2, Y = bounds.Top + bounds.Height / 2 };
-        IntPtr hwnd = WindowFromPoint(point);
-        if (hwnd == IntPtr.Zero)
-            return IntPtr.Zero;
-        IntPtr root = GetAncestor(hwnd, 2);
-        return root == IntPtr.Zero ? hwnd : root;
-    }
-
-    private static IntPtr TopLevelHwnd(AutomationElement element)
-    {
-        AutomationElement? current = element;
-        for (int depth = 0; depth < 24 && current is not null; depth++)
+        if (mainMenuBarResolved)
+            return mainMenuBar;
+        mainMenuBarResolved = true;
+        try
         {
-            try
+            AutomationElement? named = mainWindow.FindFirstDescendant(condition => condition.ByName("주 메뉴"));
+            if (named is not null && IsAppMenuBar(named))
             {
-                IntPtr hwnd = current.Properties.NativeWindowHandle.ValueOrDefault;
-                if (hwnd != IntPtr.Zero)
-                {
-                    IntPtr root = GetAncestor(hwnd, 2);
-                    return root == IntPtr.Zero ? hwnd : root;
-                }
-                current = current.Parent;
+                mainMenuBar = named;
+                return mainMenuBar;
             }
-            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            foreach (AutomationElement menu in mainWindow.FindAllDescendants(condition => condition.ByControlType(ControlType.Menu)))
             {
-                return IntPtr.Zero;
+                if (!IsAppMenuBar(menu) || ParentIsMenuItem(menu))
+                    continue;
+                mainMenuBar = menu;
+                break;
             }
         }
-        return IntPtr.Zero;
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+        }
+        return mainMenuBar;
     }
 
-    private static AutomationElement? NearestWindow(AutomationElement element)
+    private static bool IsAppMenuBar(AutomationElement element)
     {
-        AutomationElement? current = element;
-        for (int depth = 0; depth < 24 && current is not null; depth++)
-        {
-            if (TypeOf(current) == ControlType.Window)
-                return current;
-            try { current = current.Parent; }
-            catch (Exception ex) when (ex is COMException or InvalidOperationException) { return null; }
-        }
-        return null;
+        if (IsSystemMenuBar(element))
+            return false;
+        var type = TypeOf(element);
+        return type == ControlType.Menu || type == ControlType.MenuBar;
+    }
+
+    private static AutomationElement? SafeParent(AutomationElement element)
+    {
+        try { return element.Parent; }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { return null; }
     }
 
     private static bool SameRuntimeId(AutomationElement left, AutomationElement right)
@@ -469,19 +452,6 @@ internal sealed class UiReviewLint
         }
         return builder.ToString();
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct WinPoint
-    {
-        public int X;
-        public int Y;
-    }
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr WindowFromPoint(WinPoint point);
 
     private static bool ParentIsMenuItem(AutomationElement element)
     {
