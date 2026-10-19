@@ -1,7 +1,6 @@
 using System.IO;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using ThreadLogViewer.App;
 using Xunit;
 
@@ -18,10 +17,10 @@ public sealed class WindowTitleTests
         Assert.Equal("^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", EmptyTitlePattern);
         Assert.Equal("^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", OpenTitlePattern);
         Assert.Matches(EmptyTitlePattern, "ThreadLog Viewer v0.8.3");
-        Assert.False(Regex.IsMatch("ThreadLog Viewer v0.8.3\n", EmptyTitlePattern));
-        Assert.False(Regex.IsMatch("ThreadLog Viewer v\u0660.8.3", EmptyTitlePattern));
+        Assert.DoesNotMatch(EmptyTitlePattern, "ThreadLog Viewer v0.8.3\n");
+        Assert.DoesNotMatch(EmptyTitlePattern, "ThreadLog Viewer v\u0660.8.3");
         Assert.Matches(OpenTitlePattern, "opened-first.log \u2014 ThreadLog Viewer v0.8.3");
-        Assert.False(Regex.IsMatch("opened-first.log \u2014 ThreadLog Viewer v0.8.3\n", OpenTitlePattern));
+        Assert.DoesNotMatch(OpenTitlePattern, "opened-first.log \u2014 ThreadLog Viewer v0.8.3\n");
     }
 
     [Fact]
