@@ -13,7 +13,7 @@ public sealed class UiReviewPathTests
     [InlineData(@"C:\Users\runneradmin\AppData\Local\ThreadLogViewer\ui-settings.json", @"<temp>\Local\ThreadLogViewer\ui-settings.json")]
     [InlineData(@"D:\Users\builder\AppData\Roaming\ThreadLogViewer\cache", @"<temp>\Roaming\ThreadLogViewer\cache")]
     [InlineData(@"C:\Users\runneradmin\Desktop\note.txt", @"<temp>\Desktop\note.txt")]
-    [InlineData(@"D:\a\ThreadLogViewer\ThreadLogViewer\TestResults\ui-review", "<temp>/ThreadLogViewer\\ThreadLogViewer\\TestResults\\ui-review")]
+    [InlineData(@"D:\a\ThreadLogViewer\ThreadLogViewer\TestResults\ui-review", @"<temp>\ThreadLogViewer\ThreadLogViewer\TestResults\ui-review")]
     [InlineData("D:/a/ThreadLogViewer/ThreadLogViewer/index.html", "<temp>/ThreadLogViewer/ThreadLogViewer/index.html")]
     [InlineData(@"<temp>\review.log", @"<temp>\review.log")]
     [InlineData("이미 가린 경로 <temp> 만 있다.", "이미 가린 경로 <temp> 만 있다.")]
@@ -22,6 +22,14 @@ public sealed class UiReviewPathTests
     public void RedactReviewPaths_RewritesProfileTempAndRunnerCheckout(string input, string expected)
     {
         Assert.Equal(expected, UiReviewPaths.RedactReviewPaths(input));
+    }
+
+    [Fact]
+    public void OpenMenuItemOnTheBarIsNotAPopupAndADeeperItemIs()
+    {
+        Assert.False(UiReviewMenuPopup.IsPopup(isMenuOrMenuItem: true, barFound: true, isBar: true, parentKnown: false, parentIsBar: false));
+        Assert.False(UiReviewMenuPopup.IsPopup(isMenuOrMenuItem: true, barFound: true, isBar: false, parentKnown: true, parentIsBar: true));
+        Assert.True(UiReviewMenuPopup.IsPopup(isMenuOrMenuItem: true, barFound: true, isBar: false, parentKnown: true, parentIsBar: false));
     }
 
     [Fact]

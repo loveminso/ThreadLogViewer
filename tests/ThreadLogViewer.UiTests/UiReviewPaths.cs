@@ -30,7 +30,7 @@ internal static class UiReviewPaths
         string text = ReviewFolderPrefix.Replace(value, "<temp>");
         text = UserAppDataPrefix.Replace(text, "<temp>");
         text = UserProfilePrefix.Replace(text, "<temp>");
-        return RunnerCheckoutPrefix.Replace(text, "<temp>/");
+        return RunnerCheckoutPrefix.Replace(text, match => match.Value.Contains('\\') ? "<temp>\\" : "<temp>/");
     }
 
     internal static void RejectRunnerPaths(string output)
@@ -48,4 +48,14 @@ internal static class UiReviewPaths
         || text.Contains("AppData", StringComparison.OrdinalIgnoreCase)
         || text.Contains(@":\a\", StringComparison.OrdinalIgnoreCase)
         || text.Contains(":/a/", StringComparison.OrdinalIgnoreCase);
+}
+
+internal static class UiReviewMenuPopup
+{
+    internal static bool IsPopup(bool isMenuOrMenuItem, bool barFound, bool isBar, bool parentKnown, bool parentIsBar)
+    {
+        if (!isMenuOrMenuItem || !barFound || isBar || !parentKnown)
+            return false;
+        return !parentIsBar;
+    }
 }

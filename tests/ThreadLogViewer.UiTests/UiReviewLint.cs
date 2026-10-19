@@ -364,21 +364,25 @@ internal sealed class UiReviewLint
     private bool IsMenuPopup(AutomationElement element, AutomationElement mainWindow)
     {
         var type = TypeOf(element);
-        if (type != ControlType.Menu && type != ControlType.MenuItem)
-            return false;
+        bool isMenuOrMenuItem = type == ControlType.Menu || type == ControlType.MenuItem;
+        if (!isMenuOrMenuItem)
+            return UiReviewMenuPopup.IsPopup(false, barFound: false, isBar: false, parentKnown: false, parentIsBar: false);
         AutomationElement? bar = MainMenuBar(mainWindow);
-        if (bar is null)
-            return false;
+        bool barFound = bar is not null;
+        bool isBar = barFound && SameRuntimeId(element, bar!);
+        bool parentKnown = false;
+        bool parentIsBar = false;
+        if (barFound && !isBar)
+        {
+            AutomationElement? parent = SafeParent(element);
+            parentKnown = parent is not null;
+            parentIsBar = parentKnown && SameRuntimeId(parent!, bar!);
+        }
         // The bar and its top-level items stay in the bounds check.
         // WPF parents an open popup under that top-level item, so the popup is still
         // a descendant of the bar in the UIA tree. Only the bar itself and a direct
         // child of the bar count as the menu bar. Anything else is the popup.
-        if (SameRuntimeId(element, bar))
-            return false;
-        AutomationElement? parent = SafeParent(element);
-        if (parent is null)
-            return false;
-        return !SameRuntimeId(parent, bar);
+        return UiReviewMenuPopup.IsPopup(isMenuOrMenuItem, barFound, isBar, parentKnown, parentIsBar);
     }
 
     private AutomationElement? MainMenuBar(AutomationElement mainWindow)
