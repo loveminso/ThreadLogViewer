@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 
 namespace ThreadLogViewer.Tests;
@@ -10,6 +11,7 @@ public static class MemoryGrowthCheck
     public const string SuspectedLeakUnconfirmed = "누수 의심, 원인 미확인";
     public const string NoWarningVerdict = "지속 증가 경고 없음. 누수 없음으로 결론내지 않는다.";
     public const string InsufficientSamplesVerdict = "판정 불가(표본 부족)";
+    public const string RecordedOnlyVerdict = "기록용(판정 안 함)";
     public const string ManagedHeapMetric = "post-GC managed heap";
     public const string CommittedMetric = "GC committed";
     public const string PrivateBytesMetric = "private bytes";
@@ -92,9 +94,34 @@ public static class MemoryGrowthCheck
     public static MetricResult Insufficient(string name, string marginRule) =>
         new(name, null, marginRule, null, null, InsufficientSamplesVerdict);
 
+    public static bool IsJudged(string name) =>
+        name == ManagedHeapMetric || name == PrivateBytesMetric;
+
+    // Bytes stay on the result. The verdict is not a growth judgment and does not warn.
+    public static MetricResult RecordOnly(string name, IReadOnlyList<long>? refreshSamples, long? margin, string marginRule)
+    {
+        if (refreshSamples is null || margin is not long marginBytes)
+            return new MetricResult(name, margin, marginRule, null, null, RecordedOnlyVerdict);
+        MetricResult judged = Judge(name, refreshSamples, marginBytes, marginRule);
+        return judged with { Verdict = RecordedOnlyVerdict };
+    }
+
+    public static string FormatJudgedGrowthLine(int mib, string metricName, long? bytes, double? slopeTimesCountMinusOne, long? marginBytes)
+    {
+        string byteText = bytes is long value ? value.ToString(CultureInfo.InvariantCulture) : "n/a";
+        string growthText = slopeTimesCountMinusOne is double growth
+            ? growth.ToString("0.################", CultureInfo.InvariantCulture)
+            : "n/a";
+        string marginText = marginBytes is long margin ? margin.ToString(CultureInfo.InvariantCulture) : "n/a";
+        return $"{mib} MiB {metricName} bytes={byteText} slope*(N-1)={growthText} margin={marginText}";
+    }
+
     public static string? WarningText(IEnumerable<MetricResult> results, int mib)
     {
-        string[] names = results.Where(static result => result.Warning).Select(static result => result.Name).ToArray();
+        string[] names = results
+            .Where(static result => result.Warning && IsJudged(result.Name))
+            .Select(static result => result.Name)
+            .ToArray();
         if (names.Length == 0) return null;
         return $"{mib} MiB {string.Join(" and ", names)}: {SuspectedLeakUnconfirmed}";
     }

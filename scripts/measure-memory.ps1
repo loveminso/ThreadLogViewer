@@ -37,6 +37,10 @@ function Format-Byte($value) {
     if ($null -eq $value) { return 'n/a' }
     return ([int64]$value).ToString([Globalization.CultureInfo]::InvariantCulture)
 }
+function Format-Growth($value) {
+    if ($null -eq $value) { return 'n/a' }
+    return ([double]$value).ToString('0.################', [Globalization.CultureInfo]::InvariantCulture)
+}
 function Remove-Tree([string]$path) {
     if (-not (Test-Path -LiteralPath $path)) { return }
     for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -120,7 +124,7 @@ try {
     $lines.Add('')
     $lines.Add("- Step elapsed: $elapsed ms")
     $lines.Add('')
-    $lines.Add('Last F5 bytes. F5 #1 is warm-up. A slope verdict needs at least 4 F5 samples; 1024 MiB has 3, so its verdict is 판정 불가(표본 부족).')
+    $lines.Add('Last F5 bytes. F5 #1 is warm-up. Judged metrics are the post-GC managed heap and private bytes. A slope verdict needs at least 4 F5 samples; 1024 MiB has 3, so those two verdicts are 판정 불가(표본 부족). GC committed and private minus GC committed stay in the table as 기록용(판정 안 함) and do not warn.')
     $lines.Add('')
     $compact.Add('| MiB | Working set | Private | Managed | Committed | LOH | Fragmented | Managed verdict | Committed verdict | Private verdict | Private minus committed verdict |')
     $compact.Add('| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |')
@@ -143,6 +147,14 @@ try {
         Write-Host ("{0} MiB workingSet={1} private={2} managed={3} committed={4} loh={5} fragmented={6} managedVerdict={7} committedVerdict={8} privateVerdict={9} privateMinusCommittedVerdict={10}" -f `
             $report.RequestedMiB, $lastWs, $lastPrivate, $lastHeap, $lastCommitted, $lastLoh, $lastFragmented, `
             $report.ManagedHeapVerdict, $report.CommittedVerdict, $report.PrivateBytesVerdict, $report.PrivateMinusCommittedVerdict)
+        foreach ($metric in @($report.Metrics)) {
+            $metricName = [string]$metric.Name
+            if ($metricName -ne 'post-GC managed heap' -and $metricName -ne 'private bytes') { continue }
+            $metricBytes = if ($metricName -eq 'post-GC managed heap') { $lastHeap } else { $lastPrivate }
+            Write-Host ("{0} MiB {1} bytes={2} slope*(N-1)={3} margin={4}" -f `
+                $report.RequestedMiB, $metricName, $metricBytes, (Format-Growth $metric.ProjectedGrowthBytes), `
+                $(if ($null -eq $metric.MarginBytes) { 'n/a' } else { Format-Byte $metric.MarginBytes }))
+        }
         foreach ($sample in $samples) {
             $refreshCell = if ($null -eq $sample.Refresh) { '' } else { [string]$sample.Refresh }
             $detail.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} |' -f `

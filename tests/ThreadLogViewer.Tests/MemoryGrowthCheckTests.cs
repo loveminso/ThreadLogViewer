@@ -47,15 +47,15 @@ public sealed class MemoryGrowthCheckTests
     }
 
     [Fact]
-    public void RecordedHundredMiBWorkingSetAndPrivateBytesFollowTheSlopeRule()
+    public void RecordedHundredMiBManagedHeapAndPrivateBytesFollowTheSlopeRule()
     {
-        // F5 samples copied from the 100 MiB rows of run 39202580600 (the table that was at
-        // docs/MEMORY-v0.8.3-main.md lines 58-67). After-open working set 896659456 and
-        // private bytes 879276032 from that run select the 64 MiB floor.
-        long[] workingSet =
+        // Managed-heap F5 samples and after-open heap 688547120 are the 100 MiB rows of run 39212578254.
+        // That after-open heap selects the 32 MiB floor. Private-byte samples and after-open private
+        // bytes 879276032 are the 100 MiB rows of run 39202580600 and select the 64 MiB floor.
+        long[] managedHeap =
         [
-            1188859904, 1475702784, 1465208832, 1419489280, 1423400960,
-            1429221376, 1417416704, 1402191872, 1423659008, 1437372416
+            779266912, 779267224, 779399992, 779400312, 779400464,
+            779400568, 779400720, 779401064, 779401256, 779401384
         ];
         long[] privateBytes =
         [
@@ -63,13 +63,13 @@ public sealed class MemoryGrowthCheckTests
             1418764288, 1407172608, 1392332800, 1413365760, 1426354176
         ];
         const long perRefresh = 30L * 1024 * 1024;
-        long workingSetMargin = MemoryGrowthCheck.WorkingSetMargin(896_659_456);
+        long managedMargin = MemoryGrowthCheck.ManagedHeapMargin(688_547_120);
         long privateMargin = MemoryGrowthCheck.PrivateBytesMargin(879_276_032);
-        Assert.Equal(MemoryGrowthCheck.WorkingSetFloorBytes, workingSetMargin);
+        Assert.Equal(MemoryGrowthCheck.ManagedHeapFloorBytes, managedMargin);
         Assert.Equal(MemoryGrowthCheck.WorkingSetFloorBytes, privateMargin);
 
-        Assert.Equal(MemoryGrowthCheck.NoWarningVerdict, MemoryGrowthCheck.Verdict(workingSet, workingSetMargin));
-        Assert.Equal(MemoryGrowthCheck.SuspectedLeakUnconfirmed, MemoryGrowthCheck.Verdict(AddPerRefresh(workingSet, perRefresh), workingSetMargin));
+        Assert.Equal(MemoryGrowthCheck.NoWarningVerdict, MemoryGrowthCheck.Verdict(managedHeap, managedMargin));
+        Assert.Equal(MemoryGrowthCheck.SuspectedLeakUnconfirmed, MemoryGrowthCheck.Verdict(AddPerRefresh(managedHeap, perRefresh), managedMargin));
         Assert.Equal(MemoryGrowthCheck.NoWarningVerdict, MemoryGrowthCheck.Verdict(privateBytes, privateMargin));
         Assert.Equal(MemoryGrowthCheck.SuspectedLeakUnconfirmed, MemoryGrowthCheck.Verdict(AddPerRefresh(privateBytes, perRefresh), privateMargin));
     }
@@ -81,16 +81,42 @@ public sealed class MemoryGrowthCheckTests
         string? absent = MemoryGrowthCheck.WarningText([clear], 10);
         Assert.True(absent is null);
         var heap = new MemoryGrowthCheck.MetricResult(MemoryGrowthCheck.ManagedHeapMetric, 1, "", 1, 9, MemoryGrowthCheck.SuspectedLeakUnconfirmed);
-        var committed = new MemoryGrowthCheck.MetricResult(MemoryGrowthCheck.CommittedMetric, 1, "", 1, 9, MemoryGrowthCheck.SuspectedLeakUnconfirmed);
-        string? text = MemoryGrowthCheck.WarningText([heap, committed], 500);
+        var privateBytes = new MemoryGrowthCheck.MetricResult(MemoryGrowthCheck.PrivateBytesMetric, 1, "", 1, 9, MemoryGrowthCheck.SuspectedLeakUnconfirmed);
+        var committedLeak = new MemoryGrowthCheck.MetricResult(MemoryGrowthCheck.CommittedMetric, 1, "", 1, 9, MemoryGrowthCheck.SuspectedLeakUnconfirmed);
+        string? text = MemoryGrowthCheck.WarningText([heap, privateBytes, committedLeak], 500);
         Assert.NotNull(text);
-        Assert.Equal("500 MiB post-GC managed heap and GC committed: 누수 의심, 원인 미확인", text);
+        Assert.Equal("500 MiB post-GC managed heap and private bytes: 누수 의심, 원인 미확인", text);
+        Assert.DoesNotContain("GC committed", text, StringComparison.Ordinal);
         Assert.Equal(MemoryGrowthCheck.SuspectedLeakUnconfirmed, "누수 의심, 원인 미확인");
         Assert.Contains(MemoryGrowthCheck.SuspectedLeakUnconfirmed, text, StringComparison.Ordinal);
         Assert.DoesNotContain("누수가 있", text, StringComparison.Ordinal);
         Assert.Equal(MemoryGrowthCheck.NoWarningVerdict, clear.Verdict);
         Assert.Contains("누수 없음으로 결론내지 않는다", MemoryGrowthCheck.NoWarningVerdict, StringComparison.Ordinal);
         Assert.Equal(MemoryGrowthCheck.InsufficientSamplesVerdict, MemoryGrowthCheck.Summarize([MemoryGrowthCheck.InsufficientSamplesVerdict]));
+        Assert.Null(MemoryGrowthCheck.WarningText([committedLeak], 500));
+    }
+
+    [Fact]
+    public void CommittedAndPrivateMinusCommittedAreRecordedWithoutAVerdict()
+    {
+        long[] rising = [0, 10, 20, 30, 40];
+        var committed = MemoryGrowthCheck.RecordOnly(
+            MemoryGrowthCheck.CommittedMetric, rising, margin: 1, MemoryGrowthCheck.CommittedMarginRule);
+        var residual = MemoryGrowthCheck.RecordOnly(
+            MemoryGrowthCheck.PrivateMinusCommittedMetric, rising, margin: 1, MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
+        Assert.Equal("기록용(판정 안 함)", committed.Verdict);
+        Assert.Equal(MemoryGrowthCheck.RecordedOnlyVerdict, committed.Verdict);
+        Assert.Equal(MemoryGrowthCheck.RecordedOnlyVerdict, residual.Verdict);
+        Assert.False(committed.Warning);
+        Assert.False(residual.Warning);
+        Assert.True(committed.ProjectedGrowthBytes > 1d);
+        Assert.Null(MemoryGrowthCheck.WarningText([committed, residual], 100));
+        Assert.Equal(
+            "100 MiB post-GC managed heap bytes=779401384 slope*(N-1)=40 margin=33554432",
+            MemoryGrowthCheck.FormatJudgedGrowthLine(100, MemoryGrowthCheck.ManagedHeapMetric, 779401384, 40d, 33554432));
+        Assert.Equal(
+            "10 MiB private bytes bytes=n/a slope*(N-1)=n/a margin=n/a",
+            MemoryGrowthCheck.FormatJudgedGrowthLine(10, MemoryGrowthCheck.PrivateBytesMetric, null, null, null));
     }
 
     private static long[] AddPerRefresh(long[] samples, long bytesPerStep)

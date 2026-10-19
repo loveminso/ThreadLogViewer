@@ -77,18 +77,22 @@ public static class MemoryBenchmark
                 refreshSamples.Select(sample => sample.ManagedHeapBytes).ToArray(),
                 MemoryGrowthCheck.ManagedHeapMargin(open.ManagedHeapBytes),
                 MemoryGrowthCheck.ManagedHeapMarginRule);
-            MemoryGrowthCheck.MetricResult committed = MemoryGrowthCheck.Judge(
+            MemoryGrowthCheck.MetricResult committed = MemoryGrowthCheck.RecordOnly(
                 MemoryGrowthCheck.CommittedMetric,
                 refreshSamples.Select(sample => sample.CommittedBytes).ToArray(),
                 MemoryGrowthCheck.CommittedMargin(open.CommittedBytes),
                 MemoryGrowthCheck.CommittedMarginRule);
             MemoryGrowthCheck.MetricResult privateBytes = JudgePrivate(
                 refreshSamples.Select(sample => sample.PrivateBytes).ToArray(), open.PrivateBytes);
-            MemoryGrowthCheck.MetricResult privateMinusCommitted = JudgeResidual(
-                refreshSamples.Select(sample => sample.PrivateMinusCommittedBytes).ToArray(), open.PrivateMinusCommittedBytes);
+            MemoryGrowthCheck.MetricResult privateMinusCommitted = MemoryGrowthCheck.RecordOnly(
+                MemoryGrowthCheck.PrivateMinusCommittedMetric,
+                ResidualSamples(refreshSamples.Select(sample => sample.PrivateMinusCommittedBytes).ToArray(), open.PrivateMinusCommittedBytes),
+                ResidualMargin(open.PrivateMinusCommittedBytes),
+                MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
+            MemoryGrowthCheck.MetricResult[] judged = [managed, privateBytes];
             MemoryGrowthCheck.MetricResult[] metrics = [managed, committed, privateBytes, privateMinusCommitted];
-            string? warning = MemoryGrowthCheck.WarningText(metrics, mib);
-            string verdict = MemoryGrowthCheck.Summarize(metrics.Select(metric => metric.Verdict).ToArray());
+            string? warning = MemoryGrowthCheck.WarningText(judged, mib);
+            string verdict = MemoryGrowthCheck.Summarize(judged.Select(metric => metric.Verdict).ToArray());
             var report = new MemoryReport
             {
                 Timestamp = DateTimeOffset.Now,
@@ -133,8 +137,20 @@ public static class MemoryBenchmark
             };
             File.WriteAllText(Path.Combine(folder, $"memory-{mib}MiB.json"), JsonSerializer.Serialize(report, JsonOptions));
             Console.WriteLine(warning is null ? $"{mib} MiB: {verdict}" : "WARNING: " + warning);
+            MemorySample lastRefresh = refreshSamples[^1];
             foreach (MemoryGrowthCheck.MetricResult metric in metrics)
-                Console.WriteLine($"{mib} MiB {metric.Name}: {metric.Verdict}");
+            {
+                if (!MemoryGrowthCheck.IsJudged(metric.Name))
+                {
+                    Console.WriteLine($"{mib} MiB {metric.Name}: {metric.Verdict}");
+                    continue;
+                }
+                long? bytes = metric.Name == MemoryGrowthCheck.ManagedHeapMetric
+                    ? lastRefresh.ManagedHeapBytes
+                    : lastRefresh.PrivateBytes;
+                Console.WriteLine(MemoryGrowthCheck.FormatJudgedGrowthLine(
+                    mib, metric.Name, bytes, metric.ProjectedGrowthBytes, metric.MarginBytes) + $" verdict={metric.Verdict}");
+            }
             GC.KeepAlive(retained);
             return 0;
         }
@@ -227,16 +243,14 @@ public static class MemoryBenchmark
             MemoryGrowthCheck.PrivateBytesMarginRule);
     }
 
-    private static MemoryGrowthCheck.MetricResult JudgeResidual(long?[] refreshValues, long? afterOpen)
+    private static long[]? ResidualSamples(long?[] refreshValues, long? afterOpen)
     {
-        if (afterOpen is not long open || refreshValues.Any(value => value is null))
-            return MemoryGrowthCheck.Insufficient(MemoryGrowthCheck.PrivateMinusCommittedMetric, MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
-        return MemoryGrowthCheck.Judge(
-            MemoryGrowthCheck.PrivateMinusCommittedMetric,
-            refreshValues.Select(value => value!.Value).ToArray(),
-            MemoryGrowthCheck.PrivateMinusCommittedMargin(open),
-            MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
+        if (afterOpen is not long || refreshValues.Any(value => value is null)) return null;
+        return refreshValues.Select(value => value!.Value).ToArray();
     }
+
+    private static long? ResidualMargin(long? afterOpen) =>
+        afterOpen is long open ? MemoryGrowthCheck.PrivateMinusCommittedMargin(open) : null;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static MemorySample Sample(string phase, int? refresh, long elapsedMs, object rooted)
