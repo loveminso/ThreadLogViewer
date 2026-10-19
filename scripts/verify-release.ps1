@@ -72,7 +72,8 @@ foreach ($offset in 0, 1) {
     if ($length -lt 2) { continue }
     if (($length % 2) -eq 1) { $length-- }
     $decoded = [Text.Encoding]::Unicode.GetString($dllBytes, $offset, $length)
-    foreach ($match in [regex]::Matches($decoded, 'ThreadLog Viewer v\d+\.\d+\.\d+')) {
+    # (?![.\d]) stops v0.8.3 from matching inside v0.8.30 or v0.8.3.1. A longer three-part title still matches as itself.
+    foreach ($match in [regex]::Matches($decoded, 'ThreadLog Viewer v\d+\.\d+\.\d+(?![.\d])')) {
         if ($match.Value -ne $expectedLiteral) {
             throw "Embedded window title '$($match.Value)' does not match '$expectedLiteral'."
         }

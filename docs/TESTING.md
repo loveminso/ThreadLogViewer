@@ -62,3 +62,21 @@ Release 빌드 뒤 합성 작업 측정은 테스트 실행 파일의 별도 경
 ```
 
 100 MiB 읽기/필터, 세 탭, 1 MiB 한 줄, 10만 검색 결과와 실제 reader 진행 후 취소를 실행한다. 긴 줄은 기본 구간 표시와 마지막 구간 검색을 측정한다. 같은 창에서 큰 탭을 닫고 복원 보관을 비운 뒤 원문·투영·문서 약한 참조 회수를 확인하는 경우와 전체 창 종료 후 검사를 구분한다. JSON에 시간·메모리·25ms dispatcher 대기·취소 확인을 구분하고 작은 창의 비표시 렌더를 생성한다. 높은 bitmap DPI는 실제 모니터 DPI 검증을 대신하지 않는다. 창을 닫은 뒤 GC 값과 약한 참조 회수 여부는 별도 지표이며, 미회수 원인 확인 없이 누수 여부를 결론내리지 않는다.
+
+## 합성 로그 메모리
+
+PR CI는 위 작업대 측정과 따로, 기존 콘솔 `--benchmark`에 `--memory-refreshes`를 붙여 연다. 인자 세 개만 있는 기존 시간 측정은 그대로다. 메모리 측정은 크기마다 프로세스를 새로 띄운다. FlaUI와 게시한 `ThreadLogViewer.exe`는 쓰지 않는다.
+
+```powershell
+& .\.tools\dotnet\dotnet.exe .\tests\ThreadLogViewer.Tests\bin\Release\net10.0-windows\ThreadLogViewer.Tests.dll --benchmark TestResults\my-memory-10 10 --memory-refreshes 10
+```
+
+출력 폴더는 새로 만든다. 그 폴더의 합성 로그는 측정이 만든 파일이고, CI는 러너 임시 폴더에 만든 뒤 지운다. 결과 JSON은 `memory-<MiB>MiB.json`이다.
+
+포함하는 계층은 `LogFileReader.ReadAsync`, 그 읽기가 돌려주는 `LogData`, 열기 때의 `LogProjection.Create`(모든 스레드), 그 다음의 스레드 필터 `LogProjection.Create`(스레드 3, 7, 미분류. 내용 필터는 비어 있고 기존 시간 벤치마크와 같다), F5마다의 `SourceLineRemap.Create`와 `LogProjection.CreateFiltered`, `CancellableDocumentFactory.Create`(화면의 `PrepareDocument`가 쓰는 AvalonEdit `TextDocument` 복사), `status=OK`에 대한 `LogSearch.Find`와 `HighlightIndex`(`RefreshKeywordsAsync`와 같은 검색, 상한 `LogSearch.MaxHighlights`)다. 빼는 것은 `MainWindow`, WPF 배치·렌더, dispatcher, FlaUI, 게시 실행 파일 프로세스다.
+
+순서는 열기, 필터와 강조, F5다. PR CI의 10/100/500 MiB는 F5를 10회 하고, 1024 MiB(1 GB 자리)는 한 프로세스에서 F5를 3회만 한다. 단위는 기존 벤치마크와 같은 MiB(1 MiB = 1,048,576바이트)다. 열기 직후와 F5마다 `GC.Collect`, `WaitForPendingFinalizers`, `GC.Collect`를 스레드 풀에서 돌린 뒤 `GC.GetTotalMemory(false)`와 프로세스 작업 집합, 최대 작업 집합, 가능하면 private bytes를 읽는다. 최대 작업 집합은 그 프로세스의 누적 `PeakWorkingSet64`다. 필터·강조 직후 값도 JSON에 남기지만, 증가 확인은 F5 표본만 본다.
+
+증가 확인은 경고만 낸다. CI를 실패시키지 않는다. F5 표본이 3개 미만이면 경고하지 않는다. 관리 힙 노이즈 마진은 열기 직후 GC 뒤 관리 힙의 2%(`값/50`)와 32 MiB 중 큰 값이다. 작업 집합 노이즈 마진은 열기 직후 GC 뒤 작업 집합의 4%(`값/25`)와 64 MiB 중 큰 값이다. 한 지표가 F5마다 직전보다 크고, 마지막 F5가 첫 F5보다 그 마진을 초과하면 그 크기에 `누수 의심, 원인 미확인`을 낸다. 그 문장은 누수가 있다는 결론이 아니다. 경고가 없어도 누수가 없다고 적지 않는다. 잡은 `::warning`만 남긴다.
+
+CI가 잰 숫자와 그 실행의 run id는 [메모리 측정](MEMORY-v0.8.3-main.md)에 있다. 예상 시간이나 예상 메모리는 그 표에 넣지 않는다.

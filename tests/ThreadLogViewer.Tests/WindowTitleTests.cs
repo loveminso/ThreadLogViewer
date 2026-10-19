@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using ThreadLogViewer.App;
 using Xunit;
 
@@ -8,8 +9,20 @@ namespace ThreadLogViewer.Tests;
 
 public sealed class WindowTitleTests
 {
-    private const string EmptyTitlePattern = "^ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
-    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+    private const string EmptyTitlePattern = "^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
+    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z";
+
+    [Fact]
+    public void TitlePatternsUseAsciiDigitsAndTheAbsoluteEnd()
+    {
+        Assert.Equal("^ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", EmptyTitlePattern);
+        Assert.Equal("^.+ \u2014 ThreadLog Viewer v[0-9]+\\.[0-9]+\\.[0-9]+\\z", OpenTitlePattern);
+        Assert.Matches(EmptyTitlePattern, "ThreadLog Viewer v0.8.3");
+        Assert.False(Regex.IsMatch("ThreadLog Viewer v0.8.3\n", EmptyTitlePattern));
+        Assert.False(Regex.IsMatch("ThreadLog Viewer v\u0660.8.3", EmptyTitlePattern));
+        Assert.Matches(OpenTitlePattern, "opened-first.log \u2014 ThreadLog Viewer v0.8.3");
+        Assert.False(Regex.IsMatch("opened-first.log \u2014 ThreadLog Viewer v0.8.3\n", OpenTitlePattern));
+    }
 
     [Fact]
     public void FormatUsesMajorMinorBuildAndDropsRevision()

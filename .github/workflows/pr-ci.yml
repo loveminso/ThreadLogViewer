@@ -392,6 +392,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Measure memory on synthetic logs
+        id: memory
+        run: ./scripts/measure-memory.ps1 -TestDll tests/ThreadLogViewer.Tests/bin/Release/net10.0-windows/ThreadLogViewer.Tests.dll -JsonDirectory TestResults/memory -IncludeOneGigabyte
+
+      - name: Upload memory results
+        id: memory-results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-results
+          path: TestResults/memory/**
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Link artifacts in the job summary
         if: always()
         run: |
@@ -403,4 +417,5 @@ jobs:
             '- UI review screenshots (14 days): ${{ steps.ui-review-screenshots.outputs.artifact-url }}'
             '- Windows x64 folder (14 days): ${{ steps.package.outputs.artifact-url }}'
             '- Windows x64 ZIP (14 days): ${{ steps.package-zip.outputs.artifact-url }}'
+            '- Memory results (14 days): ${{ steps.memory-results.outputs.artifact-url }}'
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

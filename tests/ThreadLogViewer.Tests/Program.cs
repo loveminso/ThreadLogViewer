@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Text.Json;
 using ICSharpCode.AvalonEdit.Document;
 using ThreadLogViewer.Core;
@@ -13,16 +11,18 @@ public static class Program
     {
         if (args.Length == 3 && args[0] == "--workbench-benchmark")
             return await WorkbenchPerformanceProbe.RunAsync(args[1], int.Parse(args[2]));
+        if (args.Length == 5 && args[0] == "--benchmark" && args[3] == "--memory-refreshes")
+            return MemoryBenchmark.Run(args[1], int.Parse(args[2]), int.Parse(args[4]));
         if (args.Length != 3 || args[0] != "--benchmark")
         {
-            Console.WriteLine("Automated tests: dotnet test. Benchmark: --benchmark <output-directory> <MiB>");
+            Console.WriteLine("Automated tests: dotnet test. Benchmark: --benchmark <output-directory> <MiB> [--memory-refreshes <count>]");
             return 1;
         }
         string folder = Path.GetFullPath(args[1]);
         Directory.CreateDirectory(folder);
         int mib = int.Parse(args[2]);
         string path = Path.Combine(folder, $"synthetic-{mib}MiB.log");
-        Generate(path, mib);
+        SyntheticBenchmarkLog.Write(path, mib);
         var process = Process.GetCurrentProcess();
         process.Refresh();
         long initialWorkingSet = process.WorkingSet64;
@@ -57,19 +57,5 @@ public static class Program
         Console.WriteLine(json);
         GC.KeepAlive(document); GC.KeepAlive(filteredDocument);
         return 0;
-    }
-
-    private static void Generate(string path, int mib)
-    {
-        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
-        using var writer = new StreamWriter(stream, new UTF8Encoding(false), 65536);
-        long total = 0, target = mib * 1024L * 1024;
-        for (int i = 0; total < target; i++)
-        {
-            string line = i % 113 == 0 ? "DE AD BE EF 00 01 02 03 — synthetic dump without thread" : i % 227 == 0 ? "" :
-                $"[{i / 3600:000}:{(i / 60) % 60:00}:{i % 60:00}] [T {i % 16}] {(i % 7 == 0 ? "합성 읽기 완료" : "Synthetic Write completed")} LBA={i:000000000} status=OK (testcase.cpp:{100 + i % 300})";
-            writer.Write(line); writer.Write('\n');
-            total += Encoding.UTF8.GetByteCount(line) + 1;
-        }
     }
 }
