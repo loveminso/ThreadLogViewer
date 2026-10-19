@@ -58,15 +58,15 @@ try {
         Write-Host "memory benchmark $mib MiB, F5 x $refreshes"
         & dotnet $TestDll --benchmark $caseDir $mib --memory-refreshes $refreshes
         $exit = $LASTEXITCODE
-        $jsonName = "memory-$mibMiB.json"
+        $jsonName = "memory-${mib}MiB.json"
         $jsonPath = Join-Path $caseDir $jsonName
-        $errorPath = Join-Path $caseDir "memory-$mibMiB.error.txt"
+        $errorPath = Join-Path $caseDir "memory-${mib}MiB.error.txt"
         if (Test-Path -LiteralPath $jsonPath) {
             Copy-Item -LiteralPath $jsonPath -Destination (Join-Path $JsonDirectory $jsonName) -Force
             $raws.Add((Get-Content -LiteralPath $jsonPath -Raw -Encoding utf8))
         }
         if (Test-Path -LiteralPath $errorPath) {
-            Copy-Item -LiteralPath $errorPath -Destination (Join-Path $JsonDirectory "memory-$mibMiB.error.txt") -Force
+            Copy-Item -LiteralPath $errorPath -Destination (Join-Path $JsonDirectory "memory-${mib}MiB.error.txt") -Force
         }
         Remove-Tree $caseDir
         $copied = Test-Path -LiteralPath (Join-Path $JsonDirectory $jsonName)
