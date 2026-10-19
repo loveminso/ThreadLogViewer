@@ -4,14 +4,12 @@
 
 ## 변경 요약
 
-- **강조**([PR #8](https://github.com/loveminso/ThreadLogViewer/pull/8), [PR #11](https://github.com/loveminso/ThreadLogViewer/pull/11)): 깨진 문자가 있는 강조 규칙 하나는 건너뛰고, 나머지 올바른 규칙은 계속 강조합니다. 상태줄 안내에는 목록 번호·색 이름·문구를 붙입니다.
+- **강조**([PR #8](https://github.com/loveminso/ThreadLogViewer/pull/8), [PR #11](https://github.com/loveminso/ThreadLogViewer/pull/11)): 짝이 맞지 않는 UTF-16 문자(깨진 문자)가 들어 있는 강조 규칙은 그 규칙만 건너뛰고, 나머지 올바른 규칙은 계속 강조합니다. 모든 규칙이 건너뛰어지면 `강조 준비 실패`로 표시합니다. 상태줄 안내에는 목록 번호·색 이름·문구를 붙입니다.
 - **설정**([PR #12](https://github.com/loveminso/ThreadLogViewer/pull/12)): 실행 폴더에 설정 파일이 없고 그 위치에 쓸 수 없으면 `%LOCALAPPDATA%\ThreadLogViewer\ui-settings.json`에 같은 형식으로 저장합니다. 설정을 읽지 못하면 경로를 적지 않은 안내를 표시합니다.
-- **작은 화면**([PR #13](https://github.com/loveminso/ThreadLogViewer/pull/13)): 강조 문구 관리와 단축키 도움말 창이 메인 창 가운데에 열리고 1024×768 화면 안에 맞춥니다. 창이 좁으면 스레드 패널이 줄어들어 로그 본문이 넓어지며, 저장한 패널 너비는 유지합니다.
+- **작은 화면**([PR #13](https://github.com/loveminso/ThreadLogViewer/pull/13)): 강조 문구 관리와 단축키 도움말 창이 메인 창 가운데에 열리고 메인 창이 있는 모니터의 작업 영역을 넘지 않게 맞춥니다(1024×768 창에서 확인). 창이 좁으면 스레드 패널이 줄어들어 로그 본문이 넓어지며, 저장한 패널 너비는 유지합니다.
 - 강조 문구 관리에서 새 규칙을 추가하면 아직 쓰지 않은 색을 받습니다. 도움말 창의 텍스트를 복사할 수 있습니다.
 - 로그 본문, 보여줄 기록·숨길 기록 입력, 스레드 패널 너비 조절 분할선에 접근성 이름을 붙였습니다.
-- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7)): `Scenario07`~`Scenario13`을 추가했습니다. 회차마다 14 통과 / 1 건너뜀 / 15 합계입니다.
-- **CI**([PR #10](https://github.com/loveminso/ThreadLogViewer/pull/10)): 합성 화면 갤러리와 경고만 UI 린트를 PR CI에 포함합니다.
-- **문서**([PR #9](https://github.com/loveminso/ThreadLogViewer/pull/9)): [DESIGN.md](DESIGN.md)를 추가했습니다.
+- **FlaUI UI 테스트**([PR #7](https://github.com/loveminso/ThreadLogViewer/pull/7), [PR #13](https://github.com/loveminso/ThreadLogViewer/pull/13)): 기능 1·2·6·8·9·10·11의 `Scenario07`~`Scenario13`(PR #7)과 `Scenario14`(PR #13)를 추가했습니다. PR CI에서 회차마다 14 통과 / 1 건너뜀 / 15 합계입니다.
 
 ## 알려진 한계
 
