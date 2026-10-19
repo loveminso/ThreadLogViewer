@@ -144,7 +144,6 @@ jobs:
             ''
             '## 이번 Windows 자동 검증'
             ''
-            '- PR CI: FlaUI UI 테스트 3회 각 14 통과 / 1 건너뜀 / 15 합계, 합성 화면 갤러리·경고만 UI 린트 포함.'
             "- Release 빌드 성공, 자동 테스트 **$env:TESTS_PASSED/$env:TESTS_TOTAL 통과**."
             '- Windows x64 EXE/DLL 버전, 포함된 .NET/WPF 런타임·라이선스·문서·샘플 검사.'
             '- ZIP의 모든 파일을 배포 폴더와 SHA-256으로 비교하고 다운로드용 체크섬 파일 생성.'
@@ -152,6 +151,12 @@ jobs:
             ''
             "소스 커밋: $env:GITHUB_SHA"
             "ZIP SHA-256: $env:RELEASE_HASH"
+            ''
+            '## 병합 전 PR CI (이 릴리스 실행의 결과가 아님)'
+            ''
+            '아래 내용은 이 Windows release 실행이 측정한 결과가 아닙니다. 버전을 올리기 전 PR CI에서 확인한 화면 검증입니다.'
+            ''
+            '- PR CI: FlaUI UI 테스트 3회 각 15 통과 / 0 건너뜀 / 15 합계, 합성 화면 갤러리·경고만 UI 린트 포함.'
             ''
             "전체 설명: https://github.com/$env:GITHUB_REPOSITORY/blob/$env:GITHUB_SHA/README.md"
           )
