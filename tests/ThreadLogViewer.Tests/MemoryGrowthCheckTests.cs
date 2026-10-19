@@ -1,3 +1,4 @@
+using System.IO;
 using Xunit;
 
 namespace ThreadLogViewer.Tests;
@@ -33,8 +34,10 @@ public sealed class MemoryGrowthCheckTests
     [Fact]
     public void WarningUsesTheUnconfirmedPhraseAndDoesNotClaimALeak()
     {
-        Assert.Null(MemoryGrowthCheck.WarningText(false, false, 10));
-        string text = MemoryGrowthCheck.WarningText(true, true, 500);
+        string? absent = MemoryGrowthCheck.WarningText(false, false, 10);
+        Assert.True(absent is null);
+        string? text = MemoryGrowthCheck.WarningText(true, true, 500);
+        Assert.NotNull(text);
         Assert.Equal("500 MiB post-GC managed heap and working set: 누수 의심, 원인 미확인", text);
         Assert.Equal(MemoryGrowthCheck.SuspectedLeakUnconfirmed, "누수 의심, 원인 미확인");
         Assert.Contains(MemoryGrowthCheck.SuspectedLeakUnconfirmed, text, StringComparison.Ordinal);

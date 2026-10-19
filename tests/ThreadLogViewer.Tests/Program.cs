@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Text.Json;
 using ICSharpCode.AvalonEdit.Document;
 using ThreadLogViewer.Core;
