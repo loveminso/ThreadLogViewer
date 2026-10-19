@@ -1,6 +1,6 @@
 # ThreadLog Viewer 검증 안내
 
-[기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정한다. 수동 확인은 SmartScreen만 해당한다. 실제 Explorer 끌어 놓기는 알려진 한계다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)을 따른다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그에서 F5를 20회 실행한다.
+[기능 테스트 방법](FEATURE-TEST-GUIDE.md)의 매핑 표에 적힌 범위만 FlaUI UI 테스트가 판정한다. 수동 확인은 SmartScreen만 해당한다. 실제 Explorer 끌어 놓기는 알려진 한계다. 키 조작은 [단축키 표](SHORTCUTS.md), 빌드·회귀·배포 결과는 [v0.8.3 검증 기록](VALIDATION-v0.8.3.md)을 따른다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그에서 F5를 20회 실행한다.
 
 ## 자동 회귀
 

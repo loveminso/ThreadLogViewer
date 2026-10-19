@@ -68,7 +68,7 @@ F5와 `파일 → 현재 파일 새로 고침`은 `RefreshCurrentSessionAsync`�
 
 규칙은 탭마다 최대 8개다 (`HighlightPrompt`). 새 규칙은 Shift+F8과 같이 0부터 5까지 아직 쓰지 않은 색을 고른다. 여섯 색이 모두 쓰이면 규칙 개수의 나머지를 쓴다. ‘강조 문구 관리’의 새 문구 색도 그 값에서 시작하고, 추가나 삭제 뒤에 다음 빈 색으로 옮긴다. `RefreshKeywordsAsync`가 켠 규칙을 하나씩 준비한다 (`src/ThreadLogViewer.App/MainWindow.Analysis.cs`). 준비는 `Task.Run` 안에서 `KeywordRefreshFailure.CanPrepare`로 검사한 뒤 `LogSearch.Find`로 찾는다. 짝 없는 UTF-16 서로게이트는 그 규칙만 `SkippedRule`로 건너뛴다. 나머지 규칙은 계속 강조한다. 건너뛴 규칙이 있으면 상태줄 `OperationStatus`에 `KeywordRefreshFailure.SkippedNotice`가 만든 문장이 남는다. 그 문장은 `강조 준비 실패`로 시작하고, 목록 번호·색 이름·읽을 수 있는 문구를 잇는다. `SkippedNotice`는 `FailedKeyword` 상수를 쓰지 않는다. 상수 `KeywordRefreshFailure.FailedKeyword`는 `강조 준비 실패`만이고, 강조 칸 `KeywordStatus`에 붙이거나, 켠 규칙이 모두 건너뛰면 그 칸을 그 상수로 바꾼다. 준비 중 `OperationCanceledException`이 아니면 `KeywordRefreshFailure.Apply`가 상태 문자열로 바꾼다. 취소는 실패로 보지 않아, 강조 칸이 `강조 준비 중…`인 채로 남을 수 있다. 메모리 부족은 `강조 메모리 부족 · 규칙을 줄여 주세요.`다. 그 외 예외는 강조 칸 `강조 준비 실패`, 상태줄 `강조 준비 실패 · 규칙을 확인한 뒤 다시 시도하세요.`다.
 
-`README.md`와 `docs/PLAN.md`의 v0.8.2 목록에 남은 `강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다`는 그 이전 동작이다. 현재 동작은 두 문서 맨 위의 `main(미출시)` 문장과 `src/ThreadLogViewer.App/MainWindow.Analysis.cs`다.
+`README.md`와 `docs/PLAN.md`의 v0.8.2 목록에 남은 `강조 규칙 중 하나에 깨진 문자가 있으면 모든 강조가 표시되지 않습니다`는 그 이전 동작이다. 현재 동작은 README의 v0.8.3 항목과 `src/ThreadLogViewer.App/MainWindow.Analysis.cs`다.
 
 ### 주변 로그
 
@@ -153,7 +153,7 @@ UI 테스트는 한 잡에서 1, 2, 3회를 이어서 실행한다. 회차마다
 
 **수정 5. 약 1GB 파일의 메모리.** `LogFileReader`는 길이가 `int.MaxValue`를 넘으면 `2GB 이상의 파일을 지원하지 않습니다.`로 거절한다. 읽기 중에는 그 길이의 바이트 배열을 잡지만, 디코딩이 끝나면 그 배열을 비우고 탭에 남기지 않는다. 탭에 남는 것은 디코딩된 `LogData.Text`, 줄 메타데이터, AvalonEdit 문서에 복사된 본문이다. 모든 줄을 보이는 투영의 `LogProjection.Text`는 `LogData.Text`와 같은 문자열이다. 필터나 범위로 일부만 보이면 `LogProjection.Text`는 따로 만든 문자열이다. 2GB 미만이라도 파일 크기에 비례해 메모리가 늘고, 1GB에 가까운 파일은 디코딩 문자열과 문서 복사본 때문에 메모리 한계에 닿을 수 있다. 구간 로딩은 없다. `README.md`의 `구조와 현재 한계`는 탭마다 디코딩 원문·행 정보·표시 문서를 유지하고, 2GB 이상을 막으며, 그 미만도 RAM과 줄 길이에 달렸다고 적는다. [v0.8.0 검증 기록](VALIDATION-v0.8.0.md)은 합성 100 MiB 측정이고, 구간 로딩과 전체 메모리 상한을 넣지 않았다고 적는다. 1GB 파일을 연 실측은 그 문서에 없다. [v0.6.3 UX 검토](UX-REVIEW-v0.6.3.md)는 100 MiB 콘솔 측정과 원본 바이트·문자열·투영·문서 유지를 적는다. [계획](PLAN.md)의 대용량 최적화 후보는 메모리 매핑·구간 로딩·투영 증분 처리다.
 
-**CP949 UI 시나리오는 F5를 누르는 순간 쓰지 않는다.** `Scenario05_RefreshWhileAppendingKorean`의 CP949는 도우미가 F5 사이에만 완전한 줄을 추가하고, F5를 누르는 동안에는 멈춘다. 문자 중간에서 끊긴 UTF-8·UTF-16·CP949 스냅샷은 `tests/ThreadLogViewer.Tests/AppendingEncodingTests.cs`가 판정한다. 읽기는 그 미완성 문자만 버린다. `README.md`, `docs/PLAN.md`, [v0.8.2 검증 기록](VALIDATION-v0.8.2.md)의 v0.8.2 한계 목록은 그 이전 동작이다.
+**CP949 UI 시나리오는 F5를 누르는 순간 쓰지 않는다.** `Scenario05_RefreshWhileAppendingKorean`의 CP949는 도우미가 F5 사이에만 완전한 줄을 추가하고, F5를 누르는 동안에는 멈춘다. 문자 중간에서 끊긴 UTF-8·UTF-16·CP949 스냅샷은 `tests/ThreadLogViewer.Tests/AppendingEncodingTests.cs`가 판정한다. 읽기는 그 미완성 문자만 버린다. `README.md`와 `docs/PLAN.md`의 v0.8.2·v0.8.3 한계 목록과 [v0.8.2 검증 기록](VALIDATION-v0.8.2.md), [v0.8.3 검증 기록](VALIDATION-v0.8.3.md)은 그 이전 동작이다. 현재 동작은 위 인코딩 절, F5 절, README의 `main(미출시)` 문장이다.
 
 **실제 Explorer 끌어 놓기는 자동화하지 않는다.** CI는 테스트 프로세스가 OLE 드래그 소스가 되어 창에 놓는다. 절차는 [검증 안내](TESTING.md)의 Windows UI 자동화 절이다. 실제 Explorer 창에서 끌어 오는 경우는 [기능 테스트 방법](FEATURE-TEST-GUIDE.md)과 `docs/PLAN.md`가 알려진 한계로 적는다.
 
