@@ -46,8 +46,8 @@ public partial class MainWindow
     private bool CanExecuteEditingCommand(RoutedCommand command)
     {
         var target = EditingCommandTarget();
-        // The log document is read-only; opening clipboard logs remains a separate action.
-        if (command == ApplicationCommands.Paste && ReferenceEquals(target, Editor.TextArea) && Editor.IsReadOnly) return false;
+        // The log body is read-only. 편집 → 붙여넣기 still opens the clipboard as a log, the same path as Ctrl+V.
+        if (command == ApplicationCommands.Paste && ReferenceEquals(target, Editor.TextArea)) return true;
         try { return command.CanExecute(null, target); }
         catch (ExternalException) { return false; }
     }
@@ -61,7 +61,15 @@ public partial class MainWindow
     }
 
     private void FocusCopy_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(ApplicationCommands.Copy);
-    private void FocusPaste_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(ApplicationCommands.Paste);
+    private void FocusPaste_Click(object sender, RoutedEventArgs e)
+    {
+        if (ReferenceEquals(EditingCommandTarget(), Editor.TextArea))
+        {
+            AsyncEvent.Run(PasteAsync);
+            return;
+        }
+        ExecuteEditingCommand(ApplicationCommands.Paste);
+    }
     private void FocusSelectAll_Click(object sender, RoutedEventArgs e) => ExecuteEditingCommand(ApplicationCommands.SelectAll);
     private void Editing_MenuOpened(object sender, RoutedEventArgs e) => UpdateEditingMenus();
     private void Editing_RequerySuggested(object? sender, EventArgs e) => UpdateEditingMenus();

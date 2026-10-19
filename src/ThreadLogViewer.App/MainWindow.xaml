@@ -36,7 +36,7 @@
         </MenuItem>
         <MenuItem Header="편집(_E)" SubmenuOpened="MainMenu_Opened">
           <MenuItem x:Name="FocusCopyMenu" Header="복사" InputGestureText="Ctrl+C" Click="FocusCopy_Click" />
-          <MenuItem x:Name="FocusPasteMenu" Header="붙여넣기" InputGestureText="Ctrl+V" Click="FocusPaste_Click" ToolTip="마지막 활성 입력칸에 붙여넣기 · 로그 열기는 Ctrl+Shift+V" ToolTipService.ShowOnDisabled="True" />
+          <MenuItem x:Name="FocusPasteMenu" Header="붙여넣기" InputGestureText="Ctrl+V" Click="FocusPaste_Click" ToolTip="본문에서는 Ctrl+V와 같이 클립보드 로그 열기 · 입력칸에서는 텍스트 붙여넣기 · 입력칸에서도 로그로 열려면 Ctrl+Shift+V" ToolTipService.ShowOnDisabled="True" />
           <MenuItem x:Name="FocusSelectAllMenu" Header="전체 선택" InputGestureText="Ctrl+A" Click="FocusSelectAll_Click" />
           <Separator />
           <MenuItem x:Name="FindMenu" Header="찾기…" InputGestureText="Ctrl+F" Click="Search_Click" />
@@ -181,10 +181,10 @@
               <Expander.Header><TextBlock x:Name="ContentFilterHeader" Text="내용 필터" TextWrapping="Wrap" /></Expander.Header>
               <StackPanel x:Name="TextFilterControls" Margin="0,8,0,0" IsEnabled="{Binding CanChangeFilters, RelativeSource={RelativeSource AncestorType=Window}}">
                 <TextBlock Text="보여줄 기록 · 한 줄에 한 문구" FontSize="12" />
-                <TextBox x:Name="IncludeBox" AutomationProperties.AutomationId="IncludeBox" AutomationProperties.Name="보여줄 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음" TextChanged="Criteria_Changed" />
+                <TextBox x:Name="IncludeBox" AutomationProperties.AutomationId="IncludeBox" AutomationProperties.Name="보여줄 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: Write · 비워두면 내용 제한 없음 · Enter는 줄바꿈 · Ctrl+Enter로 필터 적용" TextChanged="Criteria_Changed" PreviewKeyDown="FilterCriteria_PreviewKeyDown" />
                 <ComboBox x:Name="IncludeModeBox" SelectedIndex="0" Margin="0,6,0,0" SelectionChanged="FilterOption_Changed" AutomationProperties.Name="포함 문구 일치 방식"><ComboBoxItem Content="하나라도 포함된 기록" /><ComboBoxItem Content="모두 포함된 기록" /></ComboBox>
                 <TextBlock Text="숨길 기록 · 한 줄에 한 문구" FontSize="12" Margin="0,10,0,0" />
-                <TextBox x:Name="ExcludeBox" AutomationProperties.Name="숨길 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: heartbeat · 하나라도 포함되면 기록 전체를 숨김" TextChanged="Criteria_Changed" />
+                <TextBox x:Name="ExcludeBox" AutomationProperties.Name="숨길 기록" AcceptsReturn="True" Height="48" VerticalScrollBarVisibility="Auto" ToolTip="예: heartbeat · 하나라도 포함되면 기록 전체를 숨김 · Enter는 줄바꿈 · Ctrl+Enter로 필터 적용" TextChanged="Criteria_Changed" PreviewKeyDown="FilterCriteria_PreviewKeyDown" />
                 <CheckBox x:Name="FilterCaseBox" Content="대소문자 구분" Margin="0,8,0,6" Checked="FilterOption_Changed" Unchecked="FilterOption_Changed" />
                 <StackPanel Orientation="Horizontal">
                   <Button AutomationProperties.AutomationId="ApplyFilterButton" Content="필터 적용" Click="ApplyTextFilter_Click" />
@@ -441,7 +441,7 @@
               <Button x:Name="ResultsToggleButton" DockPanel.Dock="Right" Content="접기" Click="ResultsToggle_Click" FontSize="11" Padding="7,2" MinHeight="24" Margin="8,0,0,0" ToolTip="검색과 강조를 유지하고 결과 목록만 접기" AutomationProperties.Name="검색 결과 목록 접기" />
               <TextBlock Text="검색 결과 · 원본 줄 / 소유 헤더 시간 / 스레드" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </DockPanel>
-            <ListBox x:Name="ResultsList" AutomationProperties.AutomationId="ResultsList" Grid.Row="1" SelectionChanged="Result_Selected" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" DisplayMemberPath="Label" />
+            <ListBox x:Name="ResultsList" AutomationProperties.AutomationId="ResultsList" Grid.Row="1" SelectionChanged="Result_Selected" PreviewKeyDown="ResultsList_PreviewKeyDown" MouseDoubleClick="ResultsList_MouseDoubleClick" Background="Transparent" Foreground="{DynamicResource TextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" DisplayMemberPath="Label" />
           </Grid>
         </Border>
       </Grid>

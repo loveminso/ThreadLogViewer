@@ -28,6 +28,9 @@ public partial class MainWindow : Window
     private List<ThreadItem> threadItems = [];
     private string? requestedPath;
     private bool suppressFilters, busy;
+    // Tests replace this so menu paste can open a synthetic clipboard without touching the real one.
+    // Ctrl+V and 편집 → 붙여넣기 on the log body both call PasteAsync, which reads through it.
+    private Func<IDataObject?> readClipboard = static () => Clipboard.GetDataObject();
     private int searchIndex = -1;
     private bool searchLimited;
     private bool viewReady;
@@ -79,7 +82,7 @@ public partial class MainWindow : Window
     private void Reload_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => ReloadCurrentAsync(EncodingMode.Cp949));
     private void Paste_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(PasteAsync);
     private void PasteLog_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(PasteAsync);
-    private Task PasteAsync() => PasteFromDataObjectAsync(Clipboard.GetDataObject);
+    private Task PasteAsync() => PasteFromDataObjectAsync(readClipboard);
     private void Copy_Click(object sender, RoutedEventArgs e) => Editor.Copy();
     private void SelectText_Click(object sender, RoutedEventArgs e) { Editor.Focus(); Editor.SelectAll(); }
     private void Window_DragOver(object sender, DragEventArgs e)

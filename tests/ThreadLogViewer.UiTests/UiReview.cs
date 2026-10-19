@@ -70,8 +70,8 @@ internal static class UiReview
             }
         }
         RejectRunnerPaths(output);
-        if (shots.Count != 80)
-            throw new InvalidOperationException($"Expected 80 screenshots but wrote {shots.Count}.");
+        if (shots.Count != 104)
+            throw new InvalidOperationException($"Expected 104 screenshots but wrote {shots.Count}.");
         foreach (var shot in shots)
         {
             string path = Path.Combine(output, shot.File);
@@ -213,6 +213,7 @@ internal static class UiReview
                 CloseAbout(about);
                 session.WaitUntil(() => FindAbout(session) is null, TimeSpan.FromSeconds(8), "help dialog stayed open");
             }
+            CaptureKeyboardReview(session, lint, output, shots, theme, scale);
         }
         catch (Exception ex)
         {
@@ -232,6 +233,8 @@ internal static class UiReview
         ParkPointer(session);
         if (state == "menus")
             OpenFileMenu(session);
+        if (state == "edit-paste")
+            OpenEditMenu(session);
         if (state == "line-menu")
             session.OpenLineContextMenu("이 스레드만 보기");
         Thread.Sleep(250);
@@ -396,6 +399,73 @@ internal static class UiReview
         session.Press(VirtualKeyShort.ESCAPE);
         session.Press(VirtualKeyShort.ESCAPE);
         return check;
+    }
+
+    private static void CaptureKeyboardReview(UiSession session, UiReviewLint lint, string output, List<UiReviewShot> shots, string theme, int scale)
+    {
+        session.ShowSearch();
+        session.SetSearchQuery("neighbor");
+        session.WaitForSearchStatus(status => status.Contains('개') && !status.Contains("결과 없음", StringComparison.Ordinal), "neighbor hits");
+        var list = session.Require("ResultsList");
+        list.Focus();
+        Wait.UntilInputIsProcessed();
+        Thread.Sleep(80);
+        Keyboard.Type(VirtualKeyShort.DOWN);
+        Keyboard.Type(VirtualKeyShort.DOWN);
+        session.WaitUntil(
+            () => session.Text("PositionStatus").Contains("원본 2줄", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(10),
+            "second search result");
+        foreach (var size in Sizes)
+        {
+            Resize(session, size.Width, size.Height);
+            list.Focus();
+            Shoot(session, lint, output, shots, "search-result-focus", "검색 결과 목록 포커스", theme, scale, size.Width, size.Height, null, steady: false);
+        }
+        CloseSearch(session);
+        foreach (var size in Sizes)
+        {
+            Resize(session, size.Width, size.Height);
+            Shoot(session, lint, output, shots, "edit-paste", "편집 메뉴 붙여넣기", theme, scale, size.Width, size.Height, null, steady: false);
+            session.Press(VirtualKeyShort.ESCAPE);
+            ParkPointer(session);
+        }
+        var expander = session.Require("ContentFilterExpander");
+        if (expander.Patterns.ExpandCollapse.TryGetPattern(out var expand))
+            expand.Expand();
+        else
+            expander.Click();
+        var include = session.Require("IncludeBox").AsTextBox();
+        include.Focus();
+        try { include.Click(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+        include.Text = "neighbor-after";
+        Wait.UntilInputIsProcessed();
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.RETURN);
+        session.WaitUntil(
+            () => session.Status().Contains("필터 적용 완료", StringComparison.Ordinal) && !session.IsBusy(),
+            TimeSpan.FromSeconds(20),
+            "ctrl+enter filter");
+        foreach (var size in Sizes)
+        {
+            Resize(session, size.Width, size.Height);
+            Shoot(session, lint, output, shots, "filter-ctrl-enter", "Ctrl+Enter 필터 적용", theme, scale, size.Width, size.Height, null, steady: true);
+        }
+    }
+
+    private static void OpenEditMenu(UiSession session)
+    {
+        session.FocusWindow();
+        var editor = session.Require("LogEditor");
+        editor.Focus();
+        try { editor.Click(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { }
+        Wait.UntilInputIsProcessed();
+        Thread.Sleep(80);
+        var edit = TopMenu(session, "편집");
+        edit.AsMenuItem().Expand();
+        Wait.UntilInputIsProcessed();
+        Thread.Sleep(200);
     }
 
     private static void OpenFileMenu(UiSession session)

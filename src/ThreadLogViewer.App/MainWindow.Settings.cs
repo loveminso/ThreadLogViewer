@@ -10,6 +10,7 @@ public partial class MainWindow
 {
     private SettingsStore? settingsStore;
     private bool settingsReady, saveSettings, settingsDirty;
+    private bool contentFilterExpandedPreference;
     private int settingsSaveFailures;
     private readonly DispatcherTimer settingsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private System.ComponentModel.DependencyPropertyDescriptor? widthDescriptor;
@@ -33,6 +34,10 @@ public partial class MainWindow
         ThreadBackgroundMenu.IsChecked = settings.ThreadBackgrounds;
         largeLineGenerator.Enabled = settings.LargeLinePreview;
         LargeLineMenu.IsChecked = settings.LargeLinePreview;
+        contentFilterExpandedPreference = settings.ContentFilterExpanded;
+        ContentFilterExpander.IsExpanded = contentFilterExpandedPreference;
+        ContentFilterExpander.Expanded += ContentFilter_ExpandedChanged;
+        ContentFilterExpander.Collapsed += ContentFilter_ExpandedChanged;
         KeywordList.ItemsSource = keywordRules;
         Editor.TextArea.Caret.PositionChanged += (_, _) => UpdatePosition();
         Editor.TextArea.SelectionChanged += (_, _) => UpdatePosition();
@@ -71,7 +76,8 @@ public partial class MainWindow
             // A narrow window only clamps the column. The absolute GridLength is the preference.
             PanelWidth = ThreadColumn.Width.IsAbsolute ? ThreadColumn.Width.Value : ThreadColumn.ActualWidth,
             ResultsHeight = preferredResultsHeight, ResultsCollapsed = resultsCollapsed,
-            ThreadBackgrounds = threadRenderer.Enabled, LargeLinePreview = largeLineGenerator.Enabled
+            ThreadBackgrounds = threadRenderer.Enabled, LargeLinePreview = largeLineGenerator.Enabled,
+            ContentFilterExpanded = contentFilterExpandedPreference
         };
         SettingsSaveResult result;
         try { result = settingsStore.Save(settings.Normalize(), data?.SourcePath); }
@@ -107,10 +113,18 @@ public partial class MainWindow
         ResetLineSelectionGesture();
         SaveSettingsNow(); settingsTimer.Stop();
         settingsTimer.Tick -= SettingsTimer_Tick;
+        ContentFilterExpander.Expanded -= ContentFilter_ExpandedChanged;
+        ContentFilterExpander.Collapsed -= ContentFilter_ExpandedChanged;
         DisposeResultsLayout();
         DisposeWindowLayout(); DisposeEditing();
         if (widthChanged is not null) widthDescriptor?.RemoveValueChanged(ThreadColumn, widthChanged);
         highlightWork.Dispose(); selectionWork.Dispose();
+    }
+    private void ContentFilter_ExpandedChanged(object sender, RoutedEventArgs e)
+    {
+        if (!settingsReady || !viewReady || selectingSession || restoringPosition) return;
+        contentFilterExpandedPreference = ContentFilterExpander.IsExpanded;
+        ScheduleSettingsSave();
     }
     private void Help_Click(object sender, RoutedEventArgs e) => HelpWindow.Show(this);
 }

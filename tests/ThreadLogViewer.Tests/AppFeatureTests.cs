@@ -27,7 +27,8 @@ public sealed class AppFeatureTests
         using var json = JsonDocument.Parse(File.ReadAllBytes(store.FilePath));
         Assert.Equal(SettingsStore.OwnerMarker, json.RootElement.GetProperty("Owner").GetString());
         Assert.Equal(SettingsStore.SchemaVersion, json.RootElement.GetProperty("Schema").GetInt32());
-        Assert.Equal(9, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
+        Assert.Equal(10, json.RootElement.GetProperty("Settings").EnumerateObject().Count());
+        Assert.False(json.RootElement.GetProperty("Settings").GetProperty("ContentFilterExpanded").GetBoolean());
         Assert.Empty(Directory.EnumerateFiles(System.IO.Path.GetDirectoryName(store.FilePath)!, "*.tmp"));
     }
 
