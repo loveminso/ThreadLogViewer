@@ -28,7 +28,7 @@ F5 표본만 기울기에 넣는다. 열기 표본과 필터 표본은 표에 �
 
 10/100/500 MiB는 PR CI 실행 [39218255560](https://github.com/loveminso/ThreadLogViewer/actions/runs/39218255560)에서 왔다. 그 실행의 head는 `8d3d2f11b85ef3c1340a8ae95dfd8f33e5bbe4c3`다. `memory-results.json`의 `GithubSha`는 `4dba2583fe591c2b7ebc5d2a388cf7a037bbf3e4`이고, 이것은 그 head를 `f86af78da6ca16523a5c83889bd8af1e87e4c43c`에 합친 pull_request 병합 커밋이다. 아티팩트 `memory-results`는 [12171252899](https://github.com/loveminso/ThreadLogViewer/actions/runs/39218255560/artifacts/12171252899)이다.
 
-1024 MiB 행의 숫자는 그대로다. 그 행은 예전에 10/100/500 MiB와 같은 PR CI 단계에서 잰 값이다. 실행은 [39208016760](https://github.com/loveminso/ThreadLogViewer/actions/runs/39208016760)이고, head는 `3487b8dbbf286c79b29ac48508482788dec12d0c`다. `workflow_dispatch`로 잰 값이 아니다. 이 문서의 head에서 잰 값도 아니고, 10/100/500 MiB를 잰 head `8d3d2f11b85ef3c1340a8ae95dfd8f33e5bbe4c3`에서 잰 값도 아니다.
+1024 MiB 행의 숫자는 그대로다. 출처는 그 행 바로 아래에 적는다.
 
 10/100/500 MiB를 잰 환경은 Windows NT 10.0.26100.0, .NET 10.0.13, 논리 프로세서 4개다. 그 세 크기의 private bytes는 `PrivateMemorySize64`로 읽혔다.
 
@@ -43,8 +43,10 @@ F5 표본만 기울기에 넣는다. 열기 표본과 필터 표본은 표에 �
 | 500 | 524288072 | 6065749 | 10 | 6733320192 | 6779908096 | 3874415240 | 4876599296 | 4471641040 | 798140608 | 지속 증가 경고 없음. 누수 없음으로 결론내지 않는다. | 기록용(판정 안 함) | 지속 증가 경고 없음. 누수 없음으로 결론내지 않는다. | 기록용(판정 안 함) |
 | 1024 | 1073741839 | 12379869 | 3 | 12016812032 | 12619100160 | 7918287848 | 8813813760 | 8051054432 | 543507800 | 판정 불가(표본 부족) | 판정 불가(표본 부족) | 판정 불가(표본 부족) | 판정 불가(표본 부족) |
 
+1024 MiB 행은 head `3487b8dbbf286c79b29ac48508482788dec12d0c`의 PR CI 측정이다. 실행은 [39208016760](https://github.com/loveminso/ThreadLogViewer/actions/runs/39208016760)이다. 에이전트의 `workflow_dispatch`는 HTTP 403이라 시작하지 못했고, PM 결정으로 이 값을 쓴다. `3487b8d` 이후 이 열의 바이트를 모으는 코드는 바뀌지 않았다. `SyntheticBenchmarkLog.cs`는 그대로이고, `MemoryBenchmark.Sample`이 읽는 작업 집합, private bytes(`PrivateMemorySize64`), GC 뒤 관리 힙(`GC.GetTotalMemory(false)`), GC 커밋(`TotalCommittedBytes`), LOH(`GenerationInfo` 3번의 `SizeAfterBytes`), 조각화(`FragmentedBytes`)도 같다. 그 뒤에 바뀐 것은 판정을 관리 힙·private bytes로 한정한 것과, 그 두 지표의 `slope*(N-1)`과 마진을 CI 로그에 적는 것이다.
+
 세 번의 PR CI에서 경고가 같은 곳에 나오지 않았다. 3487b8d(실행 39208016760)와 d8880b4(실행 39214963904)는 100 MiB의 private bytes − GC 커밋에서만, 55ee84d(실행 39212578254)는 500 MiB의 GC 커밋과 private bytes에서만 경고했다. 같은 100 MiB 입력에서도 마지막 F5의 GC 커밋은 873697280~1075818496바이트로 달랐고, 관리 힙은 세 실행 모두 크기마다 거의 같았다. 그래서 이 경고들은 GC가 빈 영역을 붙잡고 돌려주는 시점에 따라 달라지는 것으로 보고, 누수 결론으로 쓰지 않는다. 원인은 확인하지 않았다. 실제 회사 로그는 최대 약 10 MB이고, 이번 작업에서 메모리 최적화는 하지 않는다.
 
 이에 따라 판정 지표는 관리 힙·private bytes로 한정하고, GC 커밋과 private bytes − GC 커밋은 기록만 한다.
 
-실행 39218255560에서 10/100/500 MiB의 판정 지표인 관리 힙과 private bytes는 `지속 증가 경고 없음. 누수 없음으로 결론내지 않는다.`다. GC 커밋과 private bytes − GC 커밋은 `기록용(판정 안 함)`이고, 잡은 `::warning`을 내지 않았으며 실패하지 않았다. 경고가 없어도 누수가 없다고 결론내지 않는다. 판정 지표의 기울기×9와 마진은 로그에 있다. 10 MiB 관리 힙은 279260.4바이트와 마진 33554432바이트, private bytes는 -7151616바이트와 마진 67108864바이트다. 100 MiB 관리 힙은 80364바이트와 마진 33554432바이트, private bytes는 -72929894.4바이트와 마진 67108864바이트다. 500 MiB 관리 힙은 243564바이트와 마진 68715872바이트, private bytes는 -74174054.4바이트와 마진 171662540바이트다. 1024 MiB 행의 네 칸은 실행 39208016760에서 F5가 3개라 `판정 불가(표본 부족)`으로 남아 있다. 그 숫자는 그 실행의 head `3487b8dbbf286c79b29ac48508482788dec12d0c`에서 온 것이고, dispatch도 이 문서의 head도 아니다.
+실행 39218255560에서 10/100/500 MiB의 판정 지표인 관리 힙과 private bytes는 `지속 증가 경고 없음. 누수 없음으로 결론내지 않는다.`다. GC 커밋과 private bytes − GC 커밋은 `기록용(판정 안 함)`이고, 잡은 `::warning`을 내지 않았으며 실패하지 않았다. 경고가 없어도 누수가 없다고 결론내지 않는다. 판정 지표의 기울기×9와 마진은 로그에 있다. 10 MiB 관리 힙은 279260.4바이트와 마진 33554432바이트, private bytes는 -7151616바이트와 마진 67108864바이트다. 100 MiB 관리 힙은 80364바이트와 마진 33554432바이트, private bytes는 -72929894.4바이트와 마진 67108864바이트다. 500 MiB 관리 힙은 243564바이트와 마진 68715872바이트, private bytes는 -74174054.4바이트와 마진 171662540바이트다. 1024 MiB 행의 네 칸은 그 실행에서 F5가 3개라 `판정 불가(표본 부족)`으로 남아 있다.
