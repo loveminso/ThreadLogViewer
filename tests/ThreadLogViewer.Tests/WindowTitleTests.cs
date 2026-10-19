@@ -8,6 +8,9 @@ namespace ThreadLogViewer.Tests;
 
 public sealed class WindowTitleTests
 {
+    private const string EmptyTitlePattern = "^ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+
     [Fact]
     public void FormatUsesMajorMinorBuildAndDropsRevision()
     {
@@ -26,6 +29,7 @@ public sealed class WindowTitleTests
         string propsVersion = PropsVersion();
         Assert.Equal(WindowTitle.Format(version!), title);
         Assert.Equal("ThreadLog Viewer v" + propsVersion, title);
+        Assert.Matches(EmptyTitlePattern, title);
         Assert.DoesNotContain("+", title, StringComparison.Ordinal);
         string? informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (informational is not null)
@@ -36,7 +40,9 @@ public sealed class WindowTitleTests
     public void WithSessionKeepsTheEmDashSeparator()
     {
         string appTitle = WindowTitle.Format(new Version(0, 8, 3, 0));
-        Assert.Equal("opened-first.log \u2014 " + appTitle, WindowTitle.WithSession("opened-first.log", appTitle));
+        string withFile = WindowTitle.WithSession("opened-first.log", appTitle);
+        Assert.Equal("opened-first.log \u2014 " + appTitle, withFile);
+        Assert.Matches(OpenTitlePattern, withFile);
     }
 
     [Fact]
@@ -49,11 +55,13 @@ public sealed class WindowTitleTests
         {
             string expected = "ThreadLog Viewer v" + PropsVersion();
             Assert.Equal(expected, window.Title);
+            Assert.Matches(EmptyTitlePattern, window.Title);
             var open = typeof(MainWindow).GetMethod("OpenFilesAsync", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(open);
             bool opened = await (Task<bool>)open!.Invoke(window, [new[] { path }])!;
             Assert.True(opened);
             Assert.Equal("opened-first.log \u2014 " + expected, window.Title);
+            Assert.Matches(OpenTitlePattern, window.Title);
         }
         finally { window.Close(); }
     });

@@ -11,11 +11,15 @@ namespace ThreadLogViewer.UiTests;
 [Collection(UiCollection.Name)]
 public sealed class UiScenarioTests(PublishedApp app)
 {
+    private const string EmptyTitlePattern = "^ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+    private const string OpenTitlePattern = "^.+ \u2014 ThreadLog Viewer v\\d+\\.\\d+\\.\\d+$";
+
     [Fact]
     public void Scenario01_SelfContainedExeShowsMainWindow() =>
         Run(null, TimeSpan.FromMinutes(2), session =>
         {
             Assert.Equal(ExpectedAppTitle(session), session.Window.Title);
+            Assert.Matches(EmptyTitlePattern, session.Window.Title);
             Assert.False(session.App.HasExited);
             string exeDirectory = Path.GetDirectoryName(session.ExePath)!;
             Assert.True(File.Exists(Path.Combine(exeDirectory, "coreclr.dll")), "Self-contained publish is missing coreclr.dll.");
@@ -50,6 +54,7 @@ public sealed class UiScenarioTests(PublishedApp app)
             session.WaitForOpen("opened-first.log");
             string appTitle = ExpectedAppTitle(session);
             Assert.Equal("opened-first.log \u2014 " + appTitle, session.Window.Title);
+            Assert.Matches(OpenTitlePattern, session.Window.Title);
             session.DropFile(dropped);
             session.WaitUntil(
                 () => session.Text("FileLabel").Contains("dropped-beta.log", StringComparison.Ordinal) &&
@@ -60,6 +65,7 @@ public sealed class UiScenarioTests(PublishedApp app)
             Assert.True(session.Window.FindFirstDescendant(cf => cf.ByName("opened-first.log")) is not null,
                 "the command-line log tab is gone after the drop");
             Assert.Equal("dropped-beta.log \u2014 " + appTitle, session.Window.Title);
+            Assert.Matches(OpenTitlePattern, session.Window.Title);
             session.ApplyIncludeFilter(SyntheticLog.KeepToken);
             Assert.Contains("1/", session.Text("CountStatus"), StringComparison.Ordinal);
             session.ExportTo(destination);
