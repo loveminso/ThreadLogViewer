@@ -15,7 +15,7 @@ public static class MemoryBenchmark
     public const string Layers =
         "Included: LogFileReader.ReadAsync for open and each F5; the LogData that read returns; LogProjection.Create for every thread on open; LogProjection.Create for threads 3, 7, and null (the existing timing benchmark's filter, EntryFilter empty) after open and on each F5; SourceLineRemap.Create on each F5; CancellableDocumentFactory.Create, the AvalonEdit TextDocument copy PrepareDocument uses; LogSearch.Find and HighlightIndex for the phrase status=OK, capped at LogSearch.MaxHighlights, the same search RefreshKeywordsAsync runs. Excluded: the MainWindow, WPF layout and render, the dispatcher, FlaUI, and the published ThreadLogViewer.exe process. One process per size. Synthetic UTF-8 only. The generated file is not written again after creation.";
     public const string Gc =
-        "GC.Collect, WaitForPendingFinalizers, and GC.Collect run on a thread-pool thread, then GC.GetTotalMemory(false) and the process counters are read. The same sequence is in WorkbenchPerformanceProbe. Counters are taken while the phase's LogData, projection, document, and highlight stay rooted.";
+        "GC.Collect, WaitForPendingFinalizers, and GC.Collect run on a thread-pool thread, then GC.GetTotalMemory(false), GC.GetGCMemoryInfo (TotalCommittedBytes, FragmentedBytes, and large-object-heap GenerationInfo[3].SizeAfterBytes), and the process counters are read. The same collection sequence is in WorkbenchPerformanceProbe. Counters are taken while the phase's LogData, projection, document, and highlight stay rooted.";
 
     private static readonly int?[] FilteredThreads = [3, 7, null];
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -70,13 +70,25 @@ public static class MemoryBenchmark
             total.Stop();
 
             MemorySample open = samples[0];
-            long[] heap = samples.Where(sample => sample.Phase == "afterRefresh").Select(sample => sample.ManagedHeapBytes).ToArray();
-            long[] workingSet = samples.Where(sample => sample.Phase == "afterRefresh").Select(sample => sample.WorkingSetBytes).ToArray();
-            long heapMargin = MemoryGrowthCheck.ManagedHeapMargin(open.ManagedHeapBytes);
+            List<MemorySample> refreshSamples = samples.Where(sample => sample.Phase == "afterRefresh").ToList();
             long workingSetMargin = MemoryGrowthCheck.WorkingSetMargin(open.WorkingSetBytes);
-            bool heapRising = MemoryGrowthCheck.KeepsRising(heap, heapMargin);
-            bool workingSetRising = MemoryGrowthCheck.KeepsRising(workingSet, workingSetMargin);
-            string? warning = MemoryGrowthCheck.WarningText(heapRising, workingSetRising, mib);
+            MemoryGrowthCheck.MetricResult managed = MemoryGrowthCheck.Judge(
+                MemoryGrowthCheck.ManagedHeapMetric,
+                refreshSamples.Select(sample => sample.ManagedHeapBytes).ToArray(),
+                MemoryGrowthCheck.ManagedHeapMargin(open.ManagedHeapBytes),
+                MemoryGrowthCheck.ManagedHeapMarginRule);
+            MemoryGrowthCheck.MetricResult committed = MemoryGrowthCheck.Judge(
+                MemoryGrowthCheck.CommittedMetric,
+                refreshSamples.Select(sample => sample.CommittedBytes).ToArray(),
+                MemoryGrowthCheck.CommittedMargin(open.CommittedBytes),
+                MemoryGrowthCheck.CommittedMarginRule);
+            MemoryGrowthCheck.MetricResult privateBytes = JudgePrivate(
+                refreshSamples.Select(sample => sample.PrivateBytes).ToArray(), open.PrivateBytes);
+            MemoryGrowthCheck.MetricResult privateMinusCommitted = JudgeResidual(
+                refreshSamples.Select(sample => sample.PrivateMinusCommittedBytes).ToArray(), open.PrivateMinusCommittedBytes);
+            MemoryGrowthCheck.MetricResult[] metrics = [managed, committed, privateBytes, privateMinusCommitted];
+            string? warning = MemoryGrowthCheck.WarningText(metrics, mib);
+            string verdict = MemoryGrowthCheck.Summarize(metrics.Select(metric => metric.Verdict).ToArray());
             var report = new MemoryReport
             {
                 Timestamp = DateTimeOffset.Now,
@@ -99,21 +111,30 @@ public static class MemoryBenchmark
                 Layers = Layers,
                 Gc = Gc,
                 Filter = "threads 3, 7, and null; EntryFilter empty",
-                ManagedHeapMarginBytes = heapMargin,
-                ManagedHeapMarginRule = MemoryGrowthCheck.ManagedHeapMarginRule,
+                ManagedHeapMarginBytes = managed.MarginBytes ?? 0,
+                ManagedHeapMarginRule = managed.MarginRule,
+                CommittedMarginBytes = committed.MarginBytes ?? 0,
+                CommittedMarginRule = committed.MarginRule,
+                PrivateBytesMarginBytes = privateBytes.MarginBytes,
+                PrivateBytesMarginRule = privateBytes.MarginRule,
+                PrivateMinusCommittedMarginBytes = privateMinusCommitted.MarginBytes,
+                PrivateMinusCommittedMarginRule = privateMinusCommitted.MarginRule,
                 WorkingSetMarginBytes = workingSetMargin,
                 WorkingSetMarginRule = MemoryGrowthCheck.WorkingSetMarginRule,
-                ManagedHeapKeepsRising = heapRising,
-                WorkingSetKeepsRising = workingSetRising,
+                ManagedHeapVerdict = managed.Verdict,
+                CommittedVerdict = committed.Verdict,
+                PrivateBytesVerdict = privateBytes.Verdict,
+                PrivateMinusCommittedVerdict = privateMinusCommitted.Verdict,
+                Metrics = metrics.ToList(),
                 Warning = warning is not null,
                 WarningText = warning,
-                Verdict = MemoryGrowthCheck.Verdict(heapRising, workingSetRising, mib),
+                Verdict = verdict,
                 Samples = samples
             };
             File.WriteAllText(Path.Combine(folder, $"memory-{mib}MiB.json"), JsonSerializer.Serialize(report, JsonOptions));
-            Console.WriteLine(warning is null
-                ? $"{mib} MiB: {MemoryGrowthCheck.NoWarningVerdict}"
-                : "WARNING: " + warning);
+            Console.WriteLine(warning is null ? $"{mib} MiB: {verdict}" : "WARNING: " + warning);
+            foreach (MemoryGrowthCheck.MetricResult metric in metrics)
+                Console.WriteLine($"{mib} MiB {metric.Name}: {metric.Verdict}");
             GC.KeepAlive(retained);
             return 0;
         }
@@ -195,11 +216,39 @@ public static class MemoryBenchmark
         return new HighlightBuild(new HighlightIndex(spans), limited);
     }
 
+    private static MemoryGrowthCheck.MetricResult JudgePrivate(long?[] refreshValues, long? afterOpen)
+    {
+        if (afterOpen is not long open || refreshValues.Any(value => value is null))
+            return MemoryGrowthCheck.Insufficient(MemoryGrowthCheck.PrivateBytesMetric, MemoryGrowthCheck.PrivateBytesMarginRule);
+        return MemoryGrowthCheck.Judge(
+            MemoryGrowthCheck.PrivateBytesMetric,
+            refreshValues.Select(value => value!.Value).ToArray(),
+            MemoryGrowthCheck.PrivateBytesMargin(open),
+            MemoryGrowthCheck.PrivateBytesMarginRule);
+    }
+
+    private static MemoryGrowthCheck.MetricResult JudgeResidual(long?[] refreshValues, long? afterOpen)
+    {
+        if (afterOpen is not long open || refreshValues.Any(value => value is null))
+            return MemoryGrowthCheck.Insufficient(MemoryGrowthCheck.PrivateMinusCommittedMetric, MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
+        return MemoryGrowthCheck.Judge(
+            MemoryGrowthCheck.PrivateMinusCommittedMetric,
+            refreshValues.Select(value => value!.Value).ToArray(),
+            MemoryGrowthCheck.PrivateMinusCommittedMargin(open),
+            MemoryGrowthCheck.PrivateMinusCommittedMarginRule);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static MemorySample Sample(string phase, int? refresh, long elapsedMs, object rooted)
     {
         Collect();
         long managedHeap = GC.GetTotalMemory(false);
+        GCMemoryInfo info = GC.GetGCMemoryInfo();
+        long lohBytes = 0;
+        // Generation 3 is the large object heap. Generation 4, when present, is the pinned object heap.
+        ReadOnlySpan<GCGenerationInfo> generations = info.GenerationInfo;
+        if (generations.Length > 3)
+            lohBytes = generations[3].SizeAfterBytes;
         Process process = Process.GetCurrentProcess();
         process.Refresh();
         long? privateBytes = null;
@@ -212,6 +261,7 @@ public static class MemoryBenchmark
         {
             privateBytesAvailable = false;
         }
+        long? privateMinusCommitted = privateBytes is long privateValue ? privateValue - info.TotalCommittedBytes : null;
         GC.KeepAlive(rooted);
         return new MemorySample
         {
@@ -221,7 +271,11 @@ public static class MemoryBenchmark
             PeakWorkingSetBytes = process.PeakWorkingSet64,
             PrivateBytes = privateBytes,
             PrivateBytesAvailable = privateBytesAvailable,
+            PrivateMinusCommittedBytes = privateMinusCommitted,
             ManagedHeapBytes = managedHeap,
+            CommittedBytes = info.TotalCommittedBytes,
+            LohBytes = lohBytes,
+            FragmentedBytes = info.FragmentedBytes,
             ElapsedMs = elapsedMs
         };
     }
@@ -262,13 +316,17 @@ public static class MemoryBenchmark
         public long PeakWorkingSetBytes { get; init; }
         public long? PrivateBytes { get; init; }
         public bool PrivateBytesAvailable { get; init; }
+        public long? PrivateMinusCommittedBytes { get; init; }
         public long ManagedHeapBytes { get; init; }
+        public long CommittedBytes { get; init; }
+        public long LohBytes { get; init; }
+        public long FragmentedBytes { get; init; }
         public long ElapsedMs { get; init; }
     }
 
     private sealed class MemoryReport
     {
-        public int Schema { get; init; } = 1;
+        public int Schema { get; init; } = 2;
         public DateTimeOffset Timestamp { get; init; }
         public string Os { get; init; } = "";
         public string Runtime { get; init; } = "";
@@ -291,10 +349,19 @@ public static class MemoryBenchmark
         public string Filter { get; init; } = "";
         public long ManagedHeapMarginBytes { get; init; }
         public string ManagedHeapMarginRule { get; init; } = "";
+        public long CommittedMarginBytes { get; init; }
+        public string CommittedMarginRule { get; init; } = "";
+        public long? PrivateBytesMarginBytes { get; init; }
+        public string PrivateBytesMarginRule { get; init; } = "";
+        public long? PrivateMinusCommittedMarginBytes { get; init; }
+        public string PrivateMinusCommittedMarginRule { get; init; } = "";
         public long WorkingSetMarginBytes { get; init; }
         public string WorkingSetMarginRule { get; init; } = "";
-        public bool ManagedHeapKeepsRising { get; init; }
-        public bool WorkingSetKeepsRising { get; init; }
+        public string ManagedHeapVerdict { get; init; } = "";
+        public string CommittedVerdict { get; init; } = "";
+        public string PrivateBytesVerdict { get; init; } = "";
+        public string PrivateMinusCommittedVerdict { get; init; } = "";
+        public List<MemoryGrowthCheck.MetricResult> Metrics { get; init; } = [];
         public bool Warning { get; init; }
         public string? WarningText { get; init; }
         public string Verdict { get; init; } = "";

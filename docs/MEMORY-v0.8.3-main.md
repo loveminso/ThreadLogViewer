@@ -12,15 +12,21 @@
 - F5: 같은 파일을 `LogFileReader.ReadAsync`로 다시 읽고, `SourceLineRemap.Create`, `LogProjection.CreateFiltered`, 문서 복사, 강조를 다시 만든다. 이전 원문·투영·문서·강조 참조는 새 결과가 생긴 뒤에 놓는다.
 - 빼는 것: `MainWindow`, WPF 배치·렌더, dispatcher, 화면 입력.
 
-GC는 `GC.Collect`, `WaitForPendingFinalizers`, `GC.Collect`를 스레드 풀에서 실행한 뒤 `GC.GetTotalMemory(false)`를 읽는다. 작업 집합과 최대 작업 집합은 그 직후의 프로세스 값이다. private bytes는 `PrivateMemorySize64`가 되면 적고, 아니면 없다고 적는다. 최대 작업 집합은 프로세스 누적 `PeakWorkingSet64`라서 단계마다 초기화되지 않는다.
+이 숫자는 ThreadLogViewer.exe의 메모리가 아니다. 화면·배치·렌더와 앱이 따로 붙잡는 상태가 빠져 있어 실제 앱은 이보다 클 수 있다.
+
+GC는 `GC.Collect`, `WaitForPendingFinalizers`, `GC.Collect`를 스레드 풀에서 실행한 뒤 `GC.GetTotalMemory(false)`와 `GC.GetGCMemoryInfo`를 읽는다. 커밋은 `TotalCommittedBytes`, 조각화는 `FragmentedBytes`, LOH는 `GenerationInfo` 인덱스 3의 `SizeAfterBytes`다. 작업 집합과 최대 작업 집합은 그 직후의 프로세스 값이다. private bytes는 `PrivateMemorySize64`가 되면 적고, 아니면 없다고 적는다. 최대 작업 집합은 프로세스 누적 `PeakWorkingSet64`라서 단계마다 초기화되지 않는다.
 
 10/100/500 MiB는 F5 10회다. 1024 MiB는 한 번만 돌리고 F5는 3회다. 1 MiB는 1,048,576바이트다. 합성 파일은 CI의 임시 폴더에 만들고 그 크기가 끝나면 지운다. 원본 로그 자리에는 쓰지 않는다.
 
 ## 증가 확인
 
-F5 표본만 비교한다. 열기 표본과 필터 표본은 표에는 있지만 기울기에는 넣지 않는다. 표본이 3개보다 적으면 경고하지 않는다. 관리 힙 마진은 열기 직후 GC 뒤 관리 힙의 `값/50`과 32 MiB 중 큰 값이다. 작업 집합 마진은 열기 직후 GC 뒤 작업 집합의 `값/25`와 64 MiB 중 큰 값이다. 지표가 F5마다 직전보다 크고 마지막이 첫 F5보다 마진을 초과하면 `누수 의심, 원인 미확인`이다. 이 문장은 누수가 있다는 뜻이 아니다. 경고가 없어도 누수가 없다는 뜻이 아니다. 경고는 CI를 실패시키지 않는다.
+F5 표본만 기울기에 넣는다. 열기 표본과 필터 표본은 표에 남지만 기울기에는 넣지 않는다. F5 1회는 워밍업이고, 최소제곱 기울기는 F5 2회부터 마지막까지다. x는 1부터 세는 F5 번호다. 기울기에 `(횟수-1)`을 곱한 값이 마진보다 크면 그 지표는 `누수 의심, 원인 미확인`이다. F5가 4개보다 적으면 그 지표는 `판정 불가(표본 부족)`이고, `지속 증가 경고 없음`으로 적지 않는다. 1024 MiB는 F5가 3회라서 이 경우다.
+
+판정하는 지표는 GC 뒤 관리 힙, `GCMemoryInfo.TotalCommittedBytes`, private bytes, private bytes에서 GC 커밋을 뺀 값이다. 작업 집합, LOH(`GenerationInfo` 3번의 `SizeAfterBytes`), `FragmentedBytes`는 적기만 한다. 관리 힙과 GC 커밋의 마진은 열기 직후 그 값의 `값/50`과 32 MiB 중 큰 값이다. private bytes와 (private bytes − GC 커밋)의 마진은 열기 직후 그 값의 절댓값을 25로 나눈 값과 64 MiB 중 큰 값이다. `누수 의심, 원인 미확인`은 누수가 있다는 뜻이 아니다. 경고가 없어도 누수가 없다는 뜻이 아니다. 경고는 CI를 실패시키지 않는다.
 
 ## 결과
+
+아래 표의 경고 칸은 매 F5가 오르는지 보던 이전 규칙의 결과다. 기울기 판정의 숫자, run id, head는 그 규칙을 바꾼 뒤의 CI 실행으로 교체한다.
 
 숫자는 PR CI 실행 [39202580600](https://github.com/loveminso/ThreadLogViewer/actions/runs/39202580600)에서 왔다. 그 실행의 head는 `6a82949aad07f8eec17368dd02fae11663b4f74d`다. `memory-results.json`의 `GithubSha`는 `fa3ec7441c1042b6ebc2e46d44deda47536dfdae`이고, 이것은 그 head를 `f86af78da6ca16523a5c83889bd8af1e87e4c43c`에 합친 pull_request 병합 커밋이다. 아티팩트 `memory-results`는 [12164209447](https://github.com/loveminso/ThreadLogViewer/actions/runs/39202580600/artifacts/12164209447)이다.
 

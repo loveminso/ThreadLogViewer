@@ -120,38 +120,41 @@ try {
     $lines.Add('')
     $lines.Add("- Step elapsed: $elapsed ms")
     $lines.Add('')
-    $compact.Add('| MiB | File bytes | Refreshes | After open working set | After open peak | After open private | After open managed | Last F5 working set | Last F5 peak | Last F5 private | Last F5 managed | F5 managed delta | F5 working set delta | Warning |')
-    $compact.Add('| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |')
-    $detail.Add('| MiB | Phase | Refresh | Working set | Peak working set | Private bytes | Managed heap after GC | Elapsed ms |')
-    $detail.Add('| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |')
+    $lines.Add('Last F5 bytes. F5 #1 is warm-up. A slope verdict needs at least 4 F5 samples; 1024 MiB has 3, so its verdict is 판정 불가(표본 부족).')
+    $lines.Add('')
+    $compact.Add('| MiB | Working set | Private | Managed | Committed | LOH | Fragmented | Managed verdict | Committed verdict | Private verdict | Private minus committed verdict |')
+    $compact.Add('| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- |')
+    $detail.Add('| MiB | Phase | Refresh | Working set | Peak working set | Private bytes | Managed heap after GC | Committed | LOH | Fragmented | Elapsed ms |')
+    $detail.Add('| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |')
     foreach ($raw in $raws) {
         $report = $raw | ConvertFrom-Json
         $samples = @($report.Samples)
-        $open = @($samples | Where-Object { $_.Phase -eq 'afterOpen' }) | Select-Object -First 1
         $refreshSamples = @($samples | Where-Object { $_.Phase -eq 'afterRefresh' })
-        $first = $refreshSamples | Select-Object -First 1
         $last = $refreshSamples | Select-Object -Last 1
-        $heapDelta = if ($null -eq $first -or $null -eq $last) { 'n/a' } else { Format-Byte ([int64]$last.ManagedHeapBytes - [int64]$first.ManagedHeapBytes) }
-        $wsDelta = if ($null -eq $first -or $null -eq $last) { 'n/a' } else { Format-Byte ([int64]$last.WorkingSetBytes - [int64]$first.WorkingSetBytes) }
-        $warningCell = if ($report.Warning) { [string]$report.WarningText } else { 'no' }
         $lastWs = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.WorkingSetBytes }
-        $lastPeak = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.PeakWorkingSetBytes }
         $lastPrivate = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.PrivateBytes }
         $lastHeap = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.ManagedHeapBytes }
-        $compact.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} | {13} |' -f `
-            $report.RequestedMiB, (Format-Byte $report.FileBytes), $report.RefreshCount, `
-            (Format-Byte $open.WorkingSetBytes), (Format-Byte $open.PeakWorkingSetBytes), (Format-Byte $open.PrivateBytes), (Format-Byte $open.ManagedHeapBytes), `
-            $lastWs, $lastPeak, $lastPrivate, $lastHeap, $heapDelta, $wsDelta, $warningCell))
+        $lastCommitted = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.CommittedBytes }
+        $lastLoh = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.LohBytes }
+        $lastFragmented = if ($null -eq $last) { 'n/a' } else { Format-Byte $last.FragmentedBytes }
+        $compact.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} |' -f `
+            $report.RequestedMiB, $lastWs, $lastPrivate, $lastHeap, $lastCommitted, $lastLoh, $lastFragmented, `
+            $report.ManagedHeapVerdict, $report.CommittedVerdict, $report.PrivateBytesVerdict, $report.PrivateMinusCommittedVerdict))
+        Write-Host ("{0} MiB workingSet={1} private={2} managed={3} committed={4} loh={5} fragmented={6} managedVerdict={7} committedVerdict={8} privateVerdict={9} privateMinusCommittedVerdict={10}" -f `
+            $report.RequestedMiB, $lastWs, $lastPrivate, $lastHeap, $lastCommitted, $lastLoh, $lastFragmented, `
+            $report.ManagedHeapVerdict, $report.CommittedVerdict, $report.PrivateBytesVerdict, $report.PrivateMinusCommittedVerdict)
         foreach ($sample in $samples) {
             $refreshCell = if ($null -eq $sample.Refresh) { '' } else { [string]$sample.Refresh }
-            $detail.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |' -f `
+            $detail.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} |' -f `
                 $report.RequestedMiB, $sample.Phase, $refreshCell, `
                 (Format-Byte $sample.WorkingSetBytes), (Format-Byte $sample.PeakWorkingSetBytes), (Format-Byte $sample.PrivateBytes), `
-                (Format-Byte $sample.ManagedHeapBytes), (Format-Byte $sample.ElapsedMs)))
+                (Format-Byte $sample.ManagedHeapBytes), (Format-Byte $sample.CommittedBytes), (Format-Byte $sample.LohBytes), `
+                (Format-Byte $sample.FragmentedBytes), (Format-Byte $sample.ElapsedMs)))
         }
         $notes.Add("- $($report.RequestedMiB) MiB lines $($report.Lines), filtered lines $($report.FilteredLines), highlight spans $($report.HighlightSpans), limited $($report.HighlightLimited), elapsed $($report.ElapsedMs) ms, generate $($report.GenerateMs) ms")
         $notes.Add("- $($report.RequestedMiB) MiB verdict: $($report.Verdict)")
-        $notes.Add("- $($report.RequestedMiB) MiB margins: managed $($report.ManagedHeapMarginBytes) bytes ($($report.ManagedHeapMarginRule)); working set $($report.WorkingSetMarginBytes) bytes ($($report.WorkingSetMarginRule))")
+        $notes.Add("- $($report.RequestedMiB) MiB managed: $($report.ManagedHeapVerdict); committed: $($report.CommittedVerdict); private: $($report.PrivateBytesVerdict); private minus committed: $($report.PrivateMinusCommittedVerdict)")
+        $notes.Add("- $($report.RequestedMiB) MiB margins: managed $($report.ManagedHeapMarginBytes) bytes ($($report.ManagedHeapMarginRule)); committed $($report.CommittedMarginBytes) bytes ($($report.CommittedMarginRule)); private $($report.PrivateBytesMarginBytes) bytes ($($report.PrivateBytesMarginRule)); private minus committed $($report.PrivateMinusCommittedMarginBytes) bytes ($($report.PrivateMinusCommittedMarginRule))")
         if ($report.Warning) {
             $text = ([string]$report.WarningText) -replace "`r|`n", ' '
             Write-Host "::warning title=Memory growth::$text"
