@@ -52,12 +52,29 @@ public sealed class EncodingTests
     [Theory]
     [InlineData(new byte[] { 0xEF, 0xBB, 0xBF, 0xC3, 0xA9, 0x81 })]
     [InlineData(new byte[] { 0xEF, 0xBB, 0xBF, 0x80 })]
-    [InlineData(new byte[] { 0xFF, 0xFE, 0x41 })]
-    [InlineData(new byte[] { 0xFE, 0xFF, 0x00 })]
-    [InlineData(new byte[] { 0xFF, 0xFE, 0x00, 0xD8 })]
-    [InlineData(new byte[] { 0xFE, 0xFF, 0xD8, 0x00 })]
+    [InlineData(new byte[] { 0xFF, 0xFE, 0x00, 0xDC })]
+    [InlineData(new byte[] { 0xFE, 0xFF, 0xDC, 0x00 })]
     public void RecognizedBomWithMalformedPayloadNeverFallsBackToCp949(byte[] bytes) =>
         Assert.Throws<DecoderFallbackException>(() => LogFileReader.Decode(bytes));
+
+    [Theory]
+    [InlineData(new byte[] { 0xEF, 0xBB, 0xBF }, "UTF-8 (BOM 확인)", "")]
+    [InlineData(new byte[] { 0xEF, 0xBB, 0xBF, 0x41, 0xEA, 0xB0 }, "UTF-8 (BOM 확인) (끝의 미완성 문자 제외)", "A")]
+    [InlineData(new byte[] { 0xFF, 0xFE, 0x41 }, "UTF-16 LE (BOM 확인) (끝의 미완성 문자 제외)", "")]
+    [InlineData(new byte[] { 0xFE, 0xFF, 0x00 }, "UTF-16 BE (BOM 확인) (끝의 미완성 문자 제외)", "")]
+    [InlineData(new byte[] { 0xFF, 0xFE, 0x00, 0xD8 }, "UTF-16 LE (BOM 확인) (끝의 미완성 문자 제외)", "")]
+    [InlineData(new byte[] { 0xFE, 0xFF, 0xD8, 0x00 }, "UTF-16 BE (BOM 확인) (끝의 미완성 문자 제외)", "")]
+    [InlineData(new byte[] { 0xFF, 0xFE, 0x41, 0x00, 0x00, 0xD8 }, "UTF-16 LE (BOM 확인) (끝의 미완성 문자 제외)", "A")]
+    public void UnfinishedTailAfterBomIsDroppedWithoutReplacement(byte[] bytes, string description, string text)
+    {
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal(text, decoded.Text);
+        Assert.Equal(description, decoded.Description);
+        Assert.DoesNotContain('\uFFFD', decoded.Text);
+        Assert.DoesNotContain('\uFEFF', decoded.Text);
+        Assert.DoesNotContain("CP949", decoded.Description);
+        Assert.DoesNotContain(decoded.Text.Split('\n'), line => line.StartsWith('\uFEFF'));
+    }
 
     [Theory]
     [InlineData(new byte[] { 0xFF, 0xFE, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00 })]
@@ -143,6 +160,42 @@ public sealed class EncodingTests
         var decoded = LogFileReader.Decode(bytes);
         Assert.Equal(new string('x', 65536), decoded.Text);
         Assert.Equal("UTF-8로 해석 (BOM 없음; 추정) (끝의 미완성 문자 제외)", decoded.Description);
+    }
+
+    [Fact]
+    public void Utf8BomIncompleteTailAfterBlockBoundaryDoesNotDropTheBomTwice()
+    {
+        byte[] payload = new byte[65536 + 2];
+        Array.Fill(payload, (byte)'x');
+        payload[^2] = 0xEA;
+        payload[^1] = 0xB0;
+        byte[] bytes = new byte[payload.Length + 3];
+        bytes[0] = 0xEF;
+        bytes[1] = 0xBB;
+        bytes[2] = 0xBF;
+        payload.CopyTo(bytes, 3);
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal(new string('x', 65536), decoded.Text);
+        Assert.Equal("UTF-8 (BOM 확인) (끝의 미완성 문자 제외)", decoded.Description);
+        Assert.DoesNotContain('\uFEFF', decoded.Text);
+        Assert.DoesNotContain('\uFFFD', decoded.Text);
+    }
+
+    [Fact]
+    public void Utf8BomCharacterSplitAcrossBlockBoundaryStaysWhole()
+    {
+        const int prefix = 65535;
+        byte[] payload = new byte[prefix + 3];
+        Array.Fill(payload, (byte)'x', 0, prefix);
+        payload[prefix] = 0xEA;
+        payload[prefix + 1] = 0xB0;
+        payload[prefix + 2] = 0x80;
+        byte[] bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(payload).ToArray();
+        var decoded = LogFileReader.Decode(bytes);
+        Assert.Equal(new string('x', prefix) + "가", decoded.Text);
+        Assert.Equal("UTF-8 (BOM 확인)", decoded.Description);
+        Assert.DoesNotContain('\uFEFF', decoded.Text);
+        Assert.DoesNotContain('\uFFFD', decoded.Text);
     }
 
     [Theory]

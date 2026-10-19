@@ -220,6 +220,71 @@ public sealed class FileRefreshTests
     });
 
     [Fact]
+    public Task RefreshWhileUtf8BomFileIsOpenShowsAppendedLines() => InSta(async () =>
+    {
+        using var folder = new SyntheticFolder();
+        string path = Path.Combine(folder.Path, "synthetic-bom-f5.log");
+        var utf8 = new UTF8Encoding(false, true);
+        const string seed = "[000:00:01] [T1] synthetic keep 합성원문\n";
+        const string added = "[000:00:02] [T1] synthetic keep 똠방각하\n";
+        const string finished = "가나다 이어서\n";
+        byte[] character = utf8.GetBytes("가");
+        var window = new MainWindow(folder.Path, false);
+        await using var writer = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        try
+        {
+            await writer.WriteAsync(new byte[] { 0xEF, 0xBB, 0xBF }.Concat(utf8.GetBytes(seed)).ToArray());
+            await writer.FlushAsync();
+            Assert.True(await Open(window, path));
+            Assert.Equal(seed, Field<LogData>(window, "data").Text);
+            Assert.Contains("BOM 확인", Field<LogData>(window, "data").EncodingDescription);
+            Assert.DoesNotContain('\uFEFF', Field<LogData>(window, "data").Text);
+
+            byte[] addition = utf8.GetBytes(added);
+            await writer.WriteAsync(addition);
+            await writer.FlushAsync();
+            byte[] beforeRefresh = await ReadShared(path);
+            await Refresh(window);
+            var source = Field<LogData>(window, "data");
+            Assert.Equal(seed + added, source.Text);
+            Assert.Equal(seed + added, Control<TextEditor>(window, "Editor").Text);
+            Assert.Contains("파일 새로 고침 완료", Control<TextBlock>(window, "OperationStatus").Text);
+            Assert.DoesNotContain("파일 새로 고침 실패", Control<TextBlock>(window, "OperationStatus").Text);
+            Assert.DoesNotContain('\uFFFD', source.Text);
+            Assert.DoesNotContain('\uFEFF', source.Text);
+            Assert.Equal(beforeRefresh, await ReadShared(path));
+
+            await writer.WriteAsync(character.AsMemory(0, character.Length - 1));
+            await writer.FlushAsync();
+            await Refresh(window);
+            source = Field<LogData>(window, "data");
+            Assert.Equal(seed + added, source.Text);
+            Assert.Contains("끝의 미완성 문자 제외", source.EncodingDescription);
+            Assert.Contains("파일 새로 고침 완료", Control<TextBlock>(window, "OperationStatus").Text);
+            Assert.DoesNotContain('\uFFFD', source.Text);
+            Assert.DoesNotContain('\uFEFF', source.Text);
+
+            await writer.WriteAsync(character.AsMemory(character.Length - 1, 1));
+            await writer.WriteAsync(utf8.GetBytes("나다 이어서\n"));
+            await writer.FlushAsync();
+            byte[] finalBytes = await ReadShared(path);
+            await Refresh(window);
+            source = Field<LogData>(window, "data");
+            Assert.Equal(seed + added + finished, source.Text);
+            Assert.Equal(source.Text, Control<TextEditor>(window, "Editor").Text);
+            Assert.DoesNotContain("미완성", source.EncodingDescription);
+            Assert.Contains("파일 새로 고침 완료", Control<TextBlock>(window, "OperationStatus").Text);
+            Assert.DoesNotContain('\uFFFD', source.Text);
+            Assert.DoesNotContain(source.Text.Split('\n'), line => line.StartsWith('\uFEFF'));
+            Assert.Equal(1, source.Text.Split("합성원문").Length - 1);
+            Assert.Equal(1, source.Text.Split("똠방각하").Length - 1);
+            Assert.Equal(1, source.Text.Split("가나다 이어서").Length - 1);
+            Assert.Equal(finalBytes, await ReadShared(path));
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public Task ReadFailureKeepsSnapshotAndRefreshIsUnavailableForPastedAndScopedTabs() => InSta(async () =>
     {
         using var folder = new SyntheticFolder();
@@ -243,6 +308,20 @@ public sealed class FileRefreshTests
         }
         finally { window.Close(); }
     });
+
+    private static async Task<byte[]> ReadShared(string path)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var bytes = new byte[checked((int)stream.Length)];
+        int offset = 0;
+        while (offset < bytes.Length)
+        {
+            int count = await stream.ReadAsync(bytes.AsMemory(offset));
+            if (count == 0) throw new EndOfStreamException(path);
+            offset += count;
+        }
+        return bytes;
+    }
 
     private static Task Refresh(MainWindow window) => (Task)Invoke(window, "RefreshCurrentSessionAsync")!;
     private static Task<bool> Open(MainWindow window, string path, EncodingMode mode = EncodingMode.Auto) => (Task<bool>)Invoke(window, "OpenAsync", path, mode)!;

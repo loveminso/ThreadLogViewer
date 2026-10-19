@@ -10,9 +10,6 @@ namespace ThreadLogViewer.UiTests;
 [Collection(UiCollection.Name)]
 public sealed class UiScenarioTests(PublishedApp app)
 {
-    private const string BomTruncationSkip =
-        "Skipped: fix 4. UTF-8 with BOM still fails when a read snapshot ends in the middle of a character. LogFileReader.Decode treats EF BB BF as authoritative and decodes the payload with strict UTF-8, so an unfinished trailing scalar throws DecoderFallbackException and F5 shows '파일 새로 고침 실패'. BOM-less UTF-8 already drops that unfinished tail. This case stays skipped until fix 4; app behavior is unchanged.";
-
     [Fact]
     public void Scenario01_SelfContainedExeShowsMainWindow() =>
         Run(null, TimeSpan.FromMinutes(2), session =>
@@ -196,7 +193,7 @@ public sealed class UiScenarioTests(PublishedApp app)
         RefreshWhileAppending(LogEncodingKind.Cp949, pauseDuringRefresh: true);
     }
 
-    [Fact(Skip = BomTruncationSkip)]
+    [Fact]
     public void Scenario05_Utf8Bom_RefreshWhileAppending() =>
         RefreshWhileAppending(LogEncodingKind.Utf8Bom, pauseDuringRefresh: false);
 

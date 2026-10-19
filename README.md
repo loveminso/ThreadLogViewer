@@ -53,6 +53,8 @@ GitHub 실행 ZIP은 [Windows release](https://github.com/loveminso/ThreadLogVie
 
 v0.8.3 릴리스 검증·CI 수치·한계는 [v0.8.3 검증 기록](docs/VALIDATION-v0.8.3.md)을 따릅니다. 공개 실행본은 위의 최신 실행 ZIP에서 받습니다.
 
+**main(미출시)**: 쓰는 중인 로그를 F5로 새로 고침하면, 그 순간의 길이가 문자 중간이어도 UTF-8(BOM 있음·없음), UTF-16 LE/BE, CP949에서 미완성 문자만 빼고 이미 쓰인 줄을 읽습니다. 이어서 쓰인 한글 줄은 한 번만 나타나고, 줄 앞에 BOM 문자(U+FEFF)나 대체 문자(U+FFFD)를 넣지 않습니다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 실행하며 회차마다 15 통과 / 0 건너뜀 / 15 합계입니다.
+
 ## v0.8.2 — 공유 읽기·예외 안정화·UI 자동화
 
 - 다른 프로그램이 읽기 공유를 허용한 채 열거나 쓰고 있는 로그도 열 수 있습니다(FileShare.ReadWrite·Delete). 다른 프로그램이 파일을 독점으로 열었으면 열 수 없습니다. ([PR #2](https://github.com/loveminso/ThreadLogViewer/pull/2))

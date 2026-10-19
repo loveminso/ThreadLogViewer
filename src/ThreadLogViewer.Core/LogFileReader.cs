@@ -57,48 +57,127 @@ public static class LogFileReader
         CancellationToken cancellationToken = default, IProgress<WorkProgress>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        // F5 reads the whole snapshot again. The failure while a logger is still writing is not a
+        // stale decoder and not the BOM being added into the next offset. Each call builds a new
+        // decoder, and a BOM is skipped once as `start`. `DecodeInBlocks` then counts bytes from
+        // that start. The snapshot length is taken before the read, so the last character can be
+        // cut in half. A strict flush used to throw DecoderFallbackException there. UTF-8 without
+        // a BOM already dropped that unfinished tail; a recognized BOM returned before that drop,
+        // and CP949 / UTF-16 had no drop at all. Drop only an unfinished tail. A malformed byte
+        // that is not an unfinished character still fails, and a BOM payload never falls back to CP949.
         if (mode == EncodingMode.Cp949)
-            return (DecodeInBlocks(bytes, 0, Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), cancellationToken, progress),
-                "CP949 (사용자 지정; 자동 판별 아님)");
+            return DecodeAuthoritative(bytes, 0, StrictCp949(), SnapshotTail.Cp949, allowEmptyRemainder: false,
+                "CP949 (사용자 지정; 자동 판별 아님)", cancellationToken, progress);
         if (bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
-            return (DecodeInBlocks(bytes, 3, new UTF8Encoding(false, true), cancellationToken, progress), "UTF-8 (BOM 확인)");
+            return DecodeAuthoritative(bytes, 3, StrictUtf8(), SnapshotTail.Utf8, allowEmptyRemainder: true,
+                "UTF-8 (BOM 확인)", cancellationToken, progress);
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE, 0, 0 }) || bytes.AsSpan().StartsWith(new byte[] { 0, 0, 0xFE, 0xFF }))
             throw new InvalidDataException("UTF-32는 지원하지 않습니다.");
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE }))
-            return (DecodeInBlocks(bytes, 2, new UnicodeEncoding(false, true, true), cancellationToken, progress), "UTF-16 LE (BOM 확인)");
+            return DecodeAuthoritative(bytes, 2, new UnicodeEncoding(false, true, true), SnapshotTail.Utf16Le, allowEmptyRemainder: true,
+                "UTF-16 LE (BOM 확인)", cancellationToken, progress);
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF }))
-            return (DecodeInBlocks(bytes, 2, new UnicodeEncoding(true, true, true), cancellationToken, progress), "UTF-16 BE (BOM 확인)");
+            return DecodeAuthoritative(bytes, 2, new UnicodeEncoding(true, true, true), SnapshotTail.Utf16Be, allowEmptyRemainder: true,
+                "UTF-16 BE (BOM 확인)", cancellationToken, progress);
         const string utf8Estimated = "UTF-8로 해석 (BOM 없음; 추정)";
-        try { return (DecodeInBlocks(bytes, 0, new UTF8Encoding(false, true), cancellationToken, progress), utf8Estimated); }
+        try
+        {
+            return DecodeAuthoritative(bytes, 0, StrictUtf8(), SnapshotTail.Utf8, allowEmptyRemainder: true,
+                utf8Estimated, cancellationToken, progress);
+        }
         catch (DecoderFallbackException)
         {
-            // A file still being written can end in the middle of one UTF-8 scalar (1–3 bytes).
-            // Drop only that unfinished tail when it is the sole strict UTF-8 failure. Do not
-            // rewind to a newline, and leave every other failure on the CP949 fallback below.
-            // A recognized BOM is authoritative and its malformed payload never reaches this fallback.
-            int tail = IncompleteUtf8TailLength(bytes);
-            if (tail > 0)
-            {
-                try
-                {
-                    return (DecodeInBlocks(bytes, 0, new UTF8Encoding(false, true), cancellationToken, progress, bytes.Length - tail),
-                        utf8Estimated + " (끝의 미완성 문자 제외)");
-                }
-                catch (DecoderFallbackException)
-                {
-                    // The tail was not the only problem.
-                }
-            }
             try
             {
-                return (DecodeInBlocks(bytes, 0, Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback), cancellationToken, progress),
-                    "CP949로 해석 (UTF-8 실패 후 대체; 추정)");
+                return DecodeAuthoritative(bytes, 0, StrictCp949(), SnapshotTail.Cp949, allowEmptyRemainder: false,
+                    "CP949로 해석 (UTF-8 실패 후 대체; 추정)", cancellationToken, progress);
             }
             catch (DecoderFallbackException ex)
             {
                 throw new InvalidDataException("BOM이 없고 UTF-8과 CP949 모두로 올바르게 읽을 수 없습니다.", ex);
             }
         }
+    }
+
+    private enum SnapshotTail { Utf8, Utf16Le, Utf16Be, Cp949 }
+
+    private const string UnfinishedTailSuffix = " (끝의 미완성 문자 제외)";
+
+    private static Encoding StrictUtf8() => new UTF8Encoding(false, true);
+
+    private static Encoding StrictCp949() =>
+        Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+
+    // `start` is the first payload byte (after a BOM). `length` passed to DecodeInBlocks is a count
+    // from `start`, so the BOM width is not subtracted again when the unfinished tail is removed.
+    private static (string Text, string Description) DecodeAuthoritative(byte[] bytes, int start, Encoding encoding,
+        SnapshotTail tailKind, bool allowEmptyRemainder, string description, CancellationToken token, IProgress<WorkProgress>? progress)
+    {
+        int payload = bytes.Length - start;
+        try
+        {
+            return (DecodeInBlocks(bytes, start, encoding, token, progress, payload), description);
+        }
+        catch (DecoderFallbackException)
+        {
+            int tail = UnfinishedTailLength(bytes.AsSpan(start, payload), tailKind);
+            if (tail > 0 && tail <= payload && (allowEmptyRemainder || tail < payload))
+            {
+                try
+                {
+                    return (DecodeInBlocks(bytes, start, encoding, token, progress, payload - tail), description + UnfinishedTailSuffix);
+                }
+                catch (DecoderFallbackException)
+                {
+                    // The unfinished tail was not the only strict failure.
+                }
+            }
+            throw;
+        }
+    }
+
+    private static int UnfinishedTailLength(ReadOnlySpan<byte> payload, SnapshotTail kind) => kind switch
+    {
+        SnapshotTail.Utf8 => IncompleteUtf8TailLength(payload),
+        SnapshotTail.Utf16Le => IncompleteUtf16TailLength(payload, bigEndian: false),
+        SnapshotTail.Utf16Be => IncompleteUtf16TailLength(payload, bigEndian: true),
+        SnapshotTail.Cp949 => IncompleteCp949TailLength(payload),
+        _ => 0
+    };
+
+    // A trailing odd byte is an unfinished code unit. A trailing high surrogate is an unfinished
+    // pair. A lone low surrogate is malformed and stays 0 so the strict decoder still rejects it.
+    private static int IncompleteUtf16TailLength(ReadOnlySpan<byte> payload, bool bigEndian)
+    {
+        if (payload.Length == 0) return 0;
+        int end = payload.Length;
+        int tail = 0;
+        if ((end & 1) == 1)
+        {
+            tail = 1;
+            end--;
+        }
+        if (end >= 2 && IsHighSurrogate(payload, end - 2, bigEndian))
+            tail += 2;
+        return tail;
+    }
+
+    private static bool IsHighSurrogate(ReadOnlySpan<byte> payload, int index, bool bigEndian)
+    {
+        int unit = bigEndian
+            ? (payload[index] << 8) | payload[index + 1]
+            : payload[index] | (payload[index + 1] << 8);
+        return unit is >= 0xD800 and <= 0xDBFF;
+    }
+
+    // CP949 lead bytes are 0x81–0xFE. 0x80 and 0xFF are complete single-byte characters.
+    // A lead without its trail is unfinished. The caller still decodes the prefix strictly,
+    // so dropping this byte cannot hide an earlier invalid pair.
+    private static int IncompleteCp949TailLength(ReadOnlySpan<byte> payload)
+    {
+        if (payload.Length == 0) return 0;
+        byte last = payload[^1];
+        return last is >= 0x81 and <= 0xFE ? 1 : 0;
     }
 
     // 0 when the bytes are well-formed or the first problem is not a 1–3 byte incomplete scalar at EOF.
@@ -180,8 +259,9 @@ public static class LogFileReader
         }
         finally { ArrayPool<char>.Shared.Return(scratch); }
         token.ThrowIfCancellationRequested();
-        // Allocate the immutable decoded string once. Stateful decoders retain split multi-byte
-        // sequences across blocks, and both passes observe cancellation at every block.
+        // Allocate the immutable decoded string once. Each pass calls GetDecoder, so an earlier
+        // snapshot cannot leave a partial character behind. Inside one pass the decoder keeps a
+        // character split across the 64 KiB block boundary. Both passes observe cancellation at every block.
         return string.Create(characters, (bytes, start, length, encoding, token, progress), static (output, state) =>
         {
             var decoder = state.encoding.GetDecoder();
