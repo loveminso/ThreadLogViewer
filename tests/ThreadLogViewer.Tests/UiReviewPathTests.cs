@@ -1,3 +1,4 @@
+using System.IO;
 using ThreadLogViewer.UiTests;
 using Xunit;
 
