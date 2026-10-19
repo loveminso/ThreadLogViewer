@@ -156,7 +156,7 @@ jobs:
             ''
             '아래 내용은 이 Windows release 실행이 측정한 결과가 아닙니다. 버전을 올리기 전 PR CI에서 확인한 화면 검증입니다.'
             ''
-            '- PR CI: FlaUI UI 테스트 3회 각 15 통과 / 0 건너뜀 / 15 합계, 합성 화면 갤러리·경고만 UI 린트 포함.'
+            '- PR CI: FlaUI UI 테스트 3회 각 16 통과 / 0 건너뜀 / 16 합계, 합성 화면 갤러리·경고만 UI 린트 포함.'
             ''
             "전체 설명: https://github.com/$env:GITHUB_REPOSITORY/blob/$env:GITHUB_SHA/README.md"
           )

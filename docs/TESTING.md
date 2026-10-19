@@ -29,9 +29,9 @@ CI는 게시 폴더를 임시 복사본으로 띄운다. 복사본으로 실행�
 
 ## UI 리뷰 갤러리와 린트
 
-UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 15, 건너뜀 0, 전체 15, 실패 0과 `$required`는 그대로다. 건너뛰는 UI 테스트는 없다.
+UI 테스트 세 회차 다음에 같은 잡이 `tests/ThreadLogViewer.UiTests` 실행 파일을 `--ui-review <게시 exe> <출력 폴더>`로 한 번 실행한다. 이것은 xUnit `[Fact]`가 아니다. `dotnet test`는 `Program.Main`을 호출하지 않는다. 통과 16, 건너뜀 0, 전체 16, 실패 0과 `$required`는 그대로다. 건너뛰는 UI 테스트는 없다.
 
-갤러리는 임시 폴더의 합성 로그만 연다. 상태는 빈 시작, 연 로그, 검색 결과, 적용된 필터, 주변 로그, 강조 문구 관리, 강조 준비 실패 안내, 파일 메뉴, 단축키 도움말이다. 각 상태를 1024×768과 1920×1080, 배율 100%와 150%, 다크와 라이트로 찍는다. 앱에 두 테마가 이미 있으므로 테마를 추가하지 않는다. 기대 파일 수는 9×2×2×2인 72다.
+갤러리는 임시 폴더의 합성 로그만 연다. 상태는 빈 시작, 연 로그, 줄 우클릭 메뉴, 검색 결과, 적용된 필터, 주변 로그, 강조 문구 관리, 강조 준비 실패 안내, 파일 메뉴, 단축키 도움말이다. 각 상태를 1024×768과 1920×1080, 배율 100%와 150%, 다크와 라이트로 찍는다. 앱에 두 테마가 이미 있으므로 테마를 추가하지 않는다. 기대 파일 수는 10×2×2×2인 80다.
 
 각 화면을 찍기 전에 포인터를 제목 표시줄처럼 컨트롤이 없는 곳에 두고 약 300ms 기다린다. 열린 도구 설명이 있으면 다른 지점으로 옮겨 닫고 다시 확인한다. 그래도 남으면 리뷰 단계가 실패한다. 린트 문구의 `%TEMP%\tlv-ui-review-*` 접두사, 사용자 프로필(`X:\Users\<이름>`과 그 아래 `AppData`), 러너 작업 폴더(`X:\a\`) 접두사는 `<temp>`로 바꾼다. `ui-lint.json`, `ui-lint.md`, `index.md`, `index.html`에 실행 계정이나 러너 작업 경로가 남으면 그 단계가 실패한다.
 
@@ -51,7 +51,7 @@ CI는 Windows 세션 DPI를 바꾸지 않는다. 150%는 뷰어 프로세스에�
 
 ## 실제 화면과 성능
 
-`Scenario01`~`Scenario14`가 기능 표의 GUI와 작은 화면의 강조·도움말 창을 판정한다. `Scenario01_SelfContainedExeShowsMainWindow`는 파일이 없을 때 창 제목이 `ThreadLog Viewer v0.8.3`인지 확인하고, `Scenario02_OpenDropFilterAndExport`는 연 파일의 제목이 `opened-first.log — ThreadLog Viewer v0.8.3`(끌어 놓은 뒤에는 `dropped-beta.log — ThreadLog Viewer v0.8.3`)인지 확인한다. 세 회차 모두 통과 15, 건너뜀 0, 전체 15, 실패 0이다. `Scenario14_HighlightAndHelpWindowsFitWorkArea`는 메인 창을 1024×768과 그 모니터 작업 영역 중 더 작은 쪽에 둔 뒤 강조 문구 관리와 단축키 도움말이 작업 영역 안에 있고, `적용`·`취소`·`확인`이 화면 안에 있으며 오프스크린이 아닌지 본다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그의 F5를 판정한다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
+`Scenario01`~`Scenario15`가 기능 표의 GUI와 작은 화면의 강조·도움말 창을 판정한다. `Scenario01_SelfContainedExeShowsMainWindow`는 파일이 없을 때 창 제목이 `ThreadLog Viewer v0.8.3`인지 확인하고, `Scenario02_OpenDropFilterAndExport`는 연 파일의 제목이 `opened-first.log — ThreadLog Viewer v0.8.3`(끌어 놓은 뒤에는 `dropped-beta.log — ThreadLog Viewer v0.8.3`)인지 확인한다. 세 회차 모두 통과 16, 건너뜀 0, 전체 16, 실패 0이다. `Scenario15_ThreadOnlyViewSurvivesRefresh`는 줄 우클릭의 이 스레드만 보기, 스레드 필터 해제, F5 유지, 모든 필터 해제를 판정한다. `Scenario14_HighlightAndHelpWindowsFitWorkArea`는 메인 창을 1024×768과 그 모니터 작업 영역 중 더 작은 쪽에 둔 뒤 강조 문구 관리와 단축키 도움말이 작업 영역 안에 있고, `적용`·`취소`·`확인`이 화면 안에 있으며 오프스크린이 아닌지 본다. `Scenario05_Utf8Bom_RefreshWhileAppending`은 쓰는 중인 UTF-8 BOM 로그의 F5를 판정한다. `Scenario07_JumpToOriginalLine`은 원본 줄 이동, `Scenario08_PositionAndSelectionInfo`는 위치·선택 정보, `Scenario09_ValidHighlightRuleHighlightsPhrase`는 올바른 문구 강조, `Scenario10_SurroundingLogKeepsFilterOnReturn`은 주변 로그, `Scenario11_FilterKeepsOrMovesPosition`은 필터 후 위치, `Scenario12_SettingsPersistAfterRestart`는 설정 저장, `Scenario13_TimeDifferenceBetweenRecords`는 두 기록 시간 차이를 판정한다. 수동으로 남기는 것은 SmartScreen만 해당한다. 알려진 한계: CI의 끌어 놓기는 실제 Explorer 창이 아니라 테스트 프로세스의 OLE 드래그 소스를 쓴다(위 절). 실제 로그는 테스트·샘플·문서에 넣지 않으며 `local-data` 안에서만 관리한다.
 
 빌드 경고·오류, 자동 테스트 수, 실제 GUI 조작, 측정 범위가 있는 성능, 배포 파일·버전·해시를 각각 기록한다. 자동 테스트 실행 시간은 앱의 마우스·스크롤 반응 속도로 해석하지 않는다. 성능을 측정한다면 새 합성 자료와 새 출력 경로를 사용하고 기존 파일을 보존한다.
 

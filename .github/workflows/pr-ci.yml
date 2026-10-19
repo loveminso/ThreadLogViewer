@@ -22,9 +22,9 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
       DOTNET_NOLOGO: '1'
       # Expected per-iteration UI test TRX counters (update when scenarios are added or un-skipped).
-      UI_TEST_EXPECTED_PASSED: '15'
+      UI_TEST_EXPECTED_PASSED: '16'
       UI_TEST_EXPECTED_SKIPPED: '0'
-      UI_TEST_EXPECTED_TOTAL: '15'
+      UI_TEST_EXPECTED_TOTAL: '16'
       UI_TEST_EXPECTED_FAILED: '0'
     defaults:
       run:
@@ -109,7 +109,8 @@ jobs:
             'Scenario11_FilterKeepsOrMovesPosition',
             'Scenario12_SettingsPersistAfterRestart',
             'Scenario13_TimeDifferenceBetweenRecords',
-            'Scenario14_HighlightAndHelpWindowsFitWorkArea'
+            'Scenario14_HighlightAndHelpWindowsFitWorkArea',
+            'Scenario15_ThreadOnlyViewSurvivesRefresh'
           )
           $iterationFailures = New-Object System.Collections.Generic.List[string]
           foreach ($iteration in 1..3) {

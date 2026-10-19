@@ -13,7 +13,8 @@
 - 끌어다 놓기는 CI에서 테스트 프로그램으로 검증하며, 실제 Explorer 창에서 끌어 오는 경우는 검증하지 않습니다.
 - 설정 읽기·저장 실패 경로, 필터 작업 중 위치 이동, 검색 옵션 일부는 UI 자동 테스트가 없습니다.
 
-**main(미출시)**: 쓰는 중인 로그의 F5는 UTF-8(BOM 있음·없음), UTF-16 LE/BE, CP949에서 스냅샷 끝의 미완성 문자만 빼고 이미 쓰인 줄을 읽습니다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 실행하며 회차마다 15 통과 / 0 건너뜀 / 15 합계입니다.
+**main(미출시)**: 쓰는 중인 로그의 F5는 UTF-8(BOM 있음·없음), UTF-16 LE/BE, CP949에서 스냅샷 끝의 미완성 문자만 빼고 이미 쓰인 줄을 읽습니다. `Scenario05_Utf8Bom_RefreshWhileAppending`을 실행하며 회차마다 16 통과 / 0 건너뜀 / 16 합계입니다.
+- 줄 우클릭 `이 스레드만 보기(스레드 ID)`와 `스레드 필터 해제`는 기존 스레드 체크의 `SetThreadsAsync`를 쓴다. 연속 본문은 소유 헤더의 ID를 쓰고, ID가 없는 줄에서는 항목이 꺼진다. 일부만 선택되면 `FilterSummary`에 `스레드 n개 선택`을 붙인다. F5와 이어 붙은 줄에도 그 선택이 남는다. UI는 `Scenario15_ThreadOnlyViewSurvivesRefresh`이고, 화면 갤러리는 줄 우클릭 메뉴를 포함해 80장이다.
 - 다음 릴리스 PR: `.github/workflows/windows-release.yml`에서 `다른 프로그램이 쓰고 있는 UTF-8 BOM 로그에서 F5 새로 고침이 실패할 수 있습니다. CI는 해당 시나리오를 건너뜁니다.` 문장을 삭제하고, `CP949 로그는 F5를 누르는 순간 다른 프로그램이 쓰고 있는 경우가 검증되지 않았습니다.` 문장을 다시 쓰며, 새 VALIDATION 파일을 작성한다.
 - 창 제목 버전 자동화는 PM 결정에 따라 PR #17에서 처리했다.
 
