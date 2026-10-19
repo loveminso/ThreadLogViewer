@@ -12,6 +12,8 @@ public sealed record UiSettings
     public bool ResultsCollapsed { get; init; }
     public bool ThreadBackgrounds { get; init; } = true;
     public bool LargeLinePreview { get; init; } = true;
+    /// <summary>Last content-filter expander choice. Missing on older schema 1 files, which stay collapsed.</summary>
+    public bool ContentFilterExpanded { get; init; }
     public static UiSettings Default { get; } = new();
 
     public UiSettings Normalize() => this with

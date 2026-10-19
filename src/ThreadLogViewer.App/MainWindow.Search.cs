@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using ICSharpCode.AvalonEdit.Rendering;
 using ThreadLogViewer.Core;
 
@@ -13,6 +14,8 @@ public partial class MainWindow
     private IReadOnlyList<SourceTextRange>? fixedSearchRanges;
     private bool selectingResult;
     private LocatedSearchHit? lastSearchLocation;
+    // Counts Editor.Focus calls from result navigation. Selection in the list must not increment it.
+    private int editorFocusRequests;
     private sealed record ResultRow(LogData Source, LocatedSearchHit Hit, bool Hidden)
     {
         public string Label
@@ -134,16 +137,37 @@ public partial class MainWindow
         if (selectingResult || ResultsList.SelectedItem is not ResultRow row || row.Source != data) return;
         searchIndex = ResultsList.SelectedIndex;
         lastSearchLocation = row.Hit;
-        await NavigateHitAsync(row.Hit);
+        await NavigateHitAsync(row.Hit, focusEditor: false);
     });
-    private async Task NavigateHitAsync(LocatedSearchHit hit)
+    private void ResultsList_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None) return;
+        if (ResultsList.SelectedItem is not ResultRow) return;
+        e.Handled = true;
+        FocusEditor();
+    }
+    private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ResultRowFrom(e.OriginalSource as DependencyObject) is null) return;
+        FocusEditor();
+    }
+    private static ResultRow? ResultRowFrom(DependencyObject? node)
+    {
+        while (node is not null)
+        {
+            if (node is ListBoxItem item && item.DataContext is ResultRow row) return row;
+            node = node is Visual visual ? VisualTreeHelper.GetParent(visual) ?? LogicalTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+        }
+        return null;
+    }
+    private async Task NavigateHitAsync(LocatedSearchHit hit, bool focusEditor = true)
     {
         if (ActiveScope is { } scope && !scope.Contains(hit.SourceLineIndex)) return;
         using var navigation = BeginNavigation();
         var source = data;
         if (projection?.FindDisplayLine(hit.SourceLineIndex + 1) is null && !await ShowContextAsync(hit.SourceLineIndex)) return;
         if (source != data || projection is null) return;
-        if (hit.Length == 0) { NavigateVisible(hit.SourceLineIndex, hit.SourceColumn); return; }
+        if (hit.Length == 0) { NavigateVisible(hit.SourceLineIndex, hit.SourceColumn, focusEditor: focusEditor); return; }
         if (projection.GetDisplayOffset(hit.SourceOffset) is not { } offset) return;
         Editor.Select(offset, Math.Min(hit.Length, Editor.Document.TextLength - offset));
         if (Editor.SelectionStart != offset || Editor.SelectionLength != hit.Length)
@@ -152,7 +176,13 @@ public partial class MainWindow
             SearchScopeStatus.Text += " · 개행 선택은 편집기 경계";
         }
         var location = Editor.Document.GetLocation(offset);
-        Editor.ScrollTo(location.Line, location.Column); Editor.Focus();
+        Editor.ScrollTo(location.Line, location.Column);
+        if (focusEditor) FocusEditor();
+    }
+    private void FocusEditor()
+    {
+        editorFocusRequests++;
+        Editor.Focus();
     }
     private void Previous_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateSearchAsync(true));
     private void Next_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(() => NavigateSearchAsync(false));

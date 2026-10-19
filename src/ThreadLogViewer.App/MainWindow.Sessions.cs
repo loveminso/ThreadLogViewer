@@ -164,6 +164,7 @@ public partial class MainWindow
             SearchBox.Clear(); SearchCaseBox.IsChecked = SearchWordBox.IsChecked = SearchRegexBox.IsChecked = false;
             SearchScopeBox.SelectedIndex = 0;
             SearchBar.Visibility = ResultsPanel.Visibility = GoToPanel.Visibility = Visibility.Collapsed;
+            if (replace is null) ContentFilterExpander.IsExpanded = contentFilterExpandedPreference;
             ContextInputStatus.Text = "로그를 클릭한 뒤 주변 보기를 누르세요. 기록은 헤더와 그 아래 본문을 묶은 단위입니다.";
             threadItems = LogSlice.GetThreadSummaries(source, scope).Select(t => new ThreadItem(t, theme)).ToList();
             foreach (var item in threadItems) item.PropertyChanged += Thread_Changed;

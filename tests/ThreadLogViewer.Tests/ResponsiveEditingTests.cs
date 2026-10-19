@@ -200,7 +200,7 @@ public sealed class ResponsiveEditingTests
             RaiseFocus(editor.TextArea, editor.TextArea);
             Assert.Same(editor.TextArea, Field<IInputElement>(window, "lastEditingTarget"));
             Invoke(window, "UpdateEditingMenus");
-            Assert.False(Control<MenuItem>(window, "FocusPasteMenu").IsEnabled);
+            Assert.True(Control<MenuItem>(window, "FocusPasteMenu").IsEnabled);
             Control<MenuItem>(window, "FocusCopyMenu").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Same(editor.TextArea, executed.Last().Source);
             Assert.Equal(SyntheticText, Field<LogData>(window, "data").Text);

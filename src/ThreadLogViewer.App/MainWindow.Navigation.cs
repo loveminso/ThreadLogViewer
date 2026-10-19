@@ -98,7 +98,7 @@ public partial class MainWindow
     }
     private int? hiddenTargetLine;
     private void HiddenContext_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () => { if (hiddenTargetLine is { } line) await ShowContextAsync(line); });
-    private bool NavigateVisible(int sourceLineIndex, int column = 1, int length = 0)
+    private bool NavigateVisible(int sourceLineIndex, int column = 1, int length = 0, bool focusEditor = true)
     {
         int? line = projection?.FindDisplayLine(sourceLineIndex + 1);
         if (line is null) return false;
@@ -106,7 +106,8 @@ public partial class MainWindow
         var row = Editor.Document.GetLineByNumber(line.Value);
         int offset = row.Offset + Math.Clamp(column - 1, 0, row.Length);
         Editor.Select(offset, Math.Clamp(length, 0, Editor.Document.TextLength - offset));
-        Editor.ScrollTo(line.Value, column); Editor.Focus();
+        Editor.ScrollTo(line.Value, column);
+        if (focusEditor) FocusEditor();
         return true;
     }
     private async Task NavigateOriginalAsync(int sourceLine, int column = 1, int length = 0)
@@ -124,6 +125,17 @@ public partial class MainWindow
         if (data is null) { FilterDirtyStatus.Text = "로그를 연 뒤 필터를 적용하세요."; return; }
         await FilterAsync(ReadDraftFilter());
     });
+    private void FilterCriteria_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!TryApplyFilterShortcut(e.Key, Keyboard.Modifiers)) return;
+        e.Handled = true;
+    }
+    private bool TryApplyFilterShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (modifiers != ModifierKeys.Control || (key != Key.Enter && key != Key.Return)) return false;
+        ApplyTextFilter_Click(this, new RoutedEventArgs());
+        return true;
+    }
     private static string[] Conditions(string text) => text.Split(["\r\n", "\n", "\r"], StringSplitOptions.None).Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
     private void ResetTextFilter_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
     {
