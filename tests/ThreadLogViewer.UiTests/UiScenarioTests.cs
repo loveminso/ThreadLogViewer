@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using FlaUI.Core.AutomationElements;
@@ -14,7 +15,7 @@ public sealed class UiScenarioTests(PublishedApp app)
     public void Scenario01_SelfContainedExeShowsMainWindow() =>
         Run(null, TimeSpan.FromMinutes(2), session =>
         {
-            Assert.Equal("ThreadLog Viewer v0.8.3", session.Window.Title);
+            Assert.Equal(ExpectedAppTitle(session), session.Window.Title);
             Assert.False(session.App.HasExited);
             string exeDirectory = Path.GetDirectoryName(session.ExePath)!;
             Assert.True(File.Exists(Path.Combine(exeDirectory, "coreclr.dll")), "Self-contained publish is missing coreclr.dll.");
@@ -47,7 +48,8 @@ public sealed class UiScenarioTests(PublishedApp app)
         Run(opened, TimeSpan.FromMinutes(3), session =>
         {
             session.WaitForOpen("opened-first.log");
-            Assert.Equal("opened-first.log \u2014 ThreadLog Viewer v0.8.3", session.Window.Title);
+            string appTitle = ExpectedAppTitle(session);
+            Assert.Equal("opened-first.log \u2014 " + appTitle, session.Window.Title);
             session.DropFile(dropped);
             session.WaitUntil(
                 () => session.Text("FileLabel").Contains("dropped-beta.log", StringComparison.Ordinal) &&
@@ -57,7 +59,7 @@ public sealed class UiScenarioTests(PublishedApp app)
                 "dropped log did not become the active tab");
             Assert.True(session.Window.FindFirstDescendant(cf => cf.ByName("opened-first.log")) is not null,
                 "the command-line log tab is gone after the drop");
-            Assert.Equal("dropped-beta.log \u2014 ThreadLog Viewer v0.8.3", session.Window.Title);
+            Assert.Equal("dropped-beta.log \u2014 " + appTitle, session.Window.Title);
             session.ApplyIncludeFilter(SyntheticLog.KeepToken);
             Assert.Contains("1/", session.Text("CountStatus"), StringComparison.Ordinal);
             session.ExportTo(destination);
@@ -304,6 +306,12 @@ public sealed class UiScenarioTests(PublishedApp app)
             value => value.Contains('개') && !value.Contains("결과 없음", StringComparison.Ordinal),
             "hits for " + query);
         Assert.DoesNotContain("결과 없음", status, StringComparison.Ordinal);
+    }
+
+    private static string ExpectedAppTitle(UiSession session)
+    {
+        var info = FileVersionInfo.GetVersionInfo(session.ExePath);
+        return $"ThreadLog Viewer v{info.FileMajorPart}.{info.FileMinorPart}.{info.FileBuildPart}";
     }
 
     private void Run(string? argument, TimeSpan timeout, Action<UiSession> body, [System.Runtime.CompilerServices.CallerMemberName] string name = "")

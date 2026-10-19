@@ -49,6 +49,7 @@ foreach ($name in @('ThreadLogViewer.exe', 'ThreadLogViewer.dll')) {
 # The window title is built at run time from AssemblyName.Version (major.minor.build).
 # That value comes from Directory.Build.props Version. Revision and an InformationalVersion +sha are not shown,
 # so the full "ThreadLog Viewer v$version" literal is not required in the DLL. A leftover hardcoded UTF-16 title must still match.
+# User strings can start on either byte alignment, so both offsets are decoded.
 $dllPath = Join-Path $publishRoot 'ThreadLogViewer.dll'
 $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($dllPath).Version
 if ($null -eq $assemblyVersion -or $assemblyVersion.Build -lt 0) {
@@ -64,13 +65,19 @@ $productCore = ($productVersion -split '\+', 2)[0]
 if ($productCore -ne $version -and $productCore -ne $expectedVersion) {
     throw "ThreadLogViewer.dll informational version '$productVersion' does not match Directory.Build.props $version."
 }
-$decoded = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($dllPath))
+$dllBytes = [IO.File]::ReadAllBytes($dllPath)
 $embeddedTitleCount = 0
-foreach ($match in [regex]::Matches($decoded, 'ThreadLog Viewer v\d+\.\d+\.\d+')) {
-    if ($match.Value -ne $expectedLiteral) {
-        throw "Embedded window title '$($match.Value)' does not match '$expectedLiteral'."
+foreach ($offset in 0, 1) {
+    $length = $dllBytes.Length - $offset
+    if ($length -lt 2) { continue }
+    if (($length % 2) -eq 1) { $length-- }
+    $decoded = [Text.Encoding]::Unicode.GetString($dllBytes, $offset, $length)
+    foreach ($match in [regex]::Matches($decoded, 'ThreadLog Viewer v\d+\.\d+\.\d+')) {
+        if ($match.Value -ne $expectedLiteral) {
+            throw "Embedded window title '$($match.Value)' does not match '$expectedLiteral'."
+        }
+        $embeddedTitleCount++
     }
-    $embeddedTitleCount++
 }
 $exe = [IO.File]::ReadAllBytes((Join-Path $publishRoot 'ThreadLogViewer.exe'))
 $pe = [BitConverter]::ToInt32($exe, 0x3c)

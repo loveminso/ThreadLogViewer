@@ -23,20 +23,20 @@ public sealed class WindowTitleTests
         Version? version = assembly.GetName().Version;
         Assert.NotNull(version);
         string title = WindowTitle.From(assembly);
+        string propsVersion = PropsVersion();
         Assert.Equal(WindowTitle.Format(version!), title);
-        Assert.Equal("ThreadLog Viewer v0.8.3", title);
+        Assert.Equal("ThreadLog Viewer v" + propsVersion, title);
         Assert.DoesNotContain("+", title, StringComparison.Ordinal);
         string? informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (informational is not null)
-            Assert.Equal("0.8.3", informational.Split('+')[0]);
+            Assert.Equal(propsVersion, informational.Split('+')[0]);
     }
 
     [Fact]
     public void WithSessionKeepsTheEmDashSeparator()
     {
-        Assert.Equal(
-            "opened-first.log \u2014 ThreadLog Viewer v0.8.3",
-            WindowTitle.WithSession("opened-first.log", WindowTitle.Format(new Version(0, 8, 3, 0))));
+        string appTitle = WindowTitle.Format(new Version(0, 8, 3, 0));
+        Assert.Equal("opened-first.log \u2014 " + appTitle, WindowTitle.WithSession("opened-first.log", appTitle));
     }
 
     [Fact]
@@ -47,15 +47,40 @@ public sealed class WindowTitleTests
         var window = new MainWindow(folder.Path, false);
         try
         {
-            Assert.Equal("ThreadLog Viewer v0.8.3", window.Title);
+            string expected = "ThreadLog Viewer v" + PropsVersion();
+            Assert.Equal(expected, window.Title);
             var open = typeof(MainWindow).GetMethod("OpenFilesAsync", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(open);
             bool opened = await (Task<bool>)open!.Invoke(window, [new[] { path }])!;
             Assert.True(opened);
-            Assert.Equal("opened-first.log \u2014 ThreadLog Viewer v0.8.3", window.Title);
+            Assert.Equal("opened-first.log \u2014 " + expected, window.Title);
         }
         finally { window.Close(); }
     });
+
+    private static string PropsVersion()
+    {
+        DirectoryInfo? dir = new(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            string props = Path.Combine(dir.FullName, "Directory.Build.props");
+            if (File.Exists(props) && File.Exists(Path.Combine(dir.FullName, "ThreadLogViewer.slnx")))
+            {
+                foreach (string line in File.ReadAllLines(props))
+                {
+                    const string open = "<Version>";
+                    const string close = "</Version>";
+                    int start = line.IndexOf(open, StringComparison.Ordinal);
+                    int end = line.IndexOf(close, StringComparison.Ordinal);
+                    if (start >= 0 && end > start)
+                        return line.Substring(start + open.Length, end - start - open.Length).Trim();
+                }
+                throw new InvalidOperationException("Directory.Build.props has no Version.");
+            }
+            dir = dir.Parent;
+        }
+        throw new InvalidOperationException("Directory.Build.props was not found.");
+    }
 
     private static Task InSta(Func<Task> action) => (Task)typeof(WindowFeatureTests)
         .GetMethod("InSta", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [action])!;
