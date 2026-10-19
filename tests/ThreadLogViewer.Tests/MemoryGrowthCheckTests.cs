@@ -49,8 +49,9 @@ public sealed class MemoryGrowthCheckTests
     [Fact]
     public void RecordedHundredMiBWorkingSetAndPrivateBytesFollowTheSlopeRule()
     {
-        // F5 samples from docs/MEMORY-v0.8.3-main.md lines 58-67 (run 39202580600).
-        // The after-open values on line 56 select the 64 MiB floor for both margins.
+        // F5 samples copied from the 100 MiB rows of run 39202580600 (the table that was at
+        // docs/MEMORY-v0.8.3-main.md lines 58-67). After-open working set 896659456 and
+        // private bytes 879276032 from that run select the 64 MiB floor.
         long[] workingSet =
         [
             1188859904, 1475702784, 1465208832, 1419489280, 1423400960,
