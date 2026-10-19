@@ -201,6 +201,98 @@ internal sealed class UiSession : IDisposable
         throw new Xunit.Sdk.XunitException("Refresh did not finish. sawBusy=" + sawBusy + " " + Describe());
     }
 
+    public void OpenLineContextMenu(string nameContains)
+    {
+        FocusWindow();
+        var editor = Require("LogEditor");
+        var bounds = editor.BoundingRectangle;
+        var window = Window.BoundingRectangle;
+        int left = Math.Max(bounds.Left, window.Left) + 8;
+        int right = Math.Min(bounds.Right, window.Right) - 8;
+        int top = Math.Max(bounds.Top, window.Top) + 4;
+        int bottom = Math.Min(bounds.Bottom, window.Bottom) - 4;
+        if (right - left < 24 || bottom - top < 16)
+            throw new Xunit.Sdk.XunitException("Log editor is not on screen. " + Describe());
+        int x = left + Math.Max(24, (right - left) / 3);
+        string last = "";
+        foreach (int dy in new[] { 16, 28, 44, 64 })
+        {
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
+            Wait.UntilInputIsProcessed();
+            Thread.Sleep(80);
+            int y = Math.Min(top + dy, bottom);
+            Mouse.RightClick(new System.Drawing.Point(x, y));
+            Wait.UntilInputIsProcessed();
+            var watch = Stopwatch.StartNew();
+            while (watch.Elapsed < TimeSpan.FromSeconds(2))
+            {
+                var item = FindMenuItem("ThreadOnlyMenuItem");
+                last = item?.Name ?? "";
+                if (item is not null && last.Contains(nameContains, StringComparison.Ordinal))
+                {
+                    Step("line menu '" + last + "'");
+                    return;
+                }
+                Thread.Sleep(40);
+            }
+        }
+        throw new Xunit.Sdk.XunitException("Line menu did not show '" + nameContains + "'. Last='" + last + "'. " + Describe());
+    }
+
+    public AutomationElement? FindMenuItem(string automationId)
+    {
+        foreach (var root in MenuSearchRoots())
+        {
+            try
+            {
+                var found = root.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
+                if (found is not null)
+                    return found;
+            }
+            catch (Exception ex) when (ex is COMException or InvalidOperationException)
+            {
+            }
+        }
+        return null;
+    }
+
+    public void ClickLineMenu(string automationId)
+    {
+        var item = FindMenuItem(automationId)
+            ?? throw new Xunit.Sdk.XunitException(automationId + " was not open. " + Describe());
+        if (!item.IsEnabled)
+            throw new Xunit.Sdk.XunitException(automationId + " was disabled. name='" + item.Name + "'. " + Describe());
+        try { item.AsMenuItem().Invoke(); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            item.Click();
+        }
+        Wait.UntilInputIsProcessed();
+        Step("clicked " + automationId);
+    }
+
+    public AutomationElement? FindButton(string name)
+    {
+        try
+        {
+            return Window.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Button).And(cf.ByName(name)));
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private IEnumerable<AutomationElement> MenuSearchRoots()
+    {
+        yield return Window;
+        AutomationElement[] tops;
+        try { tops = App.GetAllTopLevelWindows(Automation); }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException) { yield break; }
+        foreach (var top in tops)
+            yield return top;
+    }
+
     public void ShowSearch()
     {
         Press(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_F);

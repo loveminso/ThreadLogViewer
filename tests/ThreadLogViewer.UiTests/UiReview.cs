@@ -70,8 +70,8 @@ internal static class UiReview
             }
         }
         RejectRunnerPaths(output);
-        if (shots.Count != 72)
-            throw new InvalidOperationException($"Expected 72 screenshots but wrote {shots.Count}.");
+        if (shots.Count != 80)
+            throw new InvalidOperationException($"Expected 80 screenshots but wrote {shots.Count}.");
         foreach (var shot in shots)
         {
             string path = Path.Combine(output, shot.File);
@@ -111,6 +111,13 @@ internal static class UiReview
             {
                 Resize(session, size.Width, size.Height);
                 Shoot(session, lint, output, shots, "opened-log", "연 로그", theme, scale, size.Width, size.Height, null, steady: true);
+            }
+            foreach (var size in Sizes)
+            {
+                Resize(session, size.Width, size.Height);
+                Shoot(session, lint, output, shots, "line-menu", "줄 우클릭 메뉴", theme, scale, size.Width, size.Height, null, steady: false);
+                session.Press(VirtualKeyShort.ESCAPE);
+                session.WaitUntil(() => session.FindMenuItem("ThreadOnlyMenuItem") is null, TimeSpan.FromSeconds(5), "line menu stayed open");
             }
             session.ShowSearch();
             session.SetSearchQuery("timeout");
@@ -225,6 +232,8 @@ internal static class UiReview
         ParkPointer(session);
         if (state == "menus")
             OpenFileMenu(session);
+        if (state == "line-menu")
+            session.OpenLineContextMenu("이 스레드만 보기");
         Thread.Sleep(250);
         string file = $"{state}__{theme}__{width}x{height}__scale-{scale}.png";
         string path = Path.Combine(output, file);

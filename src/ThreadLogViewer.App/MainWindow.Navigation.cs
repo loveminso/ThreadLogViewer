@@ -150,6 +150,11 @@ public partial class MainWindow
             details.Add($"포함 {appliedFilter.Includes.Length}개 중 {(appliedFilter.RequireAll ? "모두 포함" : "하나라도 포함")}");
         if (appliedFilter.Excludes.Length > 0) details.Add($"제외 {appliedFilter.Excludes.Length}개 중 하나라도 일치하면 숨김");
         if (details.Count > 0 && appliedFilter.MatchCase) details.Add("대소문자 구분");
+        if (appliedFilter.Includes.Length == 0 && appliedFilter.Excludes.Length == 0)
+            details.Add("내용 필터 없음");
+        int selectedThreads = threadItems.Count(thread => thread.IsSelected);
+        if (threadItems.Count > 0 && selectedThreads < threadItems.Count)
+            details.Add($"스레드 {selectedThreads:N0}개 선택");
         FilterSummary.Text = details.Count == 0 ? "현재 적용: 내용 필터 없음" : "현재 적용: " + string.Join(" · ", details);
         UpdateFilterDraftStatus();
         UpdateEmptyResultState();

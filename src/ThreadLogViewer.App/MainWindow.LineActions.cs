@@ -159,6 +159,25 @@ public partial class MainWindow
             switch (item.Tag as string)
             {
                 case "line-title": item.Header = sourceLine is { } line ? $"작업 대상 · 원본 {line + 1:N0}줄" : "로그의 줄을 우클릭하세요"; item.IsEnabled = false; break;
+                case "thread-only":
+                {
+                    int? threadId = data is not null && sourceLine is { } threadLine && threadLine >= 0 && threadLine < data.Lines.Count
+                        ? data.Lines[threadLine].ThreadId : null;
+                    if (threadId is int shown && CanChangeFilters && !busy)
+                    {
+                        item.Header = $"이 스레드만 보기(스레드 {shown})";
+                        item.IsEnabled = true;
+                    }
+                    else
+                    {
+                        item.Header = "이 스레드만 보기";
+                        item.IsEnabled = false;
+                    }
+                    break;
+                }
+                case "thread-clear":
+                    item.IsEnabled = CanChangeFilters && !busy && threadItems.Any(thread => !thread.IsSelected);
+                    break;
                 case "line": item.IsEnabled = sourceLine is not null && !busy; break;
                 case "split-end":
                     item.IsEnabled = sourceLine is not null && separationStartLine is not null && !busy;
@@ -208,6 +227,18 @@ public partial class MainWindow
         UpdateLineActionIndicator();
     }
 
+    private void ThreadOnly_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
+    {
+        if (!CanChangeFilters || busy) return;
+        if (LineActionSourceLine() is not { } line || data is null || line < 0 || line >= data.Lines.Count) return;
+        if (data.Lines[line].ThreadId is not int id) return;
+        await SetThreadsAsync(thread => thread.Id == id);
+    });
+    private void ThreadClear_Click(object sender, RoutedEventArgs e) => AsyncEvent.Run(async () =>
+    {
+        if (!CanChangeFilters || busy || !threadItems.Any(thread => !thread.IsSelected)) return;
+        await SetThreadsAsync(_ => true);
+    });
     private void SplitStart_Click(object sender, RoutedEventArgs e)
     {
         if (LineActionSourceLine() is not { } line) { OperationStatus.Text = "줄 대상이 변경되었습니다. 로그의 시작 줄을 다시 우클릭하세요."; return; }

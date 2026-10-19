@@ -384,6 +384,9 @@
             <ContextMenu x:Name="LineContextMenu" Opened="LineContext_Opened" Closed="LineContext_Closed">
               <MenuItem Header="로그의 줄을 우클릭하세요" Tag="line-title" IsEnabled="False" />
               <Separator />
+              <MenuItem Header="이 스레드만 보기" Tag="thread-only" Click="ThreadOnly_Click" IsEnabled="False" AutomationProperties.AutomationId="ThreadOnlyMenuItem" />
+              <MenuItem Header="스레드 필터 해제" Tag="thread-clear" Click="ThreadClear_Click" IsEnabled="False" AutomationProperties.AutomationId="ThreadClearMenuItem" />
+              <Separator />
               <MenuItem Header="세션 분리 시작 · 이 줄부터" Tag="line" Click="SplitStart_Click" />
               <MenuItem Header="세션 분리 끝 · 여기까지 새 탭으로" Tag="split-end" Click="SplitEnd_Click" ToolTip="시작과 끝 줄을 포함합니다. 사이의 숨겨진 원본 줄도 포함합니다." />
               <MenuItem Header="분리 시작 지정 해제" Tag="split-clear" Click="SplitClear_Click" />

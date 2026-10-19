@@ -197,6 +197,67 @@ public sealed class UiScenarioTests(PublishedApp app)
     }
 
     [Fact]
+    public void Scenario15_ThreadOnlyViewSurvivesRefresh()
+    {
+        string folder = NewFolder("thread-only");
+        string log = Path.Combine(folder, "thread-only.log");
+        SyntheticLog.Write(log, LogEncodingKind.Utf8,
+            SyntheticLog.Line(1, 1, "thread-one-keep") +
+            SyntheticLog.Line(2, 1, "thread-one-next") +
+            SyntheticLog.Line(3, 2, "thread-two-hide"));
+        Run(log, TimeSpan.FromMinutes(3), session =>
+        {
+            session.WaitForOpen("thread-only.log");
+            session.WaitUntil(() => session.Text("CountStatus").Contains("3/3건", StringComparison.Ordinal), TimeSpan.FromSeconds(10), "three entries");
+            session.OpenLineContextMenu("(스레드 1)");
+            Assert.Contains("(스레드 1)", session.FindMenuItem("ThreadOnlyMenuItem")?.Name ?? "", StringComparison.Ordinal);
+            session.ClickLineMenu("ThreadOnlyMenuItem");
+            session.WaitUntil(
+                () => session.Text("CountStatus").Contains("2/3건", StringComparison.Ordinal) && !session.IsBusy(),
+                TimeSpan.FromSeconds(20),
+                "thread-only count");
+            session.OpenLineContextMenu("(스레드 1)");
+            session.ClickLineMenu("ThreadClearMenuItem");
+            session.WaitUntil(
+                () => session.Text("CountStatus").Contains("3/3건", StringComparison.Ordinal) && !session.IsBusy(),
+                TimeSpan.FromSeconds(20),
+                "thread filter clear");
+            session.OpenLineContextMenu("(스레드 1)");
+            session.ClickLineMenu("ThreadOnlyMenuItem");
+            session.WaitUntil(
+                () => session.Text("CountStatus").Contains("2/3건", StringComparison.Ordinal) && !session.IsBusy(),
+                TimeSpan.FromSeconds(20),
+                "thread-only again");
+            File.AppendAllText(log,
+                SyntheticLog.Line(4, 1, "thread-one-appended") + SyntheticLog.Line(5, 4, "thread-four-new"),
+                new UTF8Encoding(false));
+            string afterAppend = Hash(log);
+            session.RefreshAndWait();
+            session.WaitUntil(
+                () => session.Text("CountStatus").Contains("3/5건", StringComparison.Ordinal) &&
+                      session.Status().Contains("파일 새로 고침 완료", StringComparison.Ordinal) &&
+                      !session.IsBusy(),
+                TimeSpan.FromSeconds(20),
+                "thread filter after refresh");
+            var none = session.FindButton("전체 해제") ?? throw new Xunit.Sdk.XunitException("전체 해제 was not found. " + session.Describe());
+            none.AsButton().Invoke();
+            session.WaitUntil(() =>
+            {
+                var clearAll = session.FindButton("모든 필터 해제");
+                return session.Text("CountStatus").Contains("0/5건", StringComparison.Ordinal) &&
+                       clearAll is not null && !clearAll.IsOffscreen && clearAll.IsEnabled && !session.IsBusy();
+            }, TimeSpan.FromSeconds(20), "empty state clear-all button");
+            var restore = session.FindButton("모든 필터 해제") ?? throw new Xunit.Sdk.XunitException("모든 필터 해제 was not found. " + session.Describe());
+            restore.AsButton().Invoke();
+            session.WaitUntil(
+                () => session.Text("CountStatus").Contains("5/5건", StringComparison.Ordinal) && !session.IsBusy(),
+                TimeSpan.FromSeconds(20),
+                "all filters cleared");
+            Assert.Equal(afterAppend, Hash(log));
+        });
+    }
+
+    [Fact]
     public void Scenario05_RefreshWhileAppendingKorean()
     {
         RefreshWhileAppending(LogEncodingKind.Utf8, pauseDuringRefresh: false);
